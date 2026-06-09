@@ -21,9 +21,16 @@ enum RawEmailStatus {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
-  name      String?
+  fullName  String?
+  timezone  String   @default("Asia/Ho_Chi_Minh")
+  locale    String   @default("vi-VN")
+  baseCurrency String   @default("VND")
+  status    String   @default("active")
+  lastLogin DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  metadata  Json?
 
   transactions Transaction[]
   rawEmails    RawEmail[]
