@@ -5,7 +5,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { AuditActorType } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { createHash, randomBytes } from 'crypto';
 import { RequestUser } from '../../common/types/request-user.type';
 import { UsersRepository } from '../users/users.repository';
 import { toUserResponse } from '../users/users.mapper';
@@ -14,9 +16,15 @@ import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
+export type AuthRequestMeta = {
+  userAgent?: string;
+  ipAddress?: string;
+};
+
 @Injectable()
 export class AuthService {
   private readonly jwtExpiresIn: string;
+  private readonly refreshTokenTtlDays: number;
 
   constructor(
     private readonly usersRepository: UsersRepository,
@@ -24,9 +32,15 @@ export class AuthService {
     configService: ConfigService,
   ) {
     this.jwtExpiresIn = configService.get<string>('JWT_EXPIRES_IN') ?? '7d';
+    this.refreshTokenTtlDays = Number(
+      configService.get<string>('JWT_REFRESH_EXPIRES_IN_DAYS') ?? 30,
+    );
   }
 
-  async register(dto: RegisterDto): Promise<AuthResponseDto> {
+  async register(
+    dto: RegisterDto,
+    meta: AuthRequestMeta = {},
+  ): Promise<AuthResponseDto> {
     const existingUser = await this.usersRepository.findByEmail(dto.email);
 
     if (existingUser) {
@@ -38,10 +52,15 @@ export class AuthService {
       toRegisterUserInput(dto, passwordHash),
     );
 
-    return this.buildAuthResponse(user.id, user.email, toUserResponse(user));
+    await this.writeAuditLog(user.id, 'REGISTER', 'users', user.id, meta);
+
+    return this.buildAuthResponse(user.id, user.email, toUserResponse(user), meta);
   }
 
-  async login(dto: LoginDto): Promise<AuthResponseDto> {
+  async login(
+    dto: LoginDto,
+    meta: AuthRequestMeta = {},
+  ): Promise<AuthResponseDto> {
     const user = await this.usersRepository.findByEmailForAuth(dto.email);
 
     if (!user?.passwordHash) {
@@ -56,11 +75,64 @@ export class AuthService {
 
     const updatedUser = await this.usersRepository.updateLastLogin(user.id);
 
+    await this.writeAuditLog(user.id, 'LOGIN', 'users', user.id, meta);
+
     return this.buildAuthResponse(
       updatedUser.id,
       updatedUser.email,
       toUserResponse(updatedUser),
+      meta,
     );
+  }
+
+  async refresh(
+    refreshToken: string | undefined,
+    meta: AuthRequestMeta = {},
+  ): Promise<AuthResponseDto> {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token is required');
+    }
+
+    const tokenHash = this.hashRefreshToken(refreshToken);
+    const storedToken =
+      await this.usersRepository.findActiveRefreshToken(tokenHash);
+
+    if (!storedToken || storedToken.user.deletedAt) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    await this.usersRepository.revokeRefreshToken(tokenHash);
+    await this.writeAuditLog(
+      storedToken.user.id,
+      'REFRESH_TOKEN',
+      'refresh_tokens',
+      storedToken.id,
+      meta,
+    );
+
+    return this.buildAuthResponse(
+      storedToken.user.id,
+      storedToken.user.email,
+      toUserResponse(storedToken.user),
+      meta,
+    );
+  }
+
+  async logout(refreshToken?: string) {
+    if (refreshToken) {
+      await this.usersRepository.revokeRefreshToken(
+        this.hashRefreshToken(refreshToken),
+      );
+    }
+
+    return { loggedOut: true };
+  }
+
+  async logoutAll(user: RequestUser) {
+    await this.usersRepository.revokeAllRefreshTokens(user.id);
+    await this.writeAuditLog(user.id, 'LOGOUT_ALL', 'refresh_tokens', null, {});
+
+    return { loggedOut: true };
   }
 
   async me(user: RequestUser) {
@@ -73,16 +145,73 @@ export class AuthService {
     return toUserResponse(existingUser);
   }
 
-  private buildAuthResponse(
+  private async buildAuthResponse(
     userId: string,
     email: string,
     user: AuthResponseDto['user'],
-  ): AuthResponseDto {
+    meta: AuthRequestMeta,
+  ): Promise<AuthResponseDto> {
+    const refreshToken = this.generateRefreshToken();
+
+    await this.createRefreshToken(userId, refreshToken, meta);
+
     return {
-      accessToken: this.jwtService.sign({ sub: userId, email }),
+      accessToken: this.jwtService.sign({ sub: userId, email, role: user.role }),
+      refreshToken,
       tokenType: 'Bearer',
       expiresIn: this.jwtExpiresIn,
       user,
     };
+  }
+
+  private async createRefreshToken(
+    userId: string,
+    refreshToken: string,
+    meta: AuthRequestMeta,
+  ) {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + this.refreshTokenTtlDays);
+
+    await this.usersRepository.createRefreshToken({
+      user: {
+        connect: {
+          id: userId,
+        },
+      },
+      tokenHash: this.hashRefreshToken(refreshToken),
+      expiresAt,
+      userAgent: meta.userAgent,
+      ipAddress: meta.ipAddress,
+    });
+  }
+
+  private generateRefreshToken(): string {
+    return randomBytes(64).toString('base64url');
+  }
+
+  private hashRefreshToken(refreshToken: string): string {
+    return createHash('sha256').update(refreshToken).digest('hex');
+  }
+
+  private async writeAuditLog(
+    userId: string,
+    action: string,
+    resourceType: string,
+    resourceId: string | null,
+    meta: AuthRequestMeta,
+  ) {
+    await this.usersRepository.createAuditLog({
+      user: {
+        connect: {
+          id: userId,
+        },
+      },
+      actorType: AuditActorType.USER,
+      action,
+      resourceType,
+      resourceId,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
   }
 }

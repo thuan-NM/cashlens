@@ -18,24 +18,124 @@ enum RawEmailStatus {
   IGNORED
 }
 
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  passwordHash String?
-  fullName  String?
-  timezone  String   @default("Asia/Ho_Chi_Minh")
-  locale    String   @default("vi-VN")
-  baseCurrency String   @default("VND")
-  status    String   @default("active")
-  lastLogin DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
-  metadata  Json?
+enum UserRole {
+  USER
+  ADMIN
+}
 
-  transactions Transaction[]
-  rawEmails    RawEmail[]
-  categories   Category[]
+enum UserStatus {
+  ACTIVE
+  DISABLED
+  PENDING_DELETE
+}
+
+enum AuditActorType {
+  USER
+  SYSTEM
+  ADMIN
+  WORKER
+}
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  CREDIT_CARD
+  CASH
+  E_WALLET
+  INVESTMENT
+  OTHER
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum BudgetPeriod {
+  WEEKLY
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String?
+  fullName     String?
+  role         UserRole   @default(USER)
+  timezone     String     @default("Asia/Ho_Chi_Minh")
+  locale       String     @default("vi-VN")
+  baseCurrency String     @default("VND")
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+  metadata     Json?
+
+  settings      UserSettings?
+  transactions  Transaction[]
+  rawEmails     RawEmail[]
+  categories    Category[]
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  accounts      FinancialAccount[]
+  budgets       Budget[]
+  merchantRules MerchantRule[]
+}
+
+model UserSettings {
+  id                        String   @id @default(cuid())
+  userId                    String   @unique
+  storeRawEmailBody         Boolean  @default(false)
+  allowAiInsights           Boolean  @default(false)
+  autoClassificationEnabled Boolean  @default(true)
+  defaultMonthStartDay      Int      @default(1)
+  dataRetentionDays         Int?
+  notificationEnabled       Boolean  @default(true)
+  metadata                  Json?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([userId, revokedAt])
+}
+
+model AuditLog {
+  id           String         @id @default(cuid())
+  userId       String?
+  actorType    AuditActorType @default(USER)
+  action       String
+  resourceType String
+  resourceId   String?
+  ipAddress    String?
+  userAgent    String?
+  metadata     Json?
+  createdAt    DateTime       @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([resourceType, resourceId])
+  @@index([action, createdAt])
 }
 
 model RawEmail {
@@ -61,7 +161,10 @@ model Transaction {
   userId          String
   rawEmailId      String?
   categoryId      String?
+  accountId       String?
   bankName        String?
+  merchantName    String?
+  externalId      String?
   amount          Decimal              @db.Decimal(18, 2)
   currency        String               @default("VND")
   direction       TransactionDirection
@@ -69,15 +172,20 @@ model Transaction {
   transactionTime DateTime
   balanceAfter    Decimal?             @db.Decimal(18, 2)
   confidence      Float?
+  metadata        Json?
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rawEmail RawEmail? @relation(fields: [rawEmailId], references: [id], onDelete: SetNull)
-  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rawEmail RawEmail?         @relation(fields: [rawEmailId], references: [id], onDelete: SetNull)
+  category Category?         @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  account  FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
 
+  @@unique([userId, externalId])
   @@index([userId, transactionTime])
   @@index([userId, direction])
+  @@index([userId, accountId])
+  @@index([userId, merchantName])
 }
 
 model Category {
@@ -88,8 +196,76 @@ model Category {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions  Transaction[]
+  budgets       Budget[]
+  merchantRules MerchantRule[]
+
+  @@unique([userId, name])
+}
+
+model FinancialAccount {
+  id              String        @id @default(cuid())
+  userId          String
+  name            String
+  institutionName String?
+  type            AccountType   @default(CHECKING)
+  currency        String        @default("VND")
+  openingBalance  Decimal       @default(0) @db.Decimal(18, 2)
+  currentBalance  Decimal?      @db.Decimal(18, 2)
+  creditLimit     Decimal?      @db.Decimal(18, 2)
+  status          AccountStatus @default(ACTIVE)
+  lastSyncedAt    DateTime?
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
 
   @@unique([userId, name])
+  @@index([userId, status])
+}
+
+model Budget {
+  id         String       @id @default(cuid())
+  userId     String
+  categoryId String?
+  name       String
+  amount     Decimal      @db.Decimal(18, 2)
+  currency   String       @default("VND")
+  period     BudgetPeriod @default(MONTHLY)
+  startsAt   DateTime
+  endsAt     DateTime?
+  rollover   Boolean      @default(false)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  deletedAt  DateTime?
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId, period])
+  @@index([userId, startsAt])
+}
+
+model MerchantRule {
+  id                 String                @id @default(cuid())
+  userId             String
+  categoryId         String?
+  merchantPattern    String?
+  descriptionPattern String?
+  bankName           String?
+  direction          TransactionDirection?
+  priority           Int                   @default(100)
+  isActive           Boolean               @default(true)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isActive])
+  @@index([userId, priority])
 }

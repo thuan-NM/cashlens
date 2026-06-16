@@ -1,10 +1,4 @@
-import {
-  IsEmail,
-  IsObject,
-  IsOptional,
-  IsString,
-  MinLength,
-} from 'class-validator';
+import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsEmail()
@@ -30,11 +24,4 @@ export class RegisterDto {
   @IsString()
   baseCurrency?: string;
 
-  @IsOptional()
-  @IsString()
-  status?: string;
-
-  @IsOptional()
-  @IsObject()
-  metadata?: Record<string, unknown>;
 }

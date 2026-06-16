@@ -16,7 +16,8 @@ export function toRegisterUserInput(
     timezone: dto.timezone,
     locale: dto.locale,
     baseCurrency: dto.baseCurrency,
-    status: dto.status,
-    metadata: dto.metadata as Prisma.InputJsonValue | undefined,
+    settings: {
+      create: {},
+    },
   };
 }

@@ -10,6 +10,23 @@ type UserWithPasswordHash = User & {
   passwordHash: string | null;
 };
 
+type UserSettingsPatch = Partial<
+  Pick<
+    Prisma.UserSettingsUncheckedCreateInput,
+    | 'storeRawEmailBody'
+    | 'allowAiInsights'
+    | 'autoClassificationEnabled'
+    | 'defaultMonthStartDay'
+    | 'dataRetentionDays'
+    | 'notificationEnabled'
+    | 'metadata'
+  >
+>;
+
+const userProfileInclude = {
+  settings: true,
+} satisfies Prisma.UserInclude;
+
 @Injectable()
 export class UsersRepository extends BaseRepository {
   constructor(private readonly prisma: PrismaService) {
@@ -23,34 +40,114 @@ export class UsersRepository extends BaseRepository {
   }
 
   findById(id: string) {
-    return super.baseFindOne(this.prisma.user, { id, deletedAt: null });
+    return this.prisma.user.findFirst({
+      where: { id, deletedAt: null },
+      include: userProfileInclude,
+    });
   }
 
   findByEmail(email: string) {
-    return super.baseFindOne(this.prisma.user, {
-      email: email.trim().toLowerCase(),
-      deletedAt: null,
+    return this.prisma.user.findFirst({
+      where: {
+        email: email.trim().toLowerCase(),
+        deletedAt: null,
+      },
+      include: userProfileInclude,
     });
   }
 
   findByEmailForAuth(email: string): Promise<UserWithPasswordHash | null> {
-    return super.baseFindOne(this.prisma.user, {
-      email: email.trim().toLowerCase(),
-      deletedAt: null,
+    return this.prisma.user.findFirst({
+      where: {
+        email: email.trim().toLowerCase(),
+        deletedAt: null,
+      },
+      include: userProfileInclude,
     }) as Promise<UserWithPasswordHash | null>;
   }
 
   create(data: Prisma.UserCreateInput & { passwordHash?: string | null }) {
-    return super.baseCreate(this.prisma.user, data);
+    return this.prisma.user.create({
+      data,
+      include: userProfileInclude,
+    });
   }
 
   updateById(id: string, data: Prisma.UserUpdateInput) {
-    return super.baseUpdateById(this.prisma.user, id, data);
+    return this.prisma.user.update({
+      where: { id },
+      data,
+      include: userProfileInclude,
+    });
   }
 
   updateLastLogin(id: string) {
-    return super.baseUpdateById(this.prisma.user, id, {
-      lastLogin: new Date(),
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        lastLoginAt: new Date(),
+      },
+      include: userProfileInclude,
+    });
+  }
+
+  upsertSettings(userId: string, data: UserSettingsPatch) {
+    return this.prisma.userSettings.upsert({
+      where: { userId },
+      create: {
+        userId,
+        ...data,
+      },
+      update: data,
+    });
+  }
+
+  createAuditLog(data: Prisma.AuditLogCreateInput) {
+    return this.prisma.auditLog.create({ data });
+  }
+
+  createRefreshToken(data: Prisma.RefreshTokenCreateInput) {
+    return this.prisma.refreshToken.create({ data });
+  }
+
+  findActiveRefreshToken(tokenHash: string) {
+    return this.prisma.refreshToken.findFirst({
+      where: {
+        tokenHash,
+        revokedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      include: {
+        user: {
+          include: userProfileInclude,
+        },
+      },
+    });
+  }
+
+  revokeRefreshToken(tokenHash: string) {
+    return this.prisma.refreshToken.updateMany({
+      where: {
+        tokenHash,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+  }
+
+  revokeAllRefreshTokens(userId: string) {
+    return this.prisma.refreshToken.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
     });
   }
 
