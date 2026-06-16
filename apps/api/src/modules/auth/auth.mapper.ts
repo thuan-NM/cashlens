@@ -1,0 +1,22 @@
+import type { Prisma } from '@prisma/client';
+import { RegisterDto } from './dto/register.dto';
+
+export type AuthCreateUserInput = Prisma.UserCreateInput & {
+  passwordHash: string;
+};
+
+export function toRegisterUserInput(
+  dto: RegisterDto,
+  passwordHash: string,
+): AuthCreateUserInput {
+  return {
+    email: dto.email.trim().toLowerCase(),
+    passwordHash,
+    fullName: dto.fullName,
+    timezone: dto.timezone,
+    locale: dto.locale,
+    baseCurrency: dto.baseCurrency,
+    status: dto.status,
+    metadata: dto.metadata as Prisma.InputJsonValue | undefined,
+  };
+}

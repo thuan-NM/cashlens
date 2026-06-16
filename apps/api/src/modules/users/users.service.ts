@@ -1,9 +1,12 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
 import type { ListQuery } from '../../common/types/list-query-config.type';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { toUserResponse } from './users.mapper';
+import {
+  toCreateUserInput,
+  toUpdateUserInput,
+  toUserResponse,
+} from './users.mapper';
 import { UsersRepository } from './users.repository';
 
 @Injectable()
@@ -36,14 +39,14 @@ export class UsersService {
       throw new ConflictException('Email already exists');
     }
 
-    const user = await this.usersRepository.create(this.toCreateInput(dto));
+    const user = await this.usersRepository.create(toCreateUserInput(dto));
     return toUserResponse(user);
   }
 
   async updateById(id: string, dto: UpdateUserDto) {
     await this.findById(id);
 
-    const user = await this.usersRepository.updateById(id, this.toUpdateInput(dto));
+    const user = await this.usersRepository.updateById(id, toUpdateUserInput(dto));
     return toUserResponse(user);
   }
 
@@ -52,28 +55,5 @@ export class UsersService {
     await this.usersRepository.softDeleteById(id);
 
     return { id };
-  }
-
-  private toCreateInput(dto: CreateUserDto): Prisma.UserCreateInput {
-    return {
-      email: dto.email,
-      fullName: dto.fullName,
-      timezone: dto.timezone,
-      locale: dto.locale,
-      baseCurrency: dto.baseCurrency,
-      status: dto.status,
-      metadata: dto.metadata as Prisma.InputJsonValue | undefined,
-    };
-  }
-
-  private toUpdateInput(dto: UpdateUserDto): Prisma.UserUpdateInput {
-    return {
-      fullName: dto.fullName,
-      timezone: dto.timezone,
-      locale: dto.locale,
-      baseCurrency: dto.baseCurrency,
-      status: dto.status,
-      metadata: dto.metadata as Prisma.InputJsonValue | undefined,
-    };
   }
 }

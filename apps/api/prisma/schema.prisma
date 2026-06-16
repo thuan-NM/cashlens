@@ -21,6 +21,7 @@ enum RawEmailStatus {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
+  passwordHash String?
   fullName  String?
   timezone  String   @default("Asia/Ho_Chi_Minh")
   locale    String   @default("vi-VN")

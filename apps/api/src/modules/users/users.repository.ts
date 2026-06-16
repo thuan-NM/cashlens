@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { User } from '@prisma/client';
 import { BaseRepository } from '../../common/repositories/base.repository';
 import type { ListQuery } from '../../common/types/list-query-config.type';
 import { PrismaService } from '../../prisma/prisma.service';
 import { usersListConfig } from './query/users.list-config';
+
+type UserWithPasswordHash = User & {
+  passwordHash: string | null;
+};
 
 @Injectable()
 export class UsersRepository extends BaseRepository {
@@ -22,15 +27,31 @@ export class UsersRepository extends BaseRepository {
   }
 
   findByEmail(email: string) {
-    return super.baseFindOne(this.prisma.user, { email, deletedAt: null });
+    return super.baseFindOne(this.prisma.user, {
+      email: email.trim().toLowerCase(),
+      deletedAt: null,
+    });
   }
 
-  create(data: Prisma.UserCreateInput) {
+  findByEmailForAuth(email: string): Promise<UserWithPasswordHash | null> {
+    return super.baseFindOne(this.prisma.user, {
+      email: email.trim().toLowerCase(),
+      deletedAt: null,
+    }) as Promise<UserWithPasswordHash | null>;
+  }
+
+  create(data: Prisma.UserCreateInput & { passwordHash?: string | null }) {
     return super.baseCreate(this.prisma.user, data);
   }
 
   updateById(id: string, data: Prisma.UserUpdateInput) {
     return super.baseUpdateById(this.prisma.user, id, data);
+  }
+
+  updateLastLogin(id: string) {
+    return super.baseUpdateById(this.prisma.user, id, {
+      lastLogin: new Date(),
+    });
   }
 
   deleteById(id: string) {
