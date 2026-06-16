@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TransactionDirection {
+  INCOME
+  EXPENSE
+}
+
+enum RawEmailStatus {
+  PENDING
+  PARSED
+  FAILED
+  IGNORED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  fullName  String?
+  timezone  String   @default("Asia/Ho_Chi_Minh")
+  locale    String   @default("vi-VN")
+  baseCurrency String   @default("VND")
+  status    String   @default("active")
+  lastLogin DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  metadata  Json?
+
+  transactions Transaction[]
+  rawEmails    RawEmail[]
+  categories   Category[]
+}
+
+model RawEmail {
+  id          String         @id @default(cuid())
+  userId      String
+  provider    String         @default("gmail")
+  messageId   String         @unique
+  sender      String?
+  subject     String?
+  snippet     String?
+  receivedAt  DateTime?
+  processedAt DateTime?
+  status      RawEmailStatus @default(PENDING)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+}
+
+model Transaction {
+  id              String               @id @default(cuid())
+  userId          String
+  rawEmailId      String?
+  categoryId      String?
+  bankName        String?
+  amount          Decimal              @db.Decimal(18, 2)
+  currency        String               @default("VND")
+  direction       TransactionDirection
+  description     String?
+  transactionTime DateTime
+  balanceAfter    Decimal?             @db.Decimal(18, 2)
+  confidence      Float?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rawEmail RawEmail? @relation(fields: [rawEmailId], references: [id], onDelete: SetNull)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId, transactionTime])
+  @@index([userId, direction])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  type      String   @default("both")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@unique([userId, name])
+}
