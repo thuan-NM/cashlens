@@ -10,11 +10,12 @@ import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'crypto';
 import { RequestUser } from '../../common/types/request-user.type';
 import { UsersRepository } from '../users/users.repository';
+import { UserResponseDto } from '../users/dto/user-response.dto';
 import { toUserResponse } from '../users/users.mapper';
 import { toRegisterUserInput } from './auth.mapper';
-import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { AuthSession } from './types/auth-session.type';
 
 export type AuthRequestMeta = {
   userAgent?: string;
@@ -23,7 +24,6 @@ export type AuthRequestMeta = {
 
 @Injectable()
 export class AuthService {
-  private readonly jwtExpiresIn: string;
   private readonly refreshTokenTtlDays: number;
 
   constructor(
@@ -31,7 +31,6 @@ export class AuthService {
     private readonly jwtService: JwtService,
     configService: ConfigService,
   ) {
-    this.jwtExpiresIn = configService.get<string>('JWT_EXPIRES_IN') ?? '7d';
     this.refreshTokenTtlDays = Number(
       configService.get<string>('JWT_REFRESH_EXPIRES_IN_DAYS') ?? 30,
     );
@@ -40,7 +39,7 @@ export class AuthService {
   async register(
     dto: RegisterDto,
     meta: AuthRequestMeta = {},
-  ): Promise<AuthResponseDto> {
+  ): Promise<UserResponseDto> {
     const existingUser = await this.usersRepository.findByEmail(dto.email);
 
     if (existingUser) {
@@ -54,13 +53,13 @@ export class AuthService {
 
     await this.writeAuditLog(user.id, 'REGISTER', 'users', user.id, meta);
 
-    return this.buildAuthResponse(user.id, user.email, toUserResponse(user), meta);
+    return toUserResponse(user);
   }
 
   async login(
     dto: LoginDto,
     meta: AuthRequestMeta = {},
-  ): Promise<AuthResponseDto> {
+  ): Promise<AuthSession> {
     const user = await this.usersRepository.findByEmailForAuth(dto.email);
 
     if (!user?.passwordHash) {
@@ -88,7 +87,7 @@ export class AuthService {
   async refresh(
     refreshToken: string | undefined,
     meta: AuthRequestMeta = {},
-  ): Promise<AuthResponseDto> {
+  ): Promise<AuthSession> {
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token is required');
     }
@@ -148,9 +147,9 @@ export class AuthService {
   private async buildAuthResponse(
     userId: string,
     email: string,
-    user: AuthResponseDto['user'],
+    user: UserResponseDto,
     meta: AuthRequestMeta,
-  ): Promise<AuthResponseDto> {
+  ): Promise<AuthSession> {
     const refreshToken = this.generateRefreshToken();
 
     await this.createRefreshToken(userId, refreshToken, meta);
@@ -158,8 +157,8 @@ export class AuthService {
     return {
       accessToken: this.jwtService.sign({ sub: userId, email, role: user.role }),
       refreshToken,
-      tokenType: 'Bearer',
-      expiresIn: this.jwtExpiresIn,
+      refreshTokenMaxAgeMs:
+        this.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
       user,
     };
   }
