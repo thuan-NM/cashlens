@@ -38,7 +38,6 @@ export const usersListConfig = {
   },
   status: {
     type: 'string',
-    searchable: true,
     sortable: true,
     filterable: true,
   },

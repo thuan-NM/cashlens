@@ -13,10 +13,12 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import type { RequestUser } from '../../common/types/request-user.type';
 import { AuthService } from './auth.service';
+import { toAuthResponse } from './auth.mapper';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { AuthSession } from './types/auth-session.type';
+import { UserResponseDto } from '../users/dto/user-response.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -26,11 +28,8 @@ export class AuthController {
   async register(
     @Body() dto: RegisterDto,
     @Req() request: Request,
-    @Res({ passthrough: true }) response: Response,
-  ): Promise<AuthResponseDto> {
-    const result = await this.authService.register(dto, this.getRequestMeta(request));
-    this.setAuthCookies(response, result);
-    return result;
+  ): Promise<UserResponseDto> {
+    return this.authService.register(dto, this.getRequestMeta(request));
   }
 
   @HttpCode(200)
@@ -40,24 +39,26 @@ export class AuthController {
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthResponseDto> {
-    const result = await this.authService.login(dto, this.getRequestMeta(request));
-    this.setAuthCookies(response, result);
-    return result;
+    const session = await this.authService.login(
+      dto,
+      this.getRequestMeta(request),
+    );
+    this.setAuthCookies(response, session);
+    return toAuthResponse(session);
   }
 
   @HttpCode(200)
   @Post('refresh')
   async refresh(
-    @Body() dto: RefreshTokenDto,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthResponseDto> {
-    const result = await this.authService.refresh(
-      dto.refreshToken ?? request.cookies?.refreshToken,
+    const session = await this.authService.refresh(
+      request.cookies?.refreshToken,
       this.getRequestMeta(request),
     );
-    this.setAuthCookies(response, result);
-    return result;
+    this.setAuthCookies(response, session);
+    return toAuthResponse(session);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -69,13 +70,10 @@ export class AuthController {
   @HttpCode(200)
   @Post('logout')
   async logout(
-    @Body() dto: RefreshTokenDto,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.authService.logout(
-      dto.refreshToken ?? request.cookies?.refreshToken,
-    );
+    const result = await this.authService.logout(request.cookies?.refreshToken);
     this.clearAuthCookies(response);
     return result;
   }
@@ -92,16 +90,16 @@ export class AuthController {
     return result;
   }
 
-  private setAuthCookies(response: Response, result: AuthResponseDto) {
-    response.cookie('accessToken', result.accessToken, {
+  private setAuthCookies(response: Response, session: AuthSession) {
+    response.cookie('accessToken', session.accessToken, {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
     });
 
-    response.cookie('refreshToken', result.refreshToken, {
+    response.cookie('refreshToken', session.refreshToken, {
       httpOnly: true,
-      maxAge: 30 * 24 * 60 * 60 * 1000,
+      maxAge: session.refreshTokenMaxAgeMs,
       path: '/api/auth',
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
