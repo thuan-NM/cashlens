@@ -1,9 +1,14 @@
-import { IsObject, IsOptional, IsString } from 'class-validator';
+import { UserRole, UserStatus } from '@prisma/client';
+import { IsEnum, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class UpdateUserDto {
   @IsOptional()
   @IsString()
   fullName?: string;
+
+  @IsOptional()
+  @IsEnum(UserRole)
+  role?: UserRole;
 
   @IsOptional()
   @IsString()
@@ -18,8 +23,8 @@ export class UpdateUserDto {
   baseCurrency?: string;
 
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsEnum(UserStatus)
+  status?: UserStatus;
 
   @IsOptional()
   @IsObject()

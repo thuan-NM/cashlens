@@ -1,9 +1,15 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import type { RequestUser } from '../../common/types/request-user.type';
 import type { ListQuery } from '../../common/types/list-query-config.type';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { toUserResponse } from './users.mapper';
+import {
+  toCreateUserInput,
+  toUpdateUserInput,
+  toUserResponse,
+} from './users.mapper';
 import { UsersRepository } from './users.repository';
 
 @Injectable()
@@ -29,6 +35,10 @@ export class UsersService {
     return toUserResponse(user);
   }
 
+  async findMe(user: RequestUser) {
+    return this.findById(user.id);
+  }
+
   async create(dto: CreateUserDto) {
     const existingUser = await this.usersRepository.findByEmail(dto.email);
 
@@ -36,15 +46,31 @@ export class UsersService {
       throw new ConflictException('Email already exists');
     }
 
-    const user = await this.usersRepository.create(this.toCreateInput(dto));
+    const user = await this.usersRepository.create(toCreateUserInput(dto));
     return toUserResponse(user);
   }
 
   async updateById(id: string, dto: UpdateUserDto) {
     await this.findById(id);
 
-    const user = await this.usersRepository.updateById(id, this.toUpdateInput(dto));
+    const user = await this.usersRepository.updateById(id, toUpdateUserInput(dto));
     return toUserResponse(user);
+  }
+
+  async updateMySettings(user: RequestUser, dto: UpdateUserSettingsDto) {
+    await this.findById(user.id);
+
+    await this.usersRepository.upsertSettings(user.id, {
+      storeRawEmailBody: dto.storeRawEmailBody,
+      allowAiInsights: dto.allowAiInsights,
+      autoClassificationEnabled: dto.autoClassificationEnabled,
+      defaultMonthStartDay: dto.defaultMonthStartDay,
+      dataRetentionDays: dto.dataRetentionDays,
+      notificationEnabled: dto.notificationEnabled,
+      metadata: dto.metadata as Prisma.InputJsonValue | undefined,
+    });
+
+    return this.findById(user.id);
   }
 
   async deleteById(id: string) {
@@ -52,28 +78,5 @@ export class UsersService {
     await this.usersRepository.softDeleteById(id);
 
     return { id };
-  }
-
-  private toCreateInput(dto: CreateUserDto): Prisma.UserCreateInput {
-    return {
-      email: dto.email,
-      fullName: dto.fullName,
-      timezone: dto.timezone,
-      locale: dto.locale,
-      baseCurrency: dto.baseCurrency,
-      status: dto.status,
-      metadata: dto.metadata as Prisma.InputJsonValue | undefined,
-    };
-  }
-
-  private toUpdateInput(dto: UpdateUserDto): Prisma.UserUpdateInput {
-    return {
-      fullName: dto.fullName,
-      timezone: dto.timezone,
-      locale: dto.locale,
-      baseCurrency: dto.baseCurrency,
-      status: dto.status,
-      metadata: dto.metadata as Prisma.InputJsonValue | undefined,
-    };
   }
 }

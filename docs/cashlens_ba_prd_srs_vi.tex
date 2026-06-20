@@ -1,0 +1,1553 @@
+
+\documentclass[11pt,a4paper]{article}
+
+% ---------- Font & page ----------
+\usepackage{fontspec}
+\setmainfont{DejaVu Sans}
+\setsansfont{DejaVu Sans}
+\setmonofont{DejaVu Sans Mono}
+\usepackage[a4paper,top=1.65cm,bottom=1.75cm,left=1.55cm,right=1.55cm]{geometry}
+\usepackage{setspace}
+\setstretch{1.08}
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage[table]{xcolor}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{lastpage}
+\usepackage{caption}
+\usepackage[most]{tcolorbox}
+\usepackage{needspace}
+\usepackage{pdflscape}
+\usepackage{makecell}
+
+% ---------- Colors ----------
+\definecolor{Primary}{HTML}{0F4C81}
+\definecolor{PrimaryDark}{HTML}{0B3559}
+\definecolor{Accent}{HTML}{2563EB}
+\definecolor{Dark}{HTML}{111827}
+\definecolor{Muted}{HTML}{6B7280}
+\definecolor{TableHeader}{HTML}{EAF2F8}
+\definecolor{TableAlt}{HTML}{F8FAFC}
+\definecolor{BoxBg}{HTML}{F8FBFF}
+\definecolor{Line}{HTML}{CBD5E1}
+\definecolor{PriorityP0}{HTML}{B91C1C}
+\definecolor{PriorityP1}{HTML}{B45309}
+\definecolor{PriorityP2}{HTML}{047857}
+\definecolor{PriorityP3}{HTML}{475569}
+
+% ---------- Links ----------
+\hypersetup{
+  colorlinks=true,
+  linkcolor=Primary,
+  urlcolor=Accent,
+  citecolor=Primary,
+  pdftitle={CashLens - Tài liệu BA, PRD và SRS},
+  pdfauthor={Nguyen Minh Thuan},
+  pdfsubject={Income Tracking System based on Bank Email Notifications}
+}
+
+% ---------- Header/footer ----------
+\setlength{\headheight}{15pt}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small CashLens - BA / PRD / SRS}
+\rhead{\small v2.0}
+\cfoot{\small Trang \thepage\ / \pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---------- Section style ----------
+\titleformat{\section}{\Large\bfseries\color{Primary}}{\thesection}{0.75em}{}
+\titleformat{\subsection}{\large\bfseries\color{Dark}}{\thesubsection}{0.75em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{PrimaryDark}}{\thesubsubsection}{0.65em}{}
+\titlespacing*{\section}{0pt}{1.2em}{0.55em}
+\titlespacing*{\subsection}{0pt}{0.95em}{0.4em}
+\titlespacing*{\subsubsection}{0pt}{0.75em}{0.3em}
+
+% ---------- Table helpers ----------
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{4pt}
+\arrayrulecolor{Line}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\renewcommand{\thead}[1]{\textbf{\color{PrimaryDark}#1}}
+\newcommand{\code}[1]{\texttt{\fontsize{7}{8}\selectfont\detokenize{#1}}}
+\newcommand{\badge}[2]{\begingroup\setlength{\fboxsep}{2pt}\colorbox{#1!12}{\textcolor{#1}{\scriptsize\textbf{#2}}}\endgroup}
+\newenvironment{tableblock}{\Needspace{8\baselineskip}\vspace{0.25em}}{\vspace{0.75em}}
+
+% ---------- Boxes ----------
+\newtcolorbox{summarybox}[1]{
+  enhanced,
+  colback=BoxBg,
+  colframe=Primary,
+  coltitle=white,
+  title=#1,
+  fonttitle=\bfseries,
+  arc=2mm,
+  boxrule=0.7pt,
+  left=7pt,right=7pt,top=6pt,bottom=6pt
+}
+\newtcolorbox{notebox}[1]{
+  enhanced,
+  colback=TableAlt,
+  colframe=Line,
+  title=#1,
+  fonttitle=\bfseries\color{Dark},
+  coltitle=Dark,
+  arc=2mm,
+  boxrule=0.5pt,
+  left=7pt,right=7pt,top=6pt,bottom=6pt
+}
+
+\setlist[itemize]{leftmargin=1.3em,itemsep=2pt,topsep=3pt}
+\setlist[enumerate]{leftmargin=1.4em,itemsep=2pt,topsep=3pt}
+\sloppy
+
+\begin{document}
+
+% ---------- Cover ----------
+\begin{titlepage}
+  \centering
+  \vspace*{0.7cm}
+  {\Huge\bfseries\color{Primary} CashLens\par}
+  \vspace{0.25cm}
+  {\Large\bfseries Tài liệu BA, PRD và SRS\par}
+  \vspace{0.18cm}
+  {\large Hệ thống theo dõi thu nhập/chi tiêu dựa trên email giao dịch ngân hàng\par}
+  \vspace{0.85cm}
+  \begin{tcolorbox}[width=0.86\textwidth,colback=BoxBg,colframe=Primary,arc=2mm,boxrule=0.8pt]
+  \textbf{Mục tiêu tài liệu:} Chuẩn hóa bối cảnh nghiệp vụ, phạm vi sản phẩm, yêu cầu chức năng, yêu cầu phi chức năng, mô hình dữ liệu và roadmap triển khai cho dự án CashLens. Tài liệu này được viết lại bằng tiếng Việt, ưu tiên tính dễ đọc, khả năng scale và format bảng rõ ràng để dùng làm ngữ cảnh triển khai backend/frontend.
+  \end{tcolorbox}
+  \vfill
+  \begin{tableblock}
+  \rowcolors{2}{TableAlt}{white}
+  \begin{tabular}{L{4.6cm}L{9.1cm}}
+  \rowcolor{TableHeader}\thead{Thông tin} & \thead{Giá trị} \\
+  Chủ tài liệu & Nguyen Minh Thuan \\
+  Loại tài liệu & Business Analysis Document + Product Requirements Document + Software Requirements Specification \\
+  Phiên bản & 2.0 - Vietnamese Professional Draft \\
+  Ngày cập nhật & 09/06/2026 \\
+  Trạng thái & Draft dùng cho planning và implementation \\
+  Stack mục tiêu & ReactJS, NestJS, PostgreSQL, Prisma, Gmail OAuth, Worker Queue, Rule/ML/LLM AI Layer \\
+  Quyết định mới & Tự build Alert + In-app Notification + Email fallback; Novu/Push để phase sau \\
+  \end{tabular}
+  \end{tableblock}
+  \vfill
+  {\small \textcolor{Muted}{Tài liệu này không thay thế kiểm thử thực tế, review bảo mật hoặc tư vấn tài chính chuyên nghiệp.}}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Kiểm soát tài liệu}
+
+\subsection{Lịch sử phiên bản}
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\begin{longtable}{L{2.0cm}L{2.4cm}L{3.2cm}L{7.7cm}}
+\rowcolor{TableHeader}\thead{Phiên bản} & \thead{Ngày} & \thead{Người thực hiện} & \thead{Nội dung thay đổi} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Phiên bản} & \thead{Ngày} & \thead{Người thực hiện} & \thead{Nội dung thay đổi} \\
+\endhead
+1.0 & 08/06/2026 & Nguyen Minh Thuan & Bản PRD/SRS đầu tiên cho hệ thống income tracking bằng email ngân hàng. \\
+2.0 & 09/06/2026 & Nguyen Minh Thuan & Viết lại bằng tiếng Việt; bổ sung BA analysis, financial planning, smart alerts, notification tự build; cải thiện format bảng. \\
+\end{longtable}
+\end{tableblock}
+
+\subsection{Đối tượng sử dụng tài liệu}
+\begin{itemize}
+  \item \textbf{Business Analyst / Product Owner:} dùng để hiểu bài toán, phạm vi, KPI và roadmap.
+  \item \textbf{Backend Developer:} dùng để thiết kế module NestJS, database, worker, parser, alert engine.
+  \item \textbf{Frontend Developer:} dùng để thiết kế màn hình dashboard, transaction review, settings, goals, alerts.
+  \item \textbf{QA / Tester:} dùng để viết test case, acceptance criteria và regression checklist.
+  \item \textbf{Người review project/CV:} dùng để hiểu độ sâu nghiệp vụ và kiến trúc của sản phẩm.
+\end{itemize}
+
+\subsection{Quy ước mức ưu tiên}
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\begin{longtable}{L{2.2cm}L{4.7cm}L{8.4cm}}
+\rowcolor{TableHeader}\thead{Ký hiệu} & \thead{Ý nghĩa} & \thead{Cách hiểu khi triển khai} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Ký hiệu} & \thead{Ý nghĩa} & \thead{Cách hiểu khi triển khai} \\
+\endhead
+\badge{PriorityP0}{MVP} & Bắt buộc cho bản chạy đầu tiên & Không có thì sản phẩm chưa chứng minh được value chính. \\
+\badge{PriorityP1}{P1} & Nên có sau MVP & Tạo khác biệt sản phẩm, nhưng có thể triển khai sau khi core ổn. \\
+\badge{PriorityP2}{P2} & Nâng cao / mở rộng & Tốt cho portfolio và scale, không chặn bản đầu. \\
+\badge{PriorityP3}{P3} & Tùy chọn xa hơn & Chỉ làm khi có nhu cầu thật hoặc muốn nghiên cứu sâu. \\
+\end{longtable}
+\end{tableblock}
+
+\section{Tóm tắt điều hành}
+\begin{summarybox}{Executive Summary}
+CashLens là hệ thống quản lý tài chính cá nhân tập trung vào việc tự động đọc email thông báo giao dịch ngân hàng, trích xuất giao dịch, phân loại thu/chi, tổng hợp dashboard theo tháng và hỗ trợ người dùng ra quyết định tài chính. Điểm khác biệt của sản phẩm không chỉ nằm ở tracking quá khứ, mà còn ở các module \textbf{dự định tài chính}, \textbf{smart alerts}, \textbf{in-app notification tự build} và \textbf{AI insight}.
+\end{summarybox}
+
+\subsection{Vấn đề nghiệp vụ}
+Người dùng thường có nhiều giao dịch ngân hàng nhưng không nhập tay đều đặn vào app quản lý chi tiêu. Email ngân hàng đã chứa dữ liệu quan trọng như số tiền, thời gian, nội dung, số dư, nhưng dữ liệu này đang nằm rải rác trong inbox. CashLens tận dụng email như một nguồn dữ liệu bán tự động để chuyển thành transaction chuẩn hóa.
+
+\subsection{Giải pháp đề xuất}
+\begin{enumerate}
+  \item User kết nối email bằng OAuth và chọn chính xác ngân hàng/sender được phép lắng nghe.
+  \item Hệ thống sync email, match listen rule, lưu metadata, parse giao dịch bằng parser template có version.
+  \item Transaction được chuẩn hóa, deduplicate, phân loại bằng rule trước; sau đó có thể bổ sung ML/LLM.
+  \item Dashboard hiển thị thu, chi, net income, savings rate, breakdown category, trend theo ngày/tháng.
+  \item Module planning giúp user tạo dự định như mua xe, so sánh trả hết/trả góp, đánh giá khả thi.
+  \item Alert engine tự build chủ động cảnh báo budget, giao dịch lớn, cashflow risk và goal risk.
+\end{enumerate}
+
+\subsection{North Star Metric}
+\begin{notebox}{North Star Metric đề xuất}
+\textbf{Tỷ lệ giao dịch tài chính được hệ thống tự động tracking và phân loại đúng mỗi tháng trên mỗi user.}
+\end{notebox}
+
+\section{Phần BA - Phân tích nghiệp vụ}
+
+\subsection{Bối cảnh và cơ hội sản phẩm}
+CashLens nằm giữa ba nhóm sản phẩm: expense tracker, personal finance dashboard và financial planning assistant. Nếu chỉ nhập tay transaction, sản phẩm dễ giống app ghi chép. Nếu tận dụng email ngân hàng, parser, classification, planning và alert, sản phẩm có thể trở thành trợ lý tài chính cá nhân có tính chủ động.
+
+\subsection{Mục tiêu kinh doanh / sản phẩm}
+\begin{tableblock}
+\captionof{table}{Mục tiêu sản phẩm}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{1.8cm}L{4.1cm}L{4.5cm}L{5.0cm}}
+\rowcolor{TableHeader}\thead{Mã} & \thead{Mục tiêu} & \thead{Chỉ số đo lường} & \thead{Kỳ vọng} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Mã} & \thead{Mục tiêu} & \thead{Chỉ số đo lường} & \thead{Kỳ vọng} \\
+\endhead
+OBJ-01 & Tự động hóa việc ghi nhận giao dịch & Tỷ lệ email giao dịch parse thành công & >= 85\% với bank/template đã hỗ trợ \\
+OBJ-02 & Giảm thao tác nhập tay & Số transaction user phải nhập tay mỗi tháng & Giảm dần theo thời gian sử dụng \\
+OBJ-03 & Tăng độ tin cậy phân loại & Manual correction rate & < 20\% ở nhóm category phổ biến sau P1 \\
+OBJ-04 & Hỗ trợ quyết định tài chính & Số goal/scenario được tạo và xem & Người dùng có thể biết kế hoạch mua sắm có khả thi không \\
+OBJ-05 & Chủ động cảnh báo rủi ro & Số alert hữu ích được user đọc/dismiss & Alert không spam, có cooldown và preference \\
+\end{longtable}
+\end{tableblock}
+
+\subsection{Stakeholders}
+\begin{tableblock}
+\captionof{table}{Stakeholder và nhu cầu}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.3cm}L{6.0cm}L{6.0cm}}
+\rowcolor{TableHeader}\thead{Stakeholder} & \thead{Nhu cầu chính} & \thead{Rủi ro nếu không đáp ứng} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Stakeholder} & \thead{Nhu cầu chính} & \thead{Rủi ro nếu không đáp ứng} \\
+\endhead
+End User & Theo dõi thu/chi tự động, xem dashboard, nhận cảnh báo, kiểm soát privacy. & Không tin app, không connect email, dữ liệu không đủ để phân tích. \\
+Product Owner / BA & Có scope rõ, KPI rõ, roadmap hợp lý. & Project bị lan man, over-engineering, thiếu business value. \\
+Backend Developer & Schema scale được, module rõ, pipeline idempotent. & Dễ trùng giao dịch, khó debug parser, khó thêm nguồn dữ liệu mới. \\
+Frontend Developer & API rõ cho dashboard/settings/transactions/goals/alerts. & UI khó đồng bộ state, thiếu thông tin giải thích cho user. \\
+Admin/DevOps & Có log sync/parser/classification/notification. & Không biết lỗi nằm ở email, parser hay notification delivery. \\
+\end{longtable}
+\end{tableblock}
+
+\subsection{Personas}
+\begin{tableblock}
+\captionof{table}{Persona chính}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.2cm}L{4.0cm}L{4.2cm}L{4.2cm}}
+\rowcolor{TableHeader}\thead{Persona} & \thead{Hành vi} & \thead{Pain point} & \thead{CashLens giải quyết thế nào} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Persona} & \thead{Hành vi} & \thead{Pain point} & \thead{CashLens giải quyết thế nào} \\
+\endhead
+Người đi làm nhận lương cố định & Có lương hàng tháng, chi tiêu qua chuyển khoản/thẻ/ví. & Không biết tháng này chi nhiều nhất ở đâu. & Tự parse giao dịch, dashboard tháng và category breakdown. \\
+Người có nhiều tài khoản/ngân hàng & Dùng nhiều bank, nhiều email, chuyển tiền qua lại. & Dữ liệu phân tán, transfer dễ làm sai thu/chi. & Financial accounts, bank settings, transfer detection phase sau. \\
+Người đang có dự định mua sắm lớn & Muốn mua xe/laptop sau vài tháng. & Không biết trả hết hay trả góp có an toàn không. & Financial goals, scenario simulation, feasibility score. \\
+Người muốn kiểm soát chi tiêu & Có budget từng nhóm chi. & Chỉ phát hiện vượt ngân sách khi quá muộn. & Budget threshold alert và in-app notification. \\
+\end{longtable}
+\end{tableblock}
+
+\subsection{Business Requirements}
+\begin{tableblock}
+\captionof{table}{Business Requirements}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{1.6cm}L{7.1cm}L{1.9cm}L{4.9cm}}
+\rowcolor{TableHeader}\thead{Mã} & \thead{Yêu cầu nghiệp vụ} & \thead{Ưu tiên} & \thead{Lý do} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Mã} & \thead{Yêu cầu nghiệp vụ} & \thead{Ưu tiên} & \thead{Lý do} \\
+\endhead
+BR-01 & User phải kiểm soát được hệ thống đọc email nào và ngân hàng nào. & \badge{PriorityP0}{Must} & Giảm rủi ro privacy, tăng trust. \\
+BR-02 & Một email chỉ được xử lý thành transaction một lần, trừ khi user yêu cầu reprocess. & \badge{PriorityP0}{Must} & Tránh trùng giao dịch và sai báo cáo. \\
+BR-03 & Dashboard tháng phải thể hiện thu, chi, net và tỷ lệ tiết kiệm. & \badge{PriorityP0}{Must} & Đây là value chính của sản phẩm. \\
+BR-04 & User phải sửa được category và hệ thống phải lưu lại correction. & \badge{PriorityP0}{Must} & Là nguồn dữ liệu để cải thiện rule/ML. \\
+BR-05 & Hệ thống phải có alert trước khi user vượt budget hoặc kế hoạch tài chính rủi ro. & \badge{PriorityP1}{Should} & Chuyển app từ tracking bị động sang assistant chủ động. \\
+BR-06 & AI chỉ hỗ trợ phân loại/giải thích/insight, không thay thế business calculation. & \badge{PriorityP1}{Should} & Tránh hallucination trong dữ liệu tài chính. \\
+BR-07 & Không lưu raw email body mặc định; chỉ lưu khi user bật debug/consent. & \badge{PriorityP0}{Must} & Dữ liệu tài chính và email là dữ liệu nhạy cảm. \\
+BR-08 & App phải mở rộng được sang CSV/SMS/API bank trong tương lai. & \badge{PriorityP1}{Should} & Giữ kiến trúc source\_type và parser channel. \\
+\end{longtable}
+\end{tableblock}
+
+\subsection{KPI và chỉ số vận hành}
+\begin{tableblock}
+\captionof{table}{KPI đo chất lượng sản phẩm và pipeline}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{2.9cm}L{4.0cm}L{4.2cm}L{4.4cm}}
+\rowcolor{TableHeader}\thead{Nhóm KPI} & \thead{Metric} & \thead{Cách tính} & \thead{Ý nghĩa} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Nhóm KPI} & \thead{Metric} & \thead{Cách tính} & \thead{Ý nghĩa} \\
+\endhead
+Ingestion & Email match rate & emails\_matched / emails\_found & Đánh giá rule có lọc đúng email ngân hàng không. \\
+Parser & Parse success rate & parser\_runs success / total parser\_runs & Đo chất lượng parser template. \\
+Transaction & Duplicate rate & transactions.is\_duplicate / total transactions & Đánh giá dedup logic. \\
+Classification & Manual correction rate & manual correction events / classified transactions & Proxy cho độ chính xác phân loại. \\
+Dashboard & Monthly active review & số lần user mở dashboard/tháng & Đo user value. \\
+Planning & Goal feasibility usage & số lần simulate goal/scenario & Đo value của module dự định. \\
+Alert & Alert read rate & alerts read / alerts created & Đánh giá alert có hữu ích không. \\
+Notification & Delivery success rate & sent / total deliveries & Đo độ tin cậy notification layer. \\
+\end{longtable}
+\end{tableblock}
+
+\section{Phần PRD - Product Requirements Document}
+
+\subsection{Tầm nhìn sản phẩm}
+CashLens hướng tới việc trở thành một \textbf{personal finance assistant} cho người dùng cá nhân: tự động tracking giao dịch từ email ngân hàng, giúp hiểu dòng tiền quá khứ, cảnh báo rủi ro hiện tại và mô phỏng quyết định tài chính tương lai.
+
+\subsection{Phạm vi sản phẩm}
+\begin{summarybox}{Scope tổng quan}
+\textbf{Trong scope:} email connection, bank listening settings, parser, transaction management, category, dashboard, budget, alert, notification tự build, financial goals, AI insight có kiểm soát.\newline
+\textbf{Ngoài scope MVP:} kết nối trực tiếp API ngân hàng thật, tư vấn tài chính chuyên nghiệp, tự động chuyển tiền, thanh toán, investment trading, push notification mobile phức tạp.
+\end{summarybox}
+
+\subsection{Danh sách tính năng PRD}
+\begin{tableblock}
+\captionof{table}{Danh sách tính năng sản phẩm}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{1.45cm}L{3.3cm}L{6.95cm}L{1.7cm}L{1.35cm}}
+\rowcolor{TableHeader}\thead{Mã} & \thead{Tính năng} & \thead{Mô tả} & \thead{Ưu tiên} & \thead{Phase} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Mã} & \thead{Tính năng} & \thead{Mô tả} & \thead{Ưu tiên} & \thead{Phase} \\
+\endhead
+PF-01 & Quản lý tài khoản người dùng & Đăng ký, đăng nhập, quản lý hồ sơ, timezone, tiền tệ mặc định và quyền riêng tư. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+PF-02 & Kết nối email an toàn & User kết nối Gmail/Outlook bằng OAuth, token được mã hóa, không lưu mật khẩu email. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+PF-03 & Cấu hình nguồn lắng nghe & User chọn email nào, ngân hàng nào, sender/rule nào được phép xử lý. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+PF-04 & Ingestion email giao dịch & Hệ thống đồng bộ email mới hoặc backfill có giới hạn, deduplicate message và lưu metadata. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+PF-05 & Parser giao dịch ngân hàng & Trích xuất amount, direction, thời gian, số dư, mô tả, mã giao dịch từ email. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+PF-06 & Quản lý giao dịch & Danh sách giao dịch, filter, search, chỉnh category, note, mark duplicate/ignored. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+PF-07 & Phân loại giao dịch & Rule-based classification trước; sau đó thêm ML classifier và LLM fallback. & \badge{PriorityP1}{Should} & \badge{PriorityP1}{P1} \\
+PF-08 & Dashboard tài chính & Tổng thu, tổng chi, net income, savings rate, breakdown category, cashflow theo ngày/tháng. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+PF-09 & Ngân sách và cảnh báo & User đặt budget; hệ thống cảnh báo khi đạt 80\%, 100\% hoặc ngưỡng tùy chỉnh. & \badge{PriorityP1}{Should} & \badge{PriorityP1}{P1} \\
+PF-10 & Dự định tài chính & Tạo mục tiêu như mua xe/laptop, tính required saving, feasibility score và projected cashflow. & \badge{PriorityP1}{Should} & \badge{PriorityP1}{P1} \\
+PF-11 & So sánh kịch bản tài chính & So sánh trả hết, trả góp, dời deadline, đổi target amount. & \badge{PriorityP2}{Could} & \badge{PriorityP2}{P2} \\
+PF-12 & Notification tự build & In-app notification + email fallback, delivery log, user preference, cooldown chống spam. & \badge{PriorityP1}{Should} & \badge{PriorityP1}{P1} \\
+PF-13 & AI insight & LLM tạo giải thích/tháng báo cáo/gợi ý điều chỉnh, không để LLM tự tính số liệu tiền. & \badge{PriorityP2}{Could} & \badge{PriorityP2}{P2} \\
+PF-14 & Observability nội bộ & Parser success rate, sync latency, classification correction rate; Elasticsearch/Kibana chỉ là optional. & \badge{PriorityP2}{Could} & \badge{PriorityP2}{P2} \\
+\end{longtable}
+\end{tableblock}
+
+\subsection{User Journey chính}
+\begin{tableblock}
+\captionof{table}{User Journey end-to-end}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{1.3cm}L{3.4cm}L{5.2cm}L{5.4cm}}
+\rowcolor{TableHeader}\thead{Bước} & \thead{Màn hình / Module} & \thead{Hành động user} & \thead{Kết quả hệ thống} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Bước} & \thead{Màn hình / Module} & \thead{Hành động user} & \thead{Kết quả hệ thống} \\
+\endhead
+1 & Auth & User đăng ký/đăng nhập. & Tạo user, user\_settings mặc định. \\
+2 & Email Connections & User connect Gmail bằng OAuth. & Lưu encrypted token, trạng thái active. \\
+3 & Bank Listening Settings & User chọn ngân hàng và sender/rule được phép đọc. & Tạo email\_listen\_rules, giới hạn sync\_from\_date. \\
+4 & Email Sync & User bấm sync hoặc worker chạy scheduled sync. & Fetch email metadata, match rule, tạo email\_messages. \\
+5 & Parser & Hệ thống parse email match rule. & Tạo parser\_runs và transactions nếu thành công. \\
+6 & Transactions & User review giao dịch và sửa category nếu sai. & Cập nhật transaction, lưu classification event. \\
+7 & Dashboard & User xem thu/chi theo tháng. & API trả summary, cashflow, breakdown. \\
+8 & Budgets/Alerts & User tạo budget hoặc hệ thống check ngưỡng. & Sinh alert và in-app notification. \\
+9 & Planning & User tạo dự định mua xe/laptop. & Tính required saving, feasibility score, projected cashflow. \\
+\end{longtable}
+\end{tableblock}
+
+\subsection{Module Financial Planning}
+Module này biến CashLens từ tracker quá khứ thành công cụ hỗ trợ quyết định tương lai. Ví dụ: tháng 6 user muốn tháng 8 mua xe giá 45 triệu, có thể trả hết hoặc trả góp. Hệ thống phải tính được số tiền cần tiết kiệm mỗi tháng, so sánh với net cashflow trung bình và cảnh báo nếu kế hoạch rủi ro.
+
+\begin{tableblock}
+\captionof{table}{Yêu cầu cho Financial Planning}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.8cm}L{4.3cm}L{4.5cm}L{1.8cm}}
+\rowcolor{TableHeader}\thead{Tính năng} & \thead{Input} & \thead{Output} & \thead{Phase} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Tính năng} & \thead{Input} & \thead{Output} & \thead{Phase} \\
+\endhead
+Tạo mục tiêu & Tên, target amount, current saved, target date, priority & Financial goal active & P1 \\
+Tính required saving & Target amount, current saved, deadline & Số tiền cần tiết kiệm mỗi tháng & P1 \\
+Feasibility score & Required saving, average available cashflow & Điểm 0-100 và risk level & P1 \\
+Projected cashflow & Historical income/expense + planned cashflows & Dòng tiền dự kiến từng tháng & P1 \\
+Scenario comparison & Pay full/installment/mixed parameters & Bảng so sánh trả hết vs trả góp & P2 \\
+AI explanation & Số liệu đã aggregate và masked & Giải thích dễ hiểu, không tự tính tiền & P2 \\
+\end{longtable}
+\end{tableblock}
+
+\subsection{Module Smart Alerts và Notification tự build}
+Quyết định sản phẩm: \textbf{không dùng Novu trong MVP}, không làm push notification phức tạp ngay. CashLens tự build alert engine và notification delivery layer cơ bản để chuyên nghiệp hơn và kiểm soát được business logic.
+
+\begin{tableblock}
+\captionof{table}{Chiến lược notification}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{2.2cm}L{3.0cm}L{5.0cm}L{5.2cm}}
+\rowcolor{TableHeader}\thead{Giai đoạn} & \thead{Kênh} & \thead{Mục tiêu} & \thead{Ghi chú triển khai} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Giai đoạn} & \thead{Kênh} & \thead{Mục tiêu} & \thead{Ghi chú triển khai} \\
+\endhead
+MVP/P1 & In-app notification & User mở app thấy chuông báo và danh sách alert. & Dùng bảng alerts và notification\_deliveries provider=internal. \\
+P1 & Email fallback & Gửi email cho alert critical hoặc weekly/monthly summary. & Dùng SMTP/provider đơn giản, không gửi dữ liệu quá nhạy cảm. \\
+P2 & Push notification & Thông báo realtime cho PWA/mobile. & Chỉ làm khi có service worker/device token và permission UX rõ. \\
+P2/P3 & Novu optional & Multi-channel workflow phức tạp. & Có thể gắn sau qua provider=novu, không ảnh hưởng alert engine. \\
+\end{longtable}
+\end{tableblock}
+
+\begin{tableblock}
+\captionof{table}{Các loại alert nên hỗ trợ}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.0cm}L{7.0cm}L{2.4cm}L{1.7cm}}
+\rowcolor{TableHeader}\thead{Alert type} & \thead{Điều kiện mẫu} & \thead{Severity} & \thead{Phase} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Alert type} & \thead{Điều kiện mẫu} & \thead{Severity} & \thead{Phase} \\
+\endhead
+budget\_threshold & Chi tiêu category đạt 80\% hoặc 100\% budget. & warning / critical & P1 \\
+large\_transaction & Một giao dịch expense vượt ngưỡng user cấu hình, ví dụ 5,000,000 VND. & warning / critical & P1 \\
+category\_spike & Chi category tháng này cao hơn trung bình 3 tháng gần nhất 50\%. & warning & P2 \\
+goal\_risk & Required saving lớn hơn available cashflow. & warning & P1 \\
+cashflow\_risk & Projected net cashflow tháng tương lai âm. & critical & P1 \\
+system\_error & Email sync/parser/notification delivery fail nhiều lần. & warning / critical & P1 \\
+\end{longtable}
+\end{tableblock}
+
+\subsection{Roadmap sản phẩm}
+\begin{tableblock}
+\captionof{table}{Roadmap theo phase}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{1.8cm}L{4.0cm}L{5.9cm}L{4.0cm}}
+\rowcolor{TableHeader}\thead{Phase} & \thead{Mục tiêu} & \thead{Tính năng chính} & \thead{Kết quả mong muốn} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Phase} & \thead{Mục tiêu} & \thead{Tính năng chính} & \thead{Kết quả mong muốn} \\
+\endhead
+MVP & Chứng minh pipeline email -> transaction -> dashboard. & Auth, email connection, listen rule, parser 1-2 ngân hàng, transaction, category, dashboard cơ bản. & Có demo end-to-end và data model ổn. \\
+P1 & Biến tracker thành assistant chủ động. & Budget, alert engine, in-app notification, email fallback, financial goals, feasibility score. & User nhận cảnh báo và biết kế hoạch tài chính có khả thi không. \\
+P2 & Tăng độ thông minh và khả năng phân tích. & ML classifier, LLM insight, scenario comparison, category spike, Elasticsearch/Kibana optional. & Portfolio mạnh hơn, có AI/analytics rõ. \\
+P3 & Scale và product hóa sâu hơn. & Push notification, Novu optional, multi-source CSV/SMS/API, recurring detection, anomaly ML. & Sản phẩm gần production hơn. \\
+\end{longtable}
+\end{tableblock}
+
+\section{Phần SRS - Software Requirements Specification}
+
+\subsection{Tổng quan kiến trúc hệ thống}
+\begin{summarybox}{Kiến trúc đề xuất}
+\code{React Web App} $\rightarrow$ \code{NestJS API} $\rightarrow$ \code{PostgreSQL}\newline
+\code{Worker Queue} xử lý email sync, parser, classification, alert evaluation và notification delivery.\newline
+\code{AI/ML Service} là optional layer cho classification fallback và insight, không dùng để tính toán tài chính core.
+\end{summarybox}
+
+\subsection{Module backend đề xuất}
+\begin{tableblock}
+\captionof{table}{Module backend NestJS}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.2cm}L{7.0cm}L{4.9cm}}
+\rowcolor{TableHeader}\thead{Module} & \thead{Trách nhiệm} & \thead{Ghi chú} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Module} & \thead{Trách nhiệm} & \thead{Ghi chú} \\
+\endhead
+auth & Đăng nhập, JWT/refresh token, guards. & Tách riêng khỏi users. \\
+users & Profile, settings, base currency, timezone. & Cần timezone từ đầu. \\
+email-connections & OAuth provider, encrypted tokens, disconnect/reconnect. & Không lưu password email. \\
+email-rules & Rule chọn sender/subject/body/bank được listen. & Privacy control quan trọng. \\
+email-ingestion & Sync Gmail/Outlook, lưu metadata email, sync run logs. & Worker-safe, idempotent. \\
+bank-providers & Danh sách bank, sender, supported channels. & Không hardcode trong service. \\
+parsers & Parser templates, parser runs, normalized payload. & Versioned parser. \\
+transactions & CRUD transaction, dedup, source trace, search/filter. & Core finance entity. \\
+categories & System/user categories, hierarchy, exclude flags. & Không copy category name vào transaction. \\
+classification & Rule/ML/LLM strategy, events, manual correction. & Strategy pattern. \\
+analytics & Monthly summary, category breakdown, cashflow. & Có thể realtime trước, cache sau. \\
+budgets & Budget theo category/kỳ. & Nguồn cho budget alerts. \\
+planning & Financial goals, scenarios, planned cashflows. & Dự định mua xe/laptop. \\
+alerts & Alert rules, alert engine, alert records. & Business logic notification. \\
+notifications & Preference, delivery channels, email/in-app. & Provider abstraction. \\
+audit-logs & Log hành động nhạy cảm. & Security/privacy. \\
+\end{longtable}
+\end{tableblock}
+
+\subsection{Functional Requirements}
+\begin{tableblock}
+\captionof{table}{Functional Requirements}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{1.45cm}L{3.1cm}L{7.0cm}L{1.55cm}L{1.25cm}}
+\rowcolor{TableHeader}\thead{Mã} & \thead{Tên yêu cầu} & \thead{Mô tả} & \thead{Ưu tiên} & \thead{Phase} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Mã} & \thead{Tên yêu cầu} & \thead{Mô tả} & \thead{Ưu tiên} & \thead{Phase} \\
+\endhead
+FR-01 & Đăng ký/đăng nhập & Hệ thống cho phép user đăng ký, đăng nhập và lấy thông tin hồ sơ. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-02 & Kết nối Gmail OAuth & User có thể kết nối Gmail bằng OAuth read-only scope. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-03 & Quản lý email connection & User xem trạng thái connection, last sync, disconnect/reconnect. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-04 & Quản lý ngân hàng hỗ trợ & Admin/system có danh sách bank providers và sender email tương ứng. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-05 & Cấu hình listen rule & User tạo/bật/tắt rule theo sender, subject/body keyword, bank, sync\_from\_date. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-06 & Sync email thủ công & User hoặc hệ thống có thể trigger sync một connection trong phạm vi rule. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-07 & Lưu email metadata & Hệ thống lưu provider\_message\_id, thread\_id, history\_id, sender, subject, received\_at, body\_hash. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-08 & Parser template & Hệ thống chọn parser theo bank/channel/template version để extract field. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-09 & Parser run log & Mỗi lần parse phải lưu extracted\_payload, normalized\_payload, status, error nếu có. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-10 & Tạo transaction chuẩn hóa & Parser thành công tạo transaction với amount, direction, time, description, balance\_after, source trace. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-11 & Deduplicate transaction & Hệ thống phát hiện duplicate bằng transaction\_code hoặc fallback hash. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-12 & CRUD transaction thủ công & User có thể thêm/sửa/xóa mềm giao dịch thủ công. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-13 & Phân loại bằng rule & Hệ thống áp dụng classification\_rules theo keyword/merchant/direction/priority. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-14 & Manual correction & User sửa category; hệ thống cập nhật transaction và lưu classification event. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-15 & Dashboard tháng & API trả monthly summary, category breakdown, daily cashflow và recent transactions. & \badge{PriorityP0}{Must} & \badge{PriorityP0}{MVP} \\
+FR-16 & Budget & User tạo budget theo category/kỳ thời gian và ngưỡng alert. & \badge{PriorityP1}{Should} & \badge{PriorityP1}{P1} \\
+FR-17 & Alert engine & Hệ thống tạo alert khi budget/large transaction/goal risk/cashflow risk vượt ngưỡng. & \badge{PriorityP1}{Should} & \badge{PriorityP1}{P1} \\
+FR-18 & In-app notifications & User xem danh sách thông báo, unread count, mark read, dismiss. & \badge{PriorityP1}{Should} & \badge{PriorityP1}{P1} \\
+FR-19 & Email fallback notification & Alert severity cao có thể gửi email theo preference. & \badge{PriorityP1}{Should} & \badge{PriorityP1}{P1} \\
+FR-20 & Financial goals & User tạo mục tiêu tài chính, target amount, current saved, deadline, priority. & \badge{PriorityP1}{Should} & \badge{PriorityP1}{P1} \\
+FR-21 & Goal simulation & Hệ thống tính required saving, feasibility score và projected cashflow. & \badge{PriorityP1}{Should} & \badge{PriorityP1}{P1} \\
+FR-22 & Goal scenarios & User so sánh trả hết/trả góp/dời deadline/đổi target amount. & \badge{PriorityP2}{Could} & \badge{PriorityP2}{P2} \\
+FR-23 & LLM insight & Hệ thống gửi dữ liệu đã aggregate/masked cho LLM để sinh insight. & \badge{PriorityP2}{Could} & \badge{PriorityP2}{P2} \\
+FR-24 & ML classifier & Hệ thống train/infer category từ transaction đã label và user correction. & \badge{PriorityP2}{Could} & \badge{PriorityP2}{P2} \\
+\end{longtable}
+\end{tableblock}
+
+\subsection{Non-functional Requirements}
+\begin{tableblock}
+\captionof{table}{Non-functional Requirements}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{1.55cm}L{3.4cm}L{8.5cm}L{1.7cm}}
+\rowcolor{TableHeader}\thead{Mã} & \thead{Nhóm} & \thead{Yêu cầu} & \thead{Ưu tiên} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Mã} & \thead{Nhóm} & \thead{Yêu cầu} & \thead{Ưu tiên} \\
+\endhead
+NFR-01 & Bảo mật token & OAuth access/refresh token phải được mã hóa ở database. & \badge{PriorityP0}{Must} \\
+NFR-02 & Quyền tối thiểu & Email provider scope chỉ xin quyền đọc cần thiết, không xin quyền gửi/xóa email nếu không cần. & \badge{PriorityP0}{Must} \\
+NFR-03 & Privacy by default & Không lưu raw email body mặc định; raw body nếu có phải encrypted và có retention. & \badge{PriorityP0}{Must} \\
+NFR-04 & Khả dụng & Lỗi sync/parser của một email không được làm fail toàn bộ job. & \badge{PriorityP0}{Must} \\
+NFR-05 & Hiệu năng dashboard & Dashboard tháng cho user cá nhân nên phản hồi dưới 1 giây với dữ liệu đã index/summary. & \badge{PriorityP1}{Should} \\
+NFR-06 & Quan sát được & Sync run, parser run, classification event, notification delivery phải có log đủ để debug. & \badge{PriorityP1}{Should} \\
+NFR-07 & Idempotency & Sync/retry phải an toàn, không tạo transaction trùng nếu job chạy lại. & \badge{PriorityP0}{Must} \\
+NFR-08 & Khả năng mở rộng & Schema phải hỗ trợ source\_type: email, manual, csv, sms, api. & \badge{PriorityP1}{Should} \\
+NFR-09 & Tính đúng đắn số liệu & Số liệu tài chính phải tính bằng backend deterministic logic, không phụ thuộc LLM. & \badge{PriorityP0}{Must} \\
+NFR-10 & Không spam alert & Notification phải có cooldown, status read/dismissed và preference. & \badge{PriorityP1}{Should} \\
+\end{longtable}
+\end{tableblock}
+
+\subsection{Luồng xử lý dữ liệu chính}
+\begin{notebox}{Pipeline chuẩn}
+\code{Email Provider} $\rightarrow$ \code{Email Sync} $\rightarrow$ \code{Listen Rule Matching} $\rightarrow$ \code{Email Message Metadata} $\rightarrow$ \code{Parser Run} $\rightarrow$ \code{Transaction} $\rightarrow$ \code{Classification} $\rightarrow$ \code{Analytics} $\rightarrow$ \code{Alerts/Notifications}
+\end{notebox}
+
+\subsection{Yêu cầu API cấp cao}
+\begin{tableblock}
+\captionof{table}{API outline}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.3cm}L{5.6cm}L{6.5cm}}
+\rowcolor{TableHeader}\thead{Nhóm} & \thead{Endpoint} & \thead{Mục đích} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Nhóm} & \thead{Endpoint} & \thead{Mục đích} \\
+\endhead
+Auth & POST /auth/register & Tạo tài khoản user. \\
+Auth & POST /auth/login & Đăng nhập và nhận access/refresh token. \\
+Users & GET /users/me & Lấy hồ sơ và setting cơ bản. \\
+Email Connections & POST /email-connections/gmail/connect & Khởi tạo OAuth flow. \\
+Email Connections & GET /email-connections & Danh sách email đã connect. \\
+Email Connections & DELETE /email-connections/\{id\} & Ngắt kết nối email. \\
+Email Sync & POST /email-connections/\{id\}/sync & Trigger sync thủ công. \\
+Banks & GET /bank-providers & Danh sách ngân hàng hệ thống hỗ trợ. \\
+Listen Rules & GET /email-listen-rules & Danh sách rule của user. \\
+Listen Rules & POST /email-listen-rules & Tạo rule sender/subject/body/bank. \\
+Transactions & GET /transactions & Filter giao dịch theo tháng, category, bank, amount, direction. \\
+Transactions & PATCH /transactions/\{id\}/category & Sửa category và lưu classification event. \\
+Analytics & GET /analytics/monthly-summary & Tổng thu/chi/net/savings rate theo tháng. \\
+Analytics & GET /analytics/category-breakdown & Breakdown theo category. \\
+Budgets & POST /budgets & Tạo ngân sách theo category/kỳ. \\
+Alerts & GET /alerts & Danh sách alert/in-app notification. \\
+Alerts & PATCH /alerts/\{id\}/read & Đánh dấu đã đọc. \\
+Goals & POST /financial-goals & Tạo mục tiêu tài chính. \\
+Goals & POST /financial-goals/\{id\}/simulate & Mô phỏng khả thi và projected cashflow. \\
+Notifications & PATCH /notification-preferences & Cấu hình kênh nhận thông báo. \\
+\end{longtable}
+\end{tableblock}
+
+\section{Mô hình dữ liệu chi tiết}
+
+\subsection{Sơ đồ quan hệ cấp cao}
+\begin{notebox}{Quan hệ chính}
+\code{users} sở hữu \code{email_connections}, \code{financial_accounts}, \code{transactions}, \code{budgets}, \code{financial_goals}, \code{alerts}.\newline
+\code{email_messages} là source layer, \code{parser_runs} là parser audit layer, \code{transactions} là finance layer.\newline
+\code{alert_rules} sinh \code{alerts}, sau đó \code{notification_deliveries} ghi nhận việc gửi qua in-app/email/push/provider.
+\end{notebox}
+
+\subsection{Quy tắc thiết kế database}
+\begin{itemize}
+  \item Bảng business nên có \code{id}, \code{created_at}, \code{updated_at}, \code{deleted_at} nếu cần soft delete.
+  \item Dùng \code{metadata jsonb} cho field ít ổn định hoặc provider-specific.
+  \item Không dùng transaction table để lưu raw email. Tách source layer và finance layer.
+  \item Transaction nên lưu \code{source_type}, \code{source_id}, \code{transaction_code}, \code{classification_source} để scale và debug.
+  \item Dữ liệu tài chính phải tính bằng backend deterministic logic, không dựa vào LLM.
+\end{itemize}
+
+\subsubsection{\texttt{users}}
+\textit{Mục đích: Lưu thông tin định danh và thiết lập tài chính nền của người dùng.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính, dùng UUID để không lộ thứ tự user. \\
+\texttt{\fontsize{7}{8}\selectfont email} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} unique} & Có & \badge{PriorityP0}{MVP} & Email đăng nhập chính. \\
+\texttt{\fontsize{7}{8}\selectfont password\_\allowbreak{}hash} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP0}{MVP} & Nullable nếu đăng nhập OAuth-only; không lưu plain password. \\
+\texttt{\fontsize{7}{8}\selectfont full\_\allowbreak{}name} & \texttt{\fontsize{7}{8}\selectfont varchar} & Không & \badge{PriorityP0}{MVP} & Tên hiển thị. \\
+\texttt{\fontsize{7}{8}\selectfont timezone} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP0}{MVP} & Quan trọng để tính ngày/tháng đúng, ví dụ Asia/Ho\_Chi\_Minh. \\
+\texttt{\fontsize{7}{8}\selectfont locale} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP0}{MVP} & Ngôn ngữ/định dạng, ví dụ vi-VN. \\
+\texttt{\fontsize{7}{8}\selectfont base\_\allowbreak{}currency} & \texttt{\fontsize{7}{8}\selectfont char(3)} & Có & \badge{PriorityP0}{MVP} & Tiền tệ mặc định, ví dụ VND. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & active, disabled, pending\_delete. \\
+\texttt{\fontsize{7}{8}\selectfont last\_\allowbreak{}login\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz} & Không & \badge{PriorityP1}{P1} & Audit bảo mật. \\
+\texttt{\fontsize{7}{8}\selectfont created\_\allowbreak{}at\allowbreak{} /\allowbreak{}\allowbreak{} updated\_\allowbreak{}at\allowbreak{} /\allowbreak{}\allowbreak{} deleted\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz} & Có & \badge{PriorityP0}{MVP} & Timestamps và soft delete. \\
+\texttt{\fontsize{7}{8}\selectfont metadata} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Không & \badge{PriorityP1}{P1} & Mở rộng preference không cần migrate ngay. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{user\_settings}}
+\textit{Mục đích: Tách các tùy chọn privacy, AI và notification khỏi bảng users.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP0}{MVP} & Liên kết 1-1 với users. \\
+\texttt{\fontsize{7}{8}\selectfont store\_\allowbreak{}raw\_\allowbreak{}email\_\allowbreak{}body} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP0}{MVP} & Mặc định false để bảo vệ privacy. \\
+\texttt{\fontsize{7}{8}\selectfont allow\_\allowbreak{}ai\_\allowbreak{}insights} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP1}{P1} & User consent trước khi dùng AI insight. \\
+\texttt{\fontsize{7}{8}\selectfont auto\_\allowbreak{}classification\_\allowbreak{}enabled} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP0}{MVP} & Bật/tắt tự phân loại. \\
+\texttt{\fontsize{7}{8}\selectfont default\_\allowbreak{}month\_\allowbreak{}start\_\allowbreak{}day} & \texttt{\fontsize{7}{8}\selectfont int} & Không & \badge{PriorityP2}{P2} & Hỗ trợ tháng tài chính bắt đầu khác ngày 1. \\
+\texttt{\fontsize{7}{8}\selectfont data\_\allowbreak{}retention\_\allowbreak{}days} & \texttt{\fontsize{7}{8}\selectfont int\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Tự xóa raw/debug data sau N ngày. \\
+\texttt{\fontsize{7}{8}\selectfont notification\_\allowbreak{}enabled} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP1}{P1} & Bật/tắt notification tổng thể. \\
+\texttt{\fontsize{7}{8}\selectfont metadata} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Không & \badge{PriorityP1}{P1} & Các setting phụ. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{email\_connections}}
+\textit{Mục đích: Lưu email account đã được user kết nối qua OAuth.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP0}{MVP} & Chủ sở hữu connection. \\
+\texttt{\fontsize{7}{8}\selectfont provider} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & gmail, outlook, imap. MVP ưu tiên gmail. \\
+\texttt{\fontsize{7}{8}\selectfont email\_\allowbreak{}address} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP0}{MVP} & Địa chỉ email được connect. \\
+\texttt{\fontsize{7}{8}\selectfont provider\_\allowbreak{}user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & ID từ provider để đối soát. \\
+\texttt{\fontsize{7}{8}\selectfont access\_\allowbreak{}token\_\allowbreak{}encrypted} & \texttt{\fontsize{7}{8}\selectfont text} & Có & \badge{PriorityP0}{MVP} & Token đã mã hóa. \\
+\texttt{\fontsize{7}{8}\selectfont refresh\_\allowbreak{}token\_\allowbreak{}encrypted} & \texttt{\fontsize{7}{8}\selectfont text} & Có & \badge{PriorityP0}{MVP} & Refresh token đã mã hóa. \\
+\texttt{\fontsize{7}{8}\selectfont token\_\allowbreak{}expires\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz} & Có & \badge{PriorityP0}{MVP} & Thời điểm access token hết hạn. \\
+\texttt{\fontsize{7}{8}\selectfont scopes} & \texttt{\fontsize{7}{8}\selectfont text[]\allowbreak{} /\allowbreak{}\allowbreak{} jsonb} & Có & \badge{PriorityP0}{MVP} & Scope đã được cấp. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & active, expired, revoked, error. \\
+\texttt{\fontsize{7}{8}\selectfont last\_\allowbreak{}synced\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz} & Không & \badge{PriorityP0}{MVP} & Lần sync gần nhất. \\
+\texttt{\fontsize{7}{8}\selectfont connected\_\allowbreak{}at\allowbreak{} /\allowbreak{}\allowbreak{} disconnected\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz} & Không & \badge{PriorityP1}{P1} & Audit vòng đời connection. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{email\_watch\_states}}
+\textit{Mục đích: Theo dõi trạng thái incremental sync/push notification của mailbox.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP1}{P1} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont email\_\allowbreak{}connection\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP1}{P1} & Connection được watch. \\
+\texttt{\fontsize{7}{8}\selectfont provider} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & gmail/outlook. \\
+\texttt{\fontsize{7}{8}\selectfont history\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Mốc sync incremental của Gmail. \\
+\texttt{\fontsize{7}{8}\selectfont watch\_\allowbreak{}resource\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & ID resource watch từ provider nếu có. \\
+\texttt{\fontsize{7}{8}\selectfont expiration\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Thời điểm watch hết hạn để renew. \\
+\texttt{\fontsize{7}{8}\selectfont last\_\allowbreak{}notification\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Lần nhận webhook/push gần nhất. \\
+\texttt{\fontsize{7}{8}\selectfont last\_\allowbreak{}successful\_\allowbreak{}sync\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Lần sync thành công gần nhất. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & active, expired, stopped, error. \\
+\texttt{\fontsize{7}{8}\selectfont error\_\allowbreak{}code\allowbreak{} /\allowbreak{}\allowbreak{} error\_\allowbreak{}message} & \texttt{\fontsize{7}{8}\selectfont varchar/text} & Không & \badge{PriorityP1}{P1} & Debug watch/sync. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{email\_messages}}
+\textit{Mục đích: Lưu metadata email đã phát hiện/xử lý, không lưu raw body mặc định.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính nội bộ. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP0}{MVP} & Chủ sở hữu email. \\
+\texttt{\fontsize{7}{8}\selectfont email\_\allowbreak{}connection\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP0}{MVP} & Nguồn email. \\
+\texttt{\fontsize{7}{8}\selectfont provider\_\allowbreak{}message\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP0}{MVP} & ID message từ Gmail/Outlook, unique theo connection. \\
+\texttt{\fontsize{7}{8}\selectfont provider\_\allowbreak{}thread\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Thread ID để debug. \\
+\texttt{\fontsize{7}{8}\selectfont provider\_\allowbreak{}history\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & History ID tại thời điểm message được fetch. \\
+\texttt{\fontsize{7}{8}\selectfont message\_\allowbreak{}id\_\allowbreak{}header} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & RFC Message-ID header để hỗ trợ dedup. \\
+\texttt{\fontsize{7}{8}\selectfont sender\_\allowbreak{}email} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP0}{MVP} & Dùng match rule và audit. \\
+\texttt{\fontsize{7}{8}\selectfont sender\_\allowbreak{}name} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Tên người gửi. \\
+\texttt{\fontsize{7}{8}\selectfont subject} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP0}{MVP} & Subject email. \\
+\texttt{\fontsize{7}{8}\selectfont snippet} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Snippet ngắn từ provider. \\
+\texttt{\fontsize{7}{8}\selectfont received\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz} & Có & \badge{PriorityP0}{MVP} & Thời điểm nhận email. \\
+\texttt{\fontsize{7}{8}\selectfont body\_\allowbreak{}hash} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP0}{MVP} & Hash body để dedup mà không lưu raw. \\
+\texttt{\fontsize{7}{8}\selectfont raw\_\allowbreak{}body\_\allowbreak{}encrypted} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Chỉ lưu khi user bật debug/consent. \\
+\texttt{\fontsize{7}{8}\selectfont processing\_\allowbreak{}status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & pending, ignored, parsed, failed. \\
+\texttt{\fontsize{7}{8}\selectfont matched\_\allowbreak{}rule\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Rule khiến email được xử lý. \\
+\texttt{\fontsize{7}{8}\selectfont bank\_\allowbreak{}provider\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Ngân hàng được detect/match. \\
+\texttt{\fontsize{7}{8}\selectfont error\_\allowbreak{}message} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Lỗi xử lý email nếu có. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{email\_listen\_rules}}
+\textit{Mục đích: Rule do user cấu hình để quyết định email nào được phép xử lý.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP0}{MVP} & Chủ sở hữu rule. \\
+\texttt{\fontsize{7}{8}\selectfont email\_\allowbreak{}connection\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP0}{MVP} & Rule theo từng email account hoặc toàn user. \\
+\texttt{\fontsize{7}{8}\selectfont bank\_\allowbreak{}provider\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP0}{MVP} & Ngân hàng liên quan. \\
+\texttt{\fontsize{7}{8}\selectfont name} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP0}{MVP} & Tên rule hiển thị. \\
+\texttt{\fontsize{7}{8}\selectfont sender\_\allowbreak{}email} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP0}{MVP} & Match sender chính xác. \\
+\texttt{\fontsize{7}{8}\selectfont sender\_\allowbreak{}domain} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Match domain ngân hàng. \\
+\texttt{\fontsize{7}{8}\selectfont subject\_\allowbreak{}contains} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP0}{MVP} & Từ khóa subject. \\
+\texttt{\fontsize{7}{8}\selectfont body\_\allowbreak{}contains} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Từ khóa trong body. \\
+\texttt{\fontsize{7}{8}\selectfont body\_\allowbreak{}regex} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Rule nâng cao, cần giới hạn performance. \\
+\texttt{\fontsize{7}{8}\selectfont sync\_\allowbreak{}from\_\allowbreak{}date} & \texttt{\fontsize{7}{8}\selectfont date\allowbreak{} nullable} & Không & \badge{PriorityP0}{MVP} & Giới hạn backfill để không quét toàn bộ inbox. \\
+\texttt{\fontsize{7}{8}\selectfont is\_\allowbreak{}enabled} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP0}{MVP} & Bật/tắt rule. \\
+\texttt{\fontsize{7}{8}\selectfont priority} & \texttt{\fontsize{7}{8}\selectfont int} & Có & \badge{PriorityP1}{P1} & Ưu tiên khi nhiều rule match. \\
+\texttt{\fontsize{7}{8}\selectfont last\_\allowbreak{}matched\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Theo dõi rule còn hữu dụng không. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{email\_sync\_runs}}
+\textit{Mục đích: Log mỗi lần sync email để debug và đo chất lượng pipeline.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont email\_\allowbreak{}connection\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP0}{MVP} & Connection được sync. \\
+\texttt{\fontsize{7}{8}\selectfont trigger\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & manual, scheduled, webhook, backfill. \\
+\texttt{\fontsize{7}{8}\selectfont started\_\allowbreak{}at\allowbreak{} /\allowbreak{}\allowbreak{} finished\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz} & Có & \badge{PriorityP0}{MVP} & Đo thời gian sync. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & running, success, partial\_failed, failed. \\
+\texttt{\fontsize{7}{8}\selectfont from\_\allowbreak{}history\_\allowbreak{}id\allowbreak{} /\allowbreak{}\allowbreak{} to\_\allowbreak{}history\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Mốc incremental sync. \\
+\texttt{\fontsize{7}{8}\selectfont emails\_\allowbreak{}found} & \texttt{\fontsize{7}{8}\selectfont int} & Có & \badge{PriorityP1}{P1} & Số email tìm thấy. \\
+\texttt{\fontsize{7}{8}\selectfont emails\_\allowbreak{}matched} & \texttt{\fontsize{7}{8}\selectfont int} & Có & \badge{PriorityP1}{P1} & Số email match rule. \\
+\texttt{\fontsize{7}{8}\selectfont emails\_\allowbreak{}parsed} & \texttt{\fontsize{7}{8}\selectfont int} & Có & \badge{PriorityP1}{P1} & Số email parse thành công. \\
+\texttt{\fontsize{7}{8}\selectfont transactions\_\allowbreak{}created} & \texttt{\fontsize{7}{8}\selectfont int} & Có & \badge{PriorityP1}{P1} & Số transaction tạo mới. \\
+\texttt{\fontsize{7}{8}\selectfont error\_\allowbreak{}message} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Lỗi tổng của sync run. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{bank\_providers}}
+\textit{Mục đích: Danh mục ngân hàng/tổ chức tài chính mà hệ thống hỗ trợ.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont code} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} unique} & Có & \badge{PriorityP0}{MVP} & Mã ngắn: VCB, TCB, MB, ACB. \\
+\texttt{\fontsize{7}{8}\selectfont name} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP0}{MVP} & Tên ngân hàng. \\
+\texttt{\fontsize{7}{8}\selectfont country\_\allowbreak{}code} & \texttt{\fontsize{7}{8}\selectfont char(2)} & Có & \badge{PriorityP0}{MVP} & VN trong MVP. \\
+\texttt{\fontsize{7}{8}\selectfont website} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Thông tin tham khảo. \\
+\texttt{\fontsize{7}{8}\selectfont logo\_\allowbreak{}url} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & UI. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & active, inactive, experimental. \\
+\texttt{\fontsize{7}{8}\selectfont supported\_\allowbreak{}channels} & \texttt{\fontsize{7}{8}\selectfont text[]} & Có & \badge{PriorityP1}{P1} & email, csv, sms, api. \\
+\texttt{\fontsize{7}{8}\selectfont metadata} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Không & \badge{PriorityP1}{P1} & Thông tin provider-specific. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{bank\_email\_senders}}
+\textit{Mục đích: Danh sách sender email hợp lệ của từng ngân hàng.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont bank\_\allowbreak{}provider\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP0}{MVP} & Ngân hàng sở hữu sender. \\
+\texttt{\fontsize{7}{8}\selectfont sender\_\allowbreak{}email} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP0}{MVP} & Email sender cụ thể. \\
+\texttt{\fontsize{7}{8}\selectfont sender\_\allowbreak{}domain} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Domain ngân hàng. \\
+\texttt{\fontsize{7}{8}\selectfont sender\_\allowbreak{}name} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Tên sender hiển thị. \\
+\texttt{\fontsize{7}{8}\selectfont is\_\allowbreak{}verified} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP1}{P1} & Sender đã được hệ thống xác minh. \\
+\texttt{\fontsize{7}{8}\selectfont confidence\_\allowbreak{}score} & \texttt{\fontsize{7}{8}\selectfont numeric(5,4)} & Không & \badge{PriorityP2}{P2} & Nếu auto-discover sender. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & active, deprecated, suspicious. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{parser\_templates}}
+\textit{Mục đích: Template parser có version cho từng ngân hàng/channel/email format.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont bank\_\allowbreak{}provider\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP0}{MVP} & Ngân hàng áp dụng. \\
+\texttt{\fontsize{7}{8}\selectfont name} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP0}{MVP} & Tên template, ví dụ TCB balance email v1. \\
+\texttt{\fontsize{7}{8}\selectfont version} & \texttt{\fontsize{7}{8}\selectfont int} & Có & \badge{PriorityP0}{MVP} & Version parser để xử lý khi ngân hàng đổi format. \\
+\texttt{\fontsize{7}{8}\selectfont channel} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & email, csv, sms, api. \\
+\texttt{\fontsize{7}{8}\selectfont language} & \texttt{\fontsize{7}{8}\selectfont varchar} & Không & \badge{PriorityP1}{P1} & vi, en. \\
+\texttt{\fontsize{7}{8}\selectfont direction\_\allowbreak{}hint} & \texttt{\fontsize{7}{8}\selectfont enum\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & income, expense, both. \\
+\texttt{\fontsize{7}{8}\selectfont subject\_\allowbreak{}pattern} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP0}{MVP} & Pattern match subject. \\
+\texttt{\fontsize{7}{8}\selectfont body\_\allowbreak{}pattern} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Pattern match body. \\
+\texttt{\fontsize{7}{8}\selectfont is\_\allowbreak{}active} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP0}{MVP} & Chỉ active template được dùng. \\
+\texttt{\fontsize{7}{8}\selectfont priority} & \texttt{\fontsize{7}{8}\selectfont int} & Có & \badge{PriorityP1}{P1} & Ưu tiên khi nhiều template match. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{parser\_fields}}
+\textit{Mục đích: Định nghĩa field cần extract cho từng parser template.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP1}{P1} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont parser\_\allowbreak{}template\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP1}{P1} & Template sở hữu field. \\
+\texttt{\fontsize{7}{8}\selectfont field\_\allowbreak{}name} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP1}{P1} & amount, balance\_after, transaction\_time, description. \\
+\texttt{\fontsize{7}{8}\selectfont field\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & money, datetime, text, number. \\
+\texttt{\fontsize{7}{8}\selectfont regex\_\allowbreak{}pattern} & \texttt{\fontsize{7}{8}\selectfont text} & Có & \badge{PriorityP1}{P1} & Regex extract. \\
+\texttt{\fontsize{7}{8}\selectfont regex\_\allowbreak{}group\_\allowbreak{}index} & \texttt{\fontsize{7}{8}\selectfont int} & Có & \badge{PriorityP1}{P1} & Group index cần lấy. \\
+\texttt{\fontsize{7}{8}\selectfont normalizer} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & vnd\_money, vi\_datetime, remove\_accents. \\
+\texttt{\fontsize{7}{8}\selectfont is\_\allowbreak{}required} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP1}{P1} & Thiếu field required thì parser run failed. \\
+\texttt{\fontsize{7}{8}\selectfont fallback\_\allowbreak{}value} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Giá trị fallback nếu field không có. \\
+\texttt{\fontsize{7}{8}\selectfont priority} & \texttt{\fontsize{7}{8}\selectfont int} & Có & \badge{PriorityP1}{P1} & Ưu tiên nếu có nhiều regex cho cùng field. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{parser\_runs}}
+\textit{Mục đích: Audit từng lần parse email thành payload chuẩn hóa.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont email\_\allowbreak{}message\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP0}{MVP} & Email được parse. \\
+\texttt{\fontsize{7}{8}\selectfont parser\_\allowbreak{}template\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP0}{MVP} & Template được dùng; null nếu không tìm được. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & success, failed, partial. \\
+\texttt{\fontsize{7}{8}\selectfont confidence\_\allowbreak{}score} & \texttt{\fontsize{7}{8}\selectfont numeric(5,4)} & Không & \badge{PriorityP1}{P1} & Độ tin cậy parser. \\
+\texttt{\fontsize{7}{8}\selectfont extracted\_\allowbreak{}payload} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Có & \badge{PriorityP0}{MVP} & Field raw extract từ email. \\
+\texttt{\fontsize{7}{8}\selectfont normalized\_\allowbreak{}payload} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Có & \badge{PriorityP0}{MVP} & Field đã chuẩn hóa. \\
+\texttt{\fontsize{7}{8}\selectfont error\_\allowbreak{}message} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Lỗi parser. \\
+\texttt{\fontsize{7}{8}\selectfont created\_\allowbreak{}transaction\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Transaction được tạo nếu parse thành công. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{financial\_accounts}}
+\textit{Mục đích: Tài khoản tiền của user: ngân hàng, ví, tiền mặt, thẻ tín dụng.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP0}{MVP} & Chủ sở hữu. \\
+\texttt{\fontsize{7}{8}\selectfont bank\_\allowbreak{}provider\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP0}{MVP} & Null nếu cash/manual. \\
+\texttt{\fontsize{7}{8}\selectfont account\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & bank\_account, credit\_card, e\_wallet, cash, investment. \\
+\texttt{\fontsize{7}{8}\selectfont name} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP0}{MVP} & Tên user đặt, ví dụ VCB chính. \\
+\texttt{\fontsize{7}{8}\selectfont account\_\allowbreak{}mask} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Chỉ lưu ****1234, không lưu full account number. \\
+\texttt{\fontsize{7}{8}\selectfont currency} & \texttt{\fontsize{7}{8}\selectfont char(3)} & Có & \badge{PriorityP0}{MVP} & VND. \\
+\texttt{\fontsize{7}{8}\selectfont current\_\allowbreak{}balance} & \texttt{\fontsize{7}{8}\selectfont numeric(18,2)\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Số dư gần nhất nếu có. \\
+\texttt{\fontsize{7}{8}\selectfont balance\_\allowbreak{}updated\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Thời điểm cập nhật balance. \\
+\texttt{\fontsize{7}{8}\selectfont is\_\allowbreak{}default} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP1}{P1} & Tài khoản mặc định. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & active, archived, closed. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{transactions}}
+\textit{Mục đích: Bảng giao dịch chuẩn hóa - kết quả cuối của pipeline ingest/parse/classify.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP0}{MVP} & Chủ sở hữu. \\
+\texttt{\fontsize{7}{8}\selectfont financial\_\allowbreak{}account\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP0}{MVP} & Tài khoản phát sinh. \\
+\texttt{\fontsize{7}{8}\selectfont bank\_\allowbreak{}provider\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP0}{MVP} & Ngân hàng liên quan. \\
+\texttt{\fontsize{7}{8}\selectfont email\_\allowbreak{}message\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP0}{MVP} & Trace về email source; null nếu manual/csv. \\
+\texttt{\fontsize{7}{8}\selectfont source\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & email, manual, csv, sms, api. \\
+\texttt{\fontsize{7}{8}\selectfont source\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & ID record source cụ thể nếu cần polymorphic. \\
+\texttt{\fontsize{7}{8}\selectfont external\_\allowbreak{}transaction\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & ID từ API bank/Plaid-like nếu có. \\
+\texttt{\fontsize{7}{8}\selectfont transaction\_\allowbreak{}code} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP0}{MVP} & Mã giao dịch từ ngân hàng để dedup. \\
+\texttt{\fontsize{7}{8}\selectfont amount} & \texttt{\fontsize{7}{8}\selectfont numeric(18,2)} & Có & \badge{PriorityP0}{MVP} & Số tiền, nên lưu số dương và dùng direction. \\
+\texttt{\fontsize{7}{8}\selectfont currency} & \texttt{\fontsize{7}{8}\selectfont char(3)} & Có & \badge{PriorityP0}{MVP} & VND. \\
+\texttt{\fontsize{7}{8}\selectfont direction} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & income, expense, transfer\_in, transfer\_out, adjustment. \\
+\texttt{\fontsize{7}{8}\selectfont transaction\_\allowbreak{}time} & \texttt{\fontsize{7}{8}\selectfont timestamptz} & Có & \badge{PriorityP0}{MVP} & Thời điểm giao dịch thực tế. \\
+\texttt{\fontsize{7}{8}\selectfont posted\_\allowbreak{}date} & \texttt{\fontsize{7}{8}\selectfont date\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Ngày hạch toán nếu khác transaction\_time. \\
+\texttt{\fontsize{7}{8}\selectfont description} & \texttt{\fontsize{7}{8}\selectfont text} & Có & \badge{PriorityP0}{MVP} & Nội dung giao dịch. \\
+\texttt{\fontsize{7}{8}\selectfont normalized\_\allowbreak{}description} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Chuẩn hóa để search/classify. \\
+\texttt{\fontsize{7}{8}\selectfont merchant\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP1}{P1} & Merchant/counterparty đã normalize. \\
+\texttt{\fontsize{7}{8}\selectfont counterparty\_\allowbreak{}name} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Người gửi/nhận nếu parse được. \\
+\texttt{\fontsize{7}{8}\selectfont category\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP0}{MVP} & Category hiện tại. \\
+\texttt{\fontsize{7}{8}\selectfont balance\_\allowbreak{}after} & \texttt{\fontsize{7}{8}\selectfont numeric(18,2)\allowbreak{} nullable} & Không & \badge{PriorityP0}{MVP} & Số dư sau giao dịch nếu email có. \\
+\texttt{\fontsize{7}{8}\selectfont fee\_\allowbreak{}amount} & \texttt{\fontsize{7}{8}\selectfont numeric(18,2)\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Phí giao dịch nếu có. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & pending, posted, ignored, deleted, needs\_review. \\
+\texttt{\fontsize{7}{8}\selectfont is\_\allowbreak{}duplicate} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP0}{MVP} & Đánh dấu duplicate. \\
+\texttt{\fontsize{7}{8}\selectfont duplicate\_\allowbreak{}of\_\allowbreak{}transaction\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Trace transaction gốc nếu duplicate. \\
+\texttt{\fontsize{7}{8}\selectfont classification\_\allowbreak{}source} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & rule, ml, llm, manual, system, unknown. \\
+\texttt{\fontsize{7}{8}\selectfont classification\_\allowbreak{}confidence} & \texttt{\fontsize{7}{8}\selectfont numeric(5,4)\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Confidence của rule/ML/LLM. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}note} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Ghi chú cá nhân. \\
+\texttt{\fontsize{7}{8}\selectfont metadata} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Không & \badge{PriorityP1}{P1} & Extra fields từ parser/source. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{transaction\_categories}}
+\textit{Mục đích: Danh mục giao dịch dạng system/user-defined, có hierarchy.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP0}{MVP} & Null nếu category hệ thống. \\
+\texttt{\fontsize{7}{8}\selectfont parent\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP1}{P1} & Danh mục cha. \\
+\texttt{\fontsize{7}{8}\selectfont name} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP0}{MVP} & Tên hiển thị. \\
+\texttt{\fontsize{7}{8}\selectfont slug} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP1}{P1} & Key ổn định. \\
+\texttt{\fontsize{7}{8}\selectfont type} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & income, expense, transfer, neutral. \\
+\texttt{\fontsize{7}{8}\selectfont icon} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & UI. \\
+\texttt{\fontsize{7}{8}\selectfont color} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & UI. \\
+\texttt{\fontsize{7}{8}\selectfont is\_\allowbreak{}system} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP0}{MVP} & Category mặc định của hệ thống. \\
+\texttt{\fontsize{7}{8}\selectfont exclude\_\allowbreak{}from\_\allowbreak{}budget} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP1}{P1} & Transfer/refund có thể loại khỏi budget. \\
+\texttt{\fontsize{7}{8}\selectfont exclude\_\allowbreak{}from\_\allowbreak{}analytics} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP1}{P1} & Không tính vào report chính nếu cần. \\
+\texttt{\fontsize{7}{8}\selectfont sort\_\allowbreak{}order} & \texttt{\fontsize{7}{8}\selectfont int} & Có & \badge{PriorityP1}{P1} & Thứ tự hiển thị. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & active, archived. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{merchants}}
+\textit{Mục đích: Chuẩn hóa merchant/counterparty để phân loại tốt hơn.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP1}{P1} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP1}{P1} & Null nếu merchant global/system. \\
+\texttt{\fontsize{7}{8}\selectfont name} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP1}{P1} & Tên hiển thị: Grab, Shopee, Highlands. \\
+\texttt{\fontsize{7}{8}\selectfont normalized\_\allowbreak{}name} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP1}{P1} & Tên đã normalize để matching. \\
+\texttt{\fontsize{7}{8}\selectfont default\_\allowbreak{}category\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP1}{P1} & Category mặc định cho merchant. \\
+\texttt{\fontsize{7}{8}\selectfont merchant\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & store, person, bank, e\_wallet. \\
+\texttt{\fontsize{7}{8}\selectfont website} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Metadata. \\
+\texttt{\fontsize{7}{8}\selectfont logo\_\allowbreak{}url} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & UI. \\
+\texttt{\fontsize{7}{8}\selectfont metadata} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Không & \badge{PriorityP1}{P1} & Alias, source confidence, keyword. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{classification\_rules}}
+\textit{Mục đích: Rule phân loại giao dịch tự động, ưu tiên rule user trước rule system.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP0}{MVP} & Null nếu rule hệ thống. \\
+\texttt{\fontsize{7}{8}\selectfont name} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP0}{MVP} & Tên rule. \\
+\texttt{\fontsize{7}{8}\selectfont category\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP0}{MVP} & Category output. \\
+\texttt{\fontsize{7}{8}\selectfont merchant\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP1}{P1} & Rule theo merchant. \\
+\texttt{\fontsize{7}{8}\selectfont keyword} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP0}{MVP} & Keyword đơn giản: GRAB, SHOPEE, LUONG. \\
+\texttt{\fontsize{7}{8}\selectfont regex\_\allowbreak{}pattern} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Rule nâng cao. \\
+\texttt{\fontsize{7}{8}\selectfont direction} & \texttt{\fontsize{7}{8}\selectfont enum\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & income/expense/transfer. \\
+\texttt{\fontsize{7}{8}\selectfont amount\_\allowbreak{}min\allowbreak{} /\allowbreak{}\allowbreak{} amount\_\allowbreak{}max} & \texttt{\fontsize{7}{8}\selectfont numeric\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Điều kiện số tiền. \\
+\texttt{\fontsize{7}{8}\selectfont bank\_\allowbreak{}provider\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP2}{P2} & Rule riêng cho ngân hàng. \\
+\texttt{\fontsize{7}{8}\selectfont priority} & \texttt{\fontsize{7}{8}\selectfont int} & Có & \badge{PriorityP0}{MVP} & Xử lý xung đột rule. \\
+\texttt{\fontsize{7}{8}\selectfont is\_\allowbreak{}enabled} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP0}{MVP} & Bật/tắt rule. \\
+\texttt{\fontsize{7}{8}\selectfont created\_\allowbreak{}from\_\allowbreak{}transaction\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Rule được tạo từ user correction. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{transaction\_classification\_events}}
+\textit{Mục đích: Lịch sử phân loại/sửa category để đo chất lượng rule/ML/LLM.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP1}{P1} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont transaction\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP1}{P1} & Giao dịch được phân loại. \\
+\texttt{\fontsize{7}{8}\selectfont old\_\allowbreak{}category\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Category cũ. \\
+\texttt{\fontsize{7}{8}\selectfont new\_\allowbreak{}category\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Category mới. \\
+\texttt{\fontsize{7}{8}\selectfont source} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & rule, ml, llm, manual, system. \\
+\texttt{\fontsize{7}{8}\selectfont rule\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Rule áp dụng nếu có. \\
+\texttt{\fontsize{7}{8}\selectfont model\_\allowbreak{}name} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Tên ML/LLM model. \\
+\texttt{\fontsize{7}{8}\selectfont confidence\_\allowbreak{}score} & \texttt{\fontsize{7}{8}\selectfont numeric(5,4)\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Confidence. \\
+\texttt{\fontsize{7}{8}\selectfont reason} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Giải thích ngắn. \\
+\texttt{\fontsize{7}{8}\selectfont created\_\allowbreak{}by} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & User hoặc system. \\
+\texttt{\fontsize{7}{8}\selectfont created\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz} & Có & \badge{PriorityP1}{P1} & Thời điểm event. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{budgets}}
+\textit{Mục đích: Ngân sách theo category và kỳ thời gian.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP1}{P1} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP1}{P1} & Chủ sở hữu budget. \\
+\texttt{\fontsize{7}{8}\selectfont category\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP1}{P1} & Null nếu budget tổng. \\
+\texttt{\fontsize{7}{8}\selectfont period\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & weekly, monthly, yearly, custom. \\
+\texttt{\fontsize{7}{8}\selectfont period\_\allowbreak{}start\allowbreak{} /\allowbreak{}\allowbreak{} period\_\allowbreak{}end} & \texttt{\fontsize{7}{8}\selectfont date} & Có & \badge{PriorityP1}{P1} & Kỳ ngân sách. \\
+\texttt{\fontsize{7}{8}\selectfont limit\_\allowbreak{}amount} & \texttt{\fontsize{7}{8}\selectfont numeric(18,2)} & Có & \badge{PriorityP1}{P1} & Số tiền giới hạn. \\
+\texttt{\fontsize{7}{8}\selectfont currency} & \texttt{\fontsize{7}{8}\selectfont char(3)} & Có & \badge{PriorityP1}{P1} & VND. \\
+\texttt{\fontsize{7}{8}\selectfont alert\_\allowbreak{}threshold\_\allowbreak{}percent} & \texttt{\fontsize{7}{8}\selectfont numeric(5,2)} & Có & \badge{PriorityP1}{P1} & Ngưỡng cảnh báo, ví dụ 80. \\
+\texttt{\fontsize{7}{8}\selectfont spent\_\allowbreak{}amount\_\allowbreak{}cached} & \texttt{\fontsize{7}{8}\selectfont numeric(18,2)\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Cache nếu dashboard lớn, có thể tính lại. \\
+\texttt{\fontsize{7}{8}\selectfont rollover\_\allowbreak{}enabled} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP2}{P2} & Có chuyển dư sang kỳ sau không. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & active, archived. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{financial\_goals}}
+\textit{Mục đích: Mục tiêu/dự định tài chính tương lai như mua xe, mua laptop, quỹ dự phòng.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP1}{P1} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP1}{P1} & Chủ sở hữu goal. \\
+\texttt{\fontsize{7}{8}\selectfont name} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP1}{P1} & Tên mục tiêu: Mua xe, Laptop, Emergency fund. \\
+\texttt{\fontsize{7}{8}\selectfont description} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Mô tả thêm. \\
+\texttt{\fontsize{7}{8}\selectfont goal\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & planned\_purchase, emergency\_fund, debt\_repayment, saving, investment, travel, education, custom. \\
+\texttt{\fontsize{7}{8}\selectfont target\_\allowbreak{}amount} & \texttt{\fontsize{7}{8}\selectfont numeric(18,2)} & Có & \badge{PriorityP1}{P1} & Số tiền mục tiêu. \\
+\texttt{\fontsize{7}{8}\selectfont current\_\allowbreak{}saved\_\allowbreak{}amount} & \texttt{\fontsize{7}{8}\selectfont numeric(18,2)} & Có & \badge{PriorityP1}{P1} & Số tiền user đã có/đã dành cho mục tiêu. \\
+\texttt{\fontsize{7}{8}\selectfont target\_\allowbreak{}date} & \texttt{\fontsize{7}{8}\selectfont date\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Deadline mục tiêu. \\
+\texttt{\fontsize{7}{8}\selectfont priority} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & low, medium, high, critical. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & active, completed, paused, cancelled. \\
+\texttt{\fontsize{7}{8}\selectfont currency} & \texttt{\fontsize{7}{8}\selectfont char(3)} & Có & \badge{PriorityP1}{P1} & VND. \\
+\texttt{\fontsize{7}{8}\selectfont category\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP1}{P1} & Category liên quan nếu có. \\
+\texttt{\fontsize{7}{8}\selectfont metadata} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Không & \badge{PriorityP1}{P1} & Thông tin kịch bản hoặc note. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{goal\_scenarios}}
+\textit{Mục đích: Các phương án cho một mục tiêu: trả hết, trả góp, dời thời gian.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP2}{P2} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont goal\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP2}{P2} & Mục tiêu liên quan. \\
+\texttt{\fontsize{7}{8}\selectfont scenario\_\allowbreak{}name} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP2}{P2} & Tên phương án. \\
+\texttt{\fontsize{7}{8}\selectfont payment\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP2}{P2} & pay\_full, installment, mixed. \\
+\texttt{\fontsize{7}{8}\selectfont total\_\allowbreak{}amount} & \texttt{\fontsize{7}{8}\selectfont numeric(18,2)} & Có & \badge{PriorityP2}{P2} & Tổng giá trị mục tiêu. \\
+\texttt{\fontsize{7}{8}\selectfont upfront\_\allowbreak{}amount} & \texttt{\fontsize{7}{8}\selectfont numeric(18,2)} & Có & \badge{PriorityP2}{P2} & Số tiền trả trước. \\
+\texttt{\fontsize{7}{8}\selectfont installment\_\allowbreak{}amount} & \texttt{\fontsize{7}{8}\selectfont numeric(18,2)\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Số tiền góp mỗi kỳ. \\
+\texttt{\fontsize{7}{8}\selectfont installment\_\allowbreak{}months} & \texttt{\fontsize{7}{8}\selectfont int\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Số tháng trả góp. \\
+\texttt{\fontsize{7}{8}\selectfont interest\_\allowbreak{}rate} & \texttt{\fontsize{7}{8}\selectfont numeric(8,4)\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Lãi suất nếu có. \\
+\texttt{\fontsize{7}{8}\selectfont start\_\allowbreak{}month\allowbreak{} /\allowbreak{}\allowbreak{} end\_\allowbreak{}month} & \texttt{\fontsize{7}{8}\selectfont char(7)} & Không & \badge{PriorityP2}{P2} & Kỳ bắt đầu/kết thúc, ví dụ 2026-08. \\
+\texttt{\fontsize{7}{8}\selectfont estimated\_\allowbreak{}total\_\allowbreak{}cost} & \texttt{\fontsize{7}{8}\selectfont numeric(18,2)\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Tổng chi phí sau lãi/phí. \\
+\texttt{\fontsize{7}{8}\selectfont feasibility\_\allowbreak{}score} & \texttt{\fontsize{7}{8}\selectfont numeric(5,2)\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Điểm khả thi 0-100. \\
+\texttt{\fontsize{7}{8}\selectfont recommendation\_\allowbreak{}level} & \texttt{\fontsize{7}{8}\selectfont enum\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & safe, acceptable, risky, not\_recommended. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{planned\_cashflows}}
+\textit{Mục đích: Dòng tiền tương lai được sinh từ goals/scenarios để mô phỏng cashflow.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP1}{P1} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP1}{P1} & Chủ sở hữu. \\
+\texttt{\fontsize{7}{8}\selectfont goal\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP1}{P1} & Goal liên quan nếu có. \\
+\texttt{\fontsize{7}{8}\selectfont scenario\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP2}{P2} & Scenario liên quan nếu có. \\
+\texttt{\fontsize{7}{8}\selectfont cashflow\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & planned\_income, planned\_expense, installment\_payment, saving\_contribution. \\
+\texttt{\fontsize{7}{8}\selectfont amount} & \texttt{\fontsize{7}{8}\selectfont numeric(18,2)} & Có & \badge{PriorityP1}{P1} & Số tiền dự kiến. \\
+\texttt{\fontsize{7}{8}\selectfont currency} & \texttt{\fontsize{7}{8}\selectfont char(3)} & Có & \badge{PriorityP1}{P1} & VND. \\
+\texttt{\fontsize{7}{8}\selectfont expected\_\allowbreak{}date} & \texttt{\fontsize{7}{8}\selectfont date} & Có & \badge{PriorityP1}{P1} & Ngày/kỳ dự kiến. \\
+\texttt{\fontsize{7}{8}\selectfont recurrence\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & none, monthly, weekly, yearly. \\
+\texttt{\fontsize{7}{8}\selectfont recurrence\_\allowbreak{}count} & \texttt{\fontsize{7}{8}\selectfont int\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Số lần lặp. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & planned, confirmed, cancelled, converted\_to\_transaction. \\
+\texttt{\fontsize{7}{8}\selectfont metadata} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Không & \badge{PriorityP1}{P1} & Thông tin mô phỏng. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{goal\_contributions}}
+\textit{Mục đích: Theo dõi khoản đóng góp/tiết kiệm cho mục tiêu.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP1}{P1} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont goal\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP1}{P1} & Goal nhận đóng góp. \\
+\texttt{\fontsize{7}{8}\selectfont transaction\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP1}{P1} & Giao dịch liên kết nếu có. \\
+\texttt{\fontsize{7}{8}\selectfont amount} & \texttt{\fontsize{7}{8}\selectfont numeric(18,2)} & Có & \badge{PriorityP1}{P1} & Số tiền đóng góp. \\
+\texttt{\fontsize{7}{8}\selectfont contribution\_\allowbreak{}date} & \texttt{\fontsize{7}{8}\selectfont date} & Có & \badge{PriorityP1}{P1} & Ngày đóng góp. \\
+\texttt{\fontsize{7}{8}\selectfont contribution\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & manual, linked\_transaction, auto\_saving. \\
+\texttt{\fontsize{7}{8}\selectfont note} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Ghi chú. \\
+\texttt{\fontsize{7}{8}\selectfont created\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz} & Có & \badge{PriorityP1}{P1} & Thời điểm tạo. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{alert\_rules}}
+\textit{Mục đích: Cấu hình điều kiện sinh alert tài chính hoặc hệ thống.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP1}{P1} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP1}{P1} & Null nếu rule hệ thống/admin. \\
+\texttt{\fontsize{7}{8}\selectfont name} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP1}{P1} & Tên rule. \\
+\texttt{\fontsize{7}{8}\selectfont alert\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & budget\_threshold, large\_transaction, category\_spike, goal\_risk, cashflow\_risk, system\_error. \\
+\texttt{\fontsize{7}{8}\selectfont target\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & category, budget, goal, account, system. \\
+\texttt{\fontsize{7}{8}\selectfont target\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & ID object mục tiêu. \\
+\texttt{\fontsize{7}{8}\selectfont threshold\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & amount, percentage, ratio, z\_score. \\
+\texttt{\fontsize{7}{8}\selectfont threshold\_\allowbreak{}value} & \texttt{\fontsize{7}{8}\selectfont numeric(18,4)} & Có & \badge{PriorityP1}{P1} & Giá trị ngưỡng. \\
+\texttt{\fontsize{7}{8}\selectfont comparison\_\allowbreak{}operator} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & >=, >, <=, <, ==. \\
+\texttt{\fontsize{7}{8}\selectfont severity} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & info, warning, critical. \\
+\texttt{\fontsize{7}{8}\selectfont is\_\allowbreak{}enabled} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP1}{P1} & Bật/tắt rule. \\
+\texttt{\fontsize{7}{8}\selectfont cooldown\_\allowbreak{}hours} & \texttt{\fontsize{7}{8}\selectfont int} & Có & \badge{PriorityP1}{P1} & Chống spam alert giống nhau. \\
+\texttt{\fontsize{7}{8}\selectfont metadata} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Không & \badge{PriorityP1}{P1} & Điều kiện phụ. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{alerts}}
+\textit{Mục đích: Alert/in-app notification đã được sinh cho user.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP1}{P1} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP1}{P1} & Người nhận alert. \\
+\texttt{\fontsize{7}{8}\selectfont alert\_\allowbreak{}rule\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP1}{P1} & Rule sinh alert nếu có. \\
+\texttt{\fontsize{7}{8}\selectfont alert\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & Loại alert. \\
+\texttt{\fontsize{7}{8}\selectfont title} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP1}{P1} & Tiêu đề ngắn. \\
+\texttt{\fontsize{7}{8}\selectfont message} & \texttt{\fontsize{7}{8}\selectfont text} & Có & \badge{PriorityP1}{P1} & Nội dung hiển thị. \\
+\texttt{\fontsize{7}{8}\selectfont severity} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & info, warning, critical. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & new, read, dismissed, resolved. \\
+\texttt{\fontsize{7}{8}\selectfont triggered\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz} & Có & \badge{PriorityP1}{P1} & Thời điểm sinh alert. \\
+\texttt{\fontsize{7}{8}\selectfont read\_\allowbreak{}at\allowbreak{} /\allowbreak{}\allowbreak{} dismissed\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Trạng thái user tương tác. \\
+\texttt{\fontsize{7}{8}\selectfont related\_\allowbreak{}transaction\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Giao dịch liên quan. \\
+\texttt{\fontsize{7}{8}\selectfont related\_\allowbreak{}category\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Category liên quan. \\
+\texttt{\fontsize{7}{8}\selectfont related\_\allowbreak{}goal\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Goal liên quan. \\
+\texttt{\fontsize{7}{8}\selectfont metadata} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Không & \badge{PriorityP1}{P1} & Số liệu nền để explain. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{notification\_preferences}}
+\textit{Mục đích: Cài đặt user muốn nhận notification qua kênh nào.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP1}{P1} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP1}{P1} & User sở hữu preference. \\
+\texttt{\fontsize{7}{8}\selectfont in\_\allowbreak{}app\_\allowbreak{}enabled} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP1}{P1} & MVP nên bật mặc định. \\
+\texttt{\fontsize{7}{8}\selectfont email\_\allowbreak{}enabled} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP1}{P1} & Gửi email cho severity cao hoặc summary. \\
+\texttt{\fontsize{7}{8}\selectfont push\_\allowbreak{}enabled} & \texttt{\fontsize{7}{8}\selectfont boolean} & Có & \badge{PriorityP2}{P2} & Chỉ bật khi có PWA/mobile. \\
+\texttt{\fontsize{7}{8}\selectfont min\_\allowbreak{}severity} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & Ngưỡng thấp nhất được gửi: info, warning, critical. \\
+\texttt{\fontsize{7}{8}\selectfont quiet\_\allowbreak{}hours\_\allowbreak{}start\allowbreak{} /\allowbreak{}\allowbreak{} quiet\_\allowbreak{}hours\_\allowbreak{}end} & \texttt{\fontsize{7}{8}\selectfont time\allowbreak{} nullable} & Không & \badge{PriorityP2}{P2} & Không gửi push/email trong giờ nghỉ. \\
+\texttt{\fontsize{7}{8}\selectfont metadata} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Không & \badge{PriorityP1}{P1} & Preference theo từng alert\_type. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{notification\_deliveries}}
+\textit{Mục đích: Log delivery của alert qua in-app/email/push/provider.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP1}{P1} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont alert\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} fk} & Có & \badge{PriorityP1}{P1} & Alert cần deliver. \\
+\texttt{\fontsize{7}{8}\selectfont channel} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & in\_app, email, push. \\
+\texttt{\fontsize{7}{8}\selectfont provider} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & internal, smtp, ses, novu, fcm. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & pending, sent, failed, skipped. \\
+\texttt{\fontsize{7}{8}\selectfont recipient} & \texttt{\fontsize{7}{8}\selectfont varchar\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Email/device/subscriber id nếu cần. \\
+\texttt{\fontsize{7}{8}\selectfont sent\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Thời điểm gửi thành công. \\
+\texttt{\fontsize{7}{8}\selectfont error\_\allowbreak{}message} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Lỗi provider. \\
+\texttt{\fontsize{7}{8}\selectfont retry\_\allowbreak{}count} & \texttt{\fontsize{7}{8}\selectfont int} & Có & \badge{PriorityP1}{P1} & Số lần retry. \\
+\texttt{\fontsize{7}{8}\selectfont metadata} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Không & \badge{PriorityP1}{P1} & Provider response, template id. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{audit\_logs}}
+\textit{Mục đích: Audit các hành động nhạy cảm để tăng trust và debug.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP0}{MVP} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable\allowbreak{} fk} & Không & \badge{PriorityP0}{MVP} & User thực hiện hành động. \\
+\texttt{\fontsize{7}{8}\selectfont actor\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP0}{MVP} & user, system, admin, worker. \\
+\texttt{\fontsize{7}{8}\selectfont action} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP0}{MVP} & CONNECT\_EMAIL, DISCONNECT\_EMAIL, SYNC\_EMAIL, UPDATE\_CATEGORY, EXPORT\_DATA. \\
+\texttt{\fontsize{7}{8}\selectfont resource\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP0}{MVP} & transactions, email\_connections, goals, alerts. \\
+\texttt{\fontsize{7}{8}\selectfont resource\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid\allowbreak{} nullable} & Không & \badge{PriorityP0}{MVP} & ID resource liên quan. \\
+\texttt{\fontsize{7}{8}\selectfont ip\_\allowbreak{}address} & \texttt{\fontsize{7}{8}\selectfont inet\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Audit security. \\
+\texttt{\fontsize{7}{8}\selectfont user\_\allowbreak{}agent} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Audit security. \\
+\texttt{\fontsize{7}{8}\selectfont metadata} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Không & \badge{PriorityP1}{P1} & Chi tiết hành động. \\
+\texttt{\fontsize{7}{8}\selectfont created\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz} & Có & \badge{PriorityP0}{MVP} & Thời điểm xảy ra. \\
+\end{longtable}
+\end{tableblock}
+\subsubsection{\texttt{outbox\_events}}
+\textit{Mục đích: Event outbox để đồng bộ async sang notification/search/analytics mà không mất dữ liệu.}
+
+\begin{tableblock}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.25cm}L{2.65cm}L{1.65cm}L{1.25cm}L{6.25cm}}
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thuộc tính} & \thead{Kiểu dữ liệu} & \thead{Bắt buộc} & \thead{Phase} & \thead{Mô tả nghiệp vụ / kỹ thuật} \\
+\endhead
+\texttt{\fontsize{7}{8}\selectfont id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP1}{P1} & Khóa chính. \\
+\texttt{\fontsize{7}{8}\selectfont event\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP1}{P1} & TRANSACTION\_CREATED, ALERT\_CREATED, EMAIL\_SYNC\_FAILED. \\
+\texttt{\fontsize{7}{8}\selectfont aggregate\_\allowbreak{}type} & \texttt{\fontsize{7}{8}\selectfont varchar} & Có & \badge{PriorityP1}{P1} & transaction, alert, email\_sync\_run. \\
+\texttt{\fontsize{7}{8}\selectfont aggregate\_\allowbreak{}id} & \texttt{\fontsize{7}{8}\selectfont uuid} & Có & \badge{PriorityP1}{P1} & ID entity phát sinh event. \\
+\texttt{\fontsize{7}{8}\selectfont payload} & \texttt{\fontsize{7}{8}\selectfont jsonb} & Có & \badge{PriorityP1}{P1} & Dữ liệu event đã sanitize. \\
+\texttt{\fontsize{7}{8}\selectfont status} & \texttt{\fontsize{7}{8}\selectfont enum} & Có & \badge{PriorityP1}{P1} & pending, processing, processed, failed. \\
+\texttt{\fontsize{7}{8}\selectfont retry\_\allowbreak{}count} & \texttt{\fontsize{7}{8}\selectfont int} & Có & \badge{PriorityP1}{P1} & Số lần retry. \\
+\texttt{\fontsize{7}{8}\selectfont created\_\allowbreak{}at\allowbreak{} /\allowbreak{}\allowbreak{} processed\_\allowbreak{}at} & \texttt{\fontsize{7}{8}\selectfont timestamptz} & Không & \badge{PriorityP1}{P1} & Theo dõi lifecycle event. \\
+\texttt{\fontsize{7}{8}\selectfont error\_\allowbreak{}message} & \texttt{\fontsize{7}{8}\selectfont text\allowbreak{} nullable} & Không & \badge{PriorityP1}{P1} & Lỗi consumer. \\
+\end{longtable}
+\end{tableblock}
+
+\section{Chiến lược AI/ML}
+
+\subsection{Quan điểm triển khai}
+Không nên chọn tuyệt đối giữa LLM và ML. CashLens nên đi theo chiến lược hybrid:
+\begin{center}
+\code{Rule-based parser/classifier} $\rightarrow$ \code{ML classifier} $\rightarrow$ \code{LLM fallback/insight}
+\end{center}
+
+\subsection{Phân vai Rule, ML và LLM}
+\begin{tableblock}
+\captionof{table}{Vai trò AI/ML trong CashLens}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.0cm}L{5.2cm}L{5.2cm}L{1.4cm}}
+\rowcolor{TableHeader}\thead{Thành phần} & \thead{Nhiệm vụ phù hợp} & \thead{Không nên dùng cho} & \thead{Phase} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thành phần} & \thead{Nhiệm vụ phù hợp} & \thead{Không nên dùng cho} & \thead{Phase} \\
+\endhead
+Rule/Regex & Parse email, exact keyword category, budget threshold, large transaction alert. & Insight ngôn ngữ tự nhiên phức tạp. & MVP \\
+ML truyền thống & Category classification, anomaly detection, recurring detection, forecast đơn giản. & Sinh report dạng văn bản dài. & P2 \\
+LLM & Fallback classification khi confidence thấp, giải thích category, monthly insight, planning explanation. & Tự tính toán số tiền, tự quyết định tài chính thay backend. & P2 \\
+\end{longtable}
+\end{tableblock}
+
+\subsection{Decision engine phân loại}
+\begin{notebox}{Luồng đề xuất}
+1. Nếu match user rule confidence cao: apply category, source=rule.\newline
+2. Nếu không match rule: chạy ML classifier. Nếu confidence >= 0.85: apply category, source=ml.\newline
+3. Nếu ML confidence thấp và user cho phép AI: gọi LLM với payload đã mask/normalize.\newline
+4. Nếu vẫn thấp: set transaction status=\code{needs_review}.
+\end{notebox}
+
+\subsection{Metrics đánh giá AI/ML}
+\begin{tableblock}
+\captionof{table}{Metrics AI/ML}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.5cm}L{3.6cm}L{8.1cm}}
+\rowcolor{TableHeader}\thead{Metric} & \thead{Áp dụng cho} & \thead{Ý nghĩa} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Metric} & \thead{Áp dụng cho} & \thead{Ý nghĩa} \\
+\endhead
+Accuracy / Macro F1 & ML classifier & Đánh giá phân loại category cân bằng giữa nhóm phổ biến và nhóm ít data. \\
+Top-3 accuracy & ML/LLM classification & Nếu category đúng nằm trong top 3 gợi ý thì UX vẫn có giá trị. \\
+Manual correction rate & Rule/ML/LLM & Proxy quan trọng nhất trong app thật. \\
+Confidence calibration & ML/LLM & Confidence cao có thực sự đúng không. \\
+LLM JSON validity rate & LLM & Tỷ lệ output đúng schema. \\
+Cost per 1,000 transactions & LLM & Kiểm soát chi phí API. \\
+\end{longtable}
+\end{tableblock}
+
+\section{Chiến lược Alert và Notification tự build}
+
+\subsection{Nguyên tắc thiết kế}
+\begin{itemize}
+  \item \textbf{Alert engine} là business logic của CashLens, nên thuộc hệ thống của mình.
+  \item \textbf{Notification delivery} là lớp gửi thông báo, có thể tự build hoặc đổi provider sau.
+  \item MVP chỉ cần \textbf{in-app} và \textbf{email fallback}. Push/Novu để phase sau.
+  \item Payload gửi qua email/push không nên chứa quá nhiều thông tin nhạy cảm.
+  \item Luôn có cooldown để tránh spam user.
+\end{itemize}
+
+\subsection{Flow alert}
+\begin{notebox}{Flow tạo alert}
+\code{Transaction created} $\rightarrow$ update summary $\rightarrow$ evaluate alert rules $\rightarrow$ create alert $\rightarrow$ create notification delivery $\rightarrow$ in-app/email channel sends or stores notification.
+\end{notebox}
+
+\subsection{Trạng thái alert và delivery}
+\begin{tableblock}
+\captionof{table}{Enum trạng thái}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{4.2cm}L{3.0cm}L{8.0cm}}
+\rowcolor{TableHeader}\thead{Đối tượng} & \thead{Trạng thái} & \thead{Ý nghĩa} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Đối tượng} & \thead{Trạng thái} & \thead{Ý nghĩa} \\
+\endhead
+alerts.status & new & Alert mới, chưa đọc. \\
+alerts.status & read & User đã xem. \\
+alerts.status & dismissed & User bỏ qua alert. \\
+alerts.status & resolved & Điều kiện rủi ro đã được xử lý. \\
+notification\_deliveries.status & pending & Chờ gửi. \\
+notification\_deliveries.status & sent & Gửi thành công hoặc in-app đã tạo. \\
+notification\_deliveries.status & failed & Gửi thất bại, có thể retry. \\
+notification\_deliveries.status & skipped & Không gửi do preference/cooldown/quiet hours. \\
+\end{longtable}
+\end{tableblock}
+
+\section{Bảo mật, riêng tư và quản trị dữ liệu}
+
+\subsection{Yêu cầu bảo mật trọng yếu}
+\begin{tableblock}
+\captionof{table}{Bảo mật và privacy}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.1cm}L{5.4cm}L{6.7cm}}
+\rowcolor{TableHeader}\thead{Chủ đề} & \thead{Yêu cầu} & \thead{Thiết kế đề xuất} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Chủ đề} & \thead{Yêu cầu} & \thead{Thiết kế đề xuất} \\
+\endhead
+OAuth & Không lấy password email của user. & Dùng OAuth; lưu encrypted token; cho disconnect/revoke. \\
+Raw email & Không lưu raw body mặc định. & Lưu metadata + body\_hash; raw\_body\_encrypted chỉ khi user bật. \\
+Scope & Không xin quyền rộng hơn nhu cầu. & Read-only email scope cho MVP. \\
+Audit & Hành động nhạy cảm phải có log. & audit\_logs cho connect, disconnect, sync, export, delete. \\
+AI privacy & Không gửi raw email lên LLM. & Chỉ gửi amount/direction/description đã mask và aggregate data. \\
+Notification payload & Không leak thông tin nhạy cảm ra email/push. & Email chỉ nói có cảnh báo mới hoặc summary đã được kiểm soát. \\
+Soft delete & Không hard delete nhầm dữ liệu tài chính. & deleted\_at và data deletion request phase sau. \\
+\end{longtable}
+\end{tableblock}
+
+\section{Testing và Acceptance Criteria}
+
+\subsection{Acceptance criteria theo epic}
+\begin{tableblock}
+\captionof{table}{Acceptance Criteria}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{3.6cm}L{11.7cm}}
+\rowcolor{TableHeader}\thead{Epic} & \thead{Điều kiện chấp nhận} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Epic} & \thead{Điều kiện chấp nhận} \\
+\endhead
+Email Connection & User connect/disconnect Gmail thành công; token được mã hóa; trạng thái connection hiển thị đúng. \\
+Listen Rules & User tạo rule bank/sender/subject; sync chỉ xử lý email match rule. \\
+Parser & Email mẫu của ngân hàng được parse thành amount, direction, time, description; lỗi parser được lưu vào parser\_runs. \\
+Transactions & Transaction không bị trùng khi sync lại; user sửa category được; classification event được tạo. \\
+Dashboard & Dashboard tháng hiển thị total income, expense, net, savings rate, category breakdown. \\
+Budget Alerts & Khi chi category đạt ngưỡng, hệ thống tạo alert đúng một lần trong cooldown. \\
+Notifications & Alert mới xuất hiện trong in-app list; email fallback gửi khi severity đủ cao và preference bật. \\
+Financial Goals & User tạo mục tiêu mua xe; hệ thống tính required monthly saving và feasibility score. \\
+Goal Simulation & Kịch bản trả hết/trả góp trả về projected cashflow và risk level. \\
+Privacy & Raw email body không được lưu nếu setting store\_raw\_email\_body=false. \\
+\end{longtable}
+\end{tableblock}
+
+\subsection{Test case quan trọng}
+\begin{tableblock}
+\captionof{table}{Test case ưu tiên}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{1.6cm}L{7.2cm}L{6.4cm}}
+\rowcolor{TableHeader}\thead{Mã} & \thead{Tình huống} & \thead{Kỳ vọng} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Mã} & \thead{Tình huống} & \thead{Kỳ vọng} \\
+\endhead
+TC-01 & Sync cùng một email hai lần. & Không tạo transaction trùng, hoặc transaction mới được mark duplicate. \\
+TC-02 & Email bank không có amount. & parser\_run failed, email\_message status failed, không tạo transaction. \\
+TC-03 & User tắt listen rule. & Email mới từ sender đó không được parse. \\
+TC-04 & User sửa category từ Shopping sang Food. & Transaction cập nhật category, tạo classification event source=manual. \\
+TC-05 & Budget Food 3M, spent đạt 2.5M. & Tạo warning alert 80\%, không spam lại trong cooldown. \\
+TC-06 & Giao dịch expense 10M vượt large threshold. & Tạo large\_transaction alert. \\
+TC-07 & Mục tiêu mua xe cần saving 15M/tháng, available cashflow 9M. & Feasibility thấp và sinh goal\_risk/cashflow\_risk nếu bật. \\
+TC-08 & User tắt email notification. & Không tạo email delivery, nhưng in-app vẫn có nếu bật. \\
+TC-09 & LLM trả JSON sai schema. & Không apply category; transaction needs\_review hoặc fallback. \\
+TC-10 & Raw email setting false. & Database không có raw\_body\_encrypted. \\
+\end{longtable}
+\end{tableblock}
+
+\section{Rủi ro và phương án giảm thiểu}
+\begin{tableblock}
+\captionof{table}{Risk Register}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{4.1cm}L{5.0cm}L{6.1cm}}
+\rowcolor{TableHeader}\thead{Rủi ro} & \thead{Tác động} & \thead{Giảm thiểu} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Rủi ro} & \thead{Tác động} & \thead{Giảm thiểu} \\
+\endhead
+Ngân hàng đổi format email & Parser fail hàng loạt. & Versioned parser\_templates, parser\_runs, admin dashboard, test sample. \\
+Duplicate transaction & Dashboard thu/chi sai. & Dedup bằng transaction\_code; fallback hash; is\_duplicate và duplicate\_of\_transaction\_id. \\
+Classification sai & Insight/category report sai. & Manual correction, classification events, rule priority, ML confidence threshold. \\
+Alert spam & User khó chịu và tắt notification. & Cooldown, severity preference, dismiss/resolved status. \\
+Lộ dữ liệu nhạy cảm & Mất trust, rủi ro bảo mật. & Không lưu raw email mặc định, encrypt token/body, audit logs, minimal scopes. \\
+Over-engineering & MVP chậm hoàn thành. & Không dùng Elasticsearch/Kibana/Novu/Push ở core MVP; phase sau. \\
+LLM hallucination & Khuyến nghị sai. & LLM chỉ explain/insight, số liệu do backend tính, validate JSON schema. \\
+\end{longtable}
+\end{tableblock}
+
+\section{Kế hoạch triển khai gợi ý}
+\begin{tableblock}
+\captionof{table}{Implementation Plan}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{1.7cm}L{4.2cm}L{9.4cm}}
+\rowcolor{TableHeader}\thead{Thứ tự} & \thead{Nhóm việc} & \thead{Deliverable} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Thứ tự} & \thead{Nhóm việc} & \thead{Deliverable} \\
+\endhead
+1 & Project foundation & NestJS modules, Prisma schema, auth/users/settings, base response/filter. \\
+2 & Finance core & financial\_accounts, categories, transactions, manual CRUD, dashboard realtime query. \\
+3 & Email integration & email\_connections, OAuth Gmail, listen\_rules, sync\_runs, email\_messages. \\
+4 & Parser pipeline & bank\_providers, bank\_email\_senders, parser\_templates, parser\_runs, create transactions. \\
+5 & Classification & classification\_rules, auto classify, manual correction, classification\_events. \\
+6 & Analytics & monthly summary, category breakdown, daily cashflow, dashboard API. \\
+7 & Budgets and alerts & budgets, alert\_rules, alerts, budget threshold, large transaction. \\
+8 & Notifications & in-app list, unread count, mark read/dismiss, email fallback, delivery log. \\
+9 & Financial planning & financial\_goals, planned\_cashflows, feasibility score, goal risk alert. \\
+10 & AI/ML phase & LLM insight, ML classifier, category spike, scenario comparison. \\
+\end{longtable}
+\end{tableblock}
+
+\section{Phụ lục - Enum đề xuất}
+\begin{tableblock}
+\captionof{table}{Enum hệ thống}
+\rowcolors{2}{TableAlt}{white}
+\scriptsize
+\begin{longtable}{L{4.5cm}L{10.5cm}}
+\rowcolor{TableHeader}\thead{Enum} & \thead{Giá trị đề xuất} \\
+\endfirsthead
+\rowcolor{TableHeader}\thead{Enum} & \thead{Giá trị đề xuất} \\
+\endhead
+EmailConnectionStatus & active, expired, revoked, error \\
+EmailProcessingStatus & pending, ignored, parsed, failed \\
+TransactionDirection & income, expense, transfer\_in, transfer\_out, adjustment \\
+TransactionStatus & pending, posted, ignored, deleted, needs\_review \\
+TransactionSourceType & email, manual, csv, sms, api \\
+ClassificationSource & rule, ml, llm, manual, system, unknown \\
+AccountType & bank\_account, credit\_card, e\_wallet, cash, investment \\
+BudgetPeriodType & weekly, monthly, yearly, custom \\
+AlertType & budget\_threshold, large\_transaction, category\_spike, goal\_risk, cashflow\_risk, system\_error \\
+AlertSeverity & info, warning, critical \\
+AlertStatus & new, read, dismissed, resolved \\
+NotificationChannel & in\_app, email, push \\
+NotificationProvider & internal, smtp, ses, novu, fcm \\
+GoalType & planned\_purchase, emergency\_fund, debt\_repayment, saving, investment, travel, education, custom \\
+\end{longtable}
+\end{tableblock}
+
+\section{Kết luận}
+CashLens nên được triển khai như một hệ thống pipeline tài chính thay vì chỉ là CRUD transaction. Điểm quan trọng nhất là tách rõ source layer, parser layer, finance layer, analytics layer và notification layer. Với định hướng tự build alert/notification, sản phẩm vừa giữ được tính chuyên nghiệp, vừa tránh phụ thuộc sớm vào Novu/Push khi core business chưa ổn định.
+
+\begin{summarybox}{Recommendation cuối}
+\textbf{MVP:} Auth + transaction manual + dashboard + Gmail connection + listen rules + parser + classification rule.\newline
+\textbf{P1:} Budget + alert engine + in-app notification + email fallback + financial goals.\newline
+\textbf{P2:} ML classifier + LLM insight + scenario planning + Elasticsearch/Kibana optional.\newline
+\textbf{Nguyên tắc:} Backend deterministic logic tính số tiền; AI chỉ hỗ trợ phân loại, giải thích và insight.
+\end{summarybox}
+
+\end{document}

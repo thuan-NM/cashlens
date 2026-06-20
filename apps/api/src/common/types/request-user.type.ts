@@ -1,4 +1,5 @@
 export type RequestUser = {
   id: string;
-  email: string;
+  email?: string;
+  role?: string;
 };
