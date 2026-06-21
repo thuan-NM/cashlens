@@ -1,134 +1,53 @@
-import { 
-    Refine,
-    GitHubBanner, 
-    WelcomePage,
-    Authenticated
-,AuthProvider, 
-} from '@refinedev/core';
-import { DevtoolsPanel, DevtoolsProvider } from "@refinedev/devtools";
-import { RefineKbar, RefineKbarProvider } from "@refinedev/kbar";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import type { ReactNode } from "react";
+import { AppProvider } from "@/providers/AppProvider";
+import { AppShell } from "@/components/layout/AppShell";
+import { AuthPage } from "@/features/auth";
+import { DashboardPage } from "@/features/dashboard";
+import { TransactionsPage } from "@/features/transactions";
+import { AccountsPage } from "@/features/accounts";
+import { BudgetsPage } from "@/features/budgets";
+import { GoalsPage } from "@/features/goals";
+import { AlertsPage } from "@/features/alerts";
+import { EmailPage } from "@/features/email-connections";
+import { OpsPage } from "@/features/ops";
+import { SettingsPage } from "@/features/settings";
+import { useAuthStore } from "@/stores/authStore";
+import { ROUTES } from "@/config/routes";
 
-import { AuthPage,ErrorComponent
-,useNotificationProvider
-,ThemedLayout
-,ThemedSider} from '@refinedev/antd';
-import "@refinedev/antd/dist/reset.css";
+function RequireAuth({ children }: { children: ReactNode }) {
+  const isAuthed = useAuthStore((state) => state.isAuthed);
+  return isAuthed ? children : <Navigate to={ROUTES.AUTH} replace />;
+}
 
-import { App as AntdApp } from "antd"
-import { BrowserRouter, Route, Routes, Outlet } from "react-router";
-import routerProvider, { NavigateToResource, CatchAllNavigate, UnsavedChangesNotifier, DocumentTitleHandler } from "@refinedev/react-router";
-import axios from "axios";
-import { useAuth0 } from "@auth0/auth0-react";
-import { dataProvider } from "./providers/data";
-import { ColorModeContextProvider } from "./contexts/color-mode";
-import { Header } from "./components/header";
-import { Login } from "./pages/login";
-
-
-
-
-
-function App() {
-    const { isLoading, user, logout, getIdTokenClaims } = useAuth0();
-
-    
-            if (isLoading) {
-                return <span>loading...</span>
+export default function App() {
+  return (
+    <AppProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path={ROUTES.AUTH} element={<AuthPage />} />
+          <Route
+            path="/app"
+            element={
+              <RequireAuth>
+                <AppShell />
+              </RequireAuth>
             }
-
-            const authProvider: AuthProvider = {
-                login: async () => {
-                    return {
-                        success: true,
-                    };
-                },
-                logout: async () => {
-                    logout({ returnTo: window.location.origin });
-                    return {
-                        success: true,
-                    };
-                },
-                onError: async (error) => {
-                    console.error(error);
-                    return { error };
-                },
-                check: async () => {
-                    try {
-                        const token = await getIdTokenClaims();
-                        if (token) {
-                            axios.defaults.headers.common = {
-Authorization: `Bearer ${token.__raw}`
-
-                            };
-                            return {
-                                authenticated: true,
-                            };
-                        } else {
-                            return {
-                                authenticated: false,
-                                error: {
-                                    message: "Check failed",
-                                    name: "Token not found",
-                                },
-                                redirectTo: "/login",
-                                logout: true,
-                            };
-                        }
-                    } catch (error: any) {
-                        return {
-                            authenticated: false,
-                            error: new Error(error),
-                            redirectTo: "/login",
-                            logout: true,
-                        };
-                    }
-                },
-                getPermissions: async () => null,
-                getIdentity: async () => {
-                    if (user) {
-                        return {
-                            ...user,
-                            avatar: user.picture,
-                        };
-                    }
-                    return null;
-                },
-            };
-            
-    
-    return (
-        <BrowserRouter>
-        <GitHubBanner />
-        <RefineKbarProvider>
-            <ColorModeContextProvider>
-<AntdApp>
-            <DevtoolsProvider>
-                <Refine dataProvider={dataProvider}
-notificationProvider={useNotificationProvider}
-routerProvider={routerProvider}
-authProvider={authProvider} 
-                    options={{
-                        syncWithLocation: true,
-                        warnWhenUnsavedChanges: true,
-                        
-                    }}
-                >
-
-
-                        <Routes>
-                            <Route index element={<WelcomePage />} />
-                        </Routes>
-                    <RefineKbar />
-                    <UnsavedChangesNotifier />
-                    <DocumentTitleHandler />
-                </Refine>
-            <DevtoolsPanel />
-            </DevtoolsProvider>
-            </AntdApp>
-</ColorModeContextProvider>
-        </RefineKbarProvider>
-        </BrowserRouter>
-      );
-};
-
-export default App;
+          >
+            <Route index element={<Navigate to={ROUTES.DASHBOARD} replace />} />
+            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="transactions" element={<TransactionsPage />} />
+            <Route path="accounts" element={<AccountsPage />} />
+            <Route path="budgets" element={<BudgetsPage />} />
+            <Route path="goals" element={<GoalsPage />} />
+            <Route path="alerts" element={<AlertsPage />} />
+            <Route path="email" element={<EmailPage />} />
+            <Route path="ops" element={<OpsPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+          <Route path="*" element={<Navigate to={ROUTES.AUTH} replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AppProvider>
+  );
+}

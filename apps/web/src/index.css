@@ -1,0 +1,180 @@
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Newsreader:ital,opsz@1,6..72&display=swap");
+@import "tailwindcss";
+
+:root {
+  --bg: #f1efe8;
+  --surface: #ffffff;
+  --surface-2: #faf9f5;
+  --surface-3: #efece4;
+  --text: #2b2823;
+  --muted: #6b665d;
+  --faint: #9a948a;
+  --border: #e7e3da;
+  --bstrong: #d8d3c8;
+  --accent: #d97757;
+  --accent-ink: #ffffff;
+  --income: #4a9d6e;
+  --expense: #d2604c;
+  --warn: #d99a3c;
+  --glass: rgba(255, 255, 255, 0.62);
+  --glassb: rgba(255, 255, 255, 0.8);
+  --cardbg: rgba(255, 255, 255, 0.74);
+  --cardborder: rgba(255, 255, 255, 0.85);
+  --shadow: 0 1px 2px rgba(60, 50, 35, 0.05), 0 10px 26px -14px rgba(60, 50, 35, 0.16);
+  --shadowh: 0 2px 6px rgba(60, 50, 35, 0.08), 0 22px 44px -18px rgba(60, 50, 35, 0.26);
+}
+
+html.dark {
+  --bg: #211f1d;
+  --surface: #2b2926;
+  --surface-2: #322f2b;
+  --surface-3: #3a3631;
+  --text: #ece9e2;
+  --muted: #a8a298;
+  --faint: #7a746b;
+  --border: #393530;
+  --bstrong: #4a453e;
+  --income: #62b88c;
+  --expense: #e3795f;
+  --warn: #e3b05a;
+  --glass: rgba(38, 36, 33, 0.68);
+  --glassb: rgba(255, 255, 255, 0.09);
+  --cardbg: rgba(48, 46, 42, 0.68);
+  --cardborder: rgba(255, 255, 255, 0.07);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 30px -16px rgba(0, 0, 0, 0.62);
+  --shadowh: 0 2px 8px rgba(0, 0, 0, 0.42), 0 24px 50px -18px rgba(0, 0, 0, 0.72);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Be Vietnam Pro", system-ui, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+::selection {
+  background: rgba(217, 119, 87, 0.22);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background: var(--bstrong);
+  background-clip: content-box;
+}
+
+.app-mesh {
+  background:
+    radial-gradient(80% 60% at 8% -8%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%),
+    radial-gradient(70% 55% at 102% 12%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 58%),
+    radial-gradient(90% 70% at 50% 108%, color-mix(in srgb, var(--accent) 5%, transparent), transparent 60%),
+    var(--bg);
+}
+
+.glass-card {
+  border: 1px solid var(--cardborder);
+  background: var(--cardbg);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px) saturate(1.35);
+  -webkit-backdrop-filter: blur(16px) saturate(1.35);
+}
+
+.glass-panel {
+  border-color: var(--glassb);
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(1.45);
+  -webkit-backdrop-filter: blur(24px) saturate(1.45);
+}
+
+.font-editorial {
+  font-family: "Newsreader", serif;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes clFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+@keyframes clFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes clPop {
+  from { opacity: 0; transform: scale(0.985) translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.animate-float {
+  animation: clFloat 6s ease-in-out infinite;
+}
+
+.animate-fade-up {
+  animation: clFadeUp 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.animate-pop {
+  animation: clPop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.ant-drawer-content,
+.ant-modal-content {
+  border: 1px solid var(--cardborder);
+  background: var(--cardbg) !important;
+  backdrop-filter: blur(26px) saturate(1.5);
+}
+
+@media (max-width: 720px) {
+  .ant-modal {
+    max-width: calc(100vw - 24px);
+  }
+}
