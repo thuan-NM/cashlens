@@ -101,6 +101,73 @@ enum BudgetPeriod {
   CUSTOM
 }
 
+enum EmailProvider {
+  GMAIL
+  OUTLOOK
+  IMAP
+}
+
+enum EmailConnectionStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  ERROR
+}
+
+enum EmailProcessingStatus {
+  PENDING
+  IGNORED
+  PARSED
+  FAILED
+}
+
+enum EmailSyncTriggerType {
+  MANUAL
+  SCHEDULED
+  WEBHOOK
+  BACKFILL
+}
+
+enum EmailSyncStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL_FAILED
+  FAILED
+}
+
+enum BankProviderStatus {
+  ACTIVE
+  INACTIVE
+  EXPERIMENTAL
+}
+
+enum BankEmailSenderStatus {
+  ACTIVE
+  DEPRECATED
+  SUSPICIOUS
+}
+
+enum ParserChannel {
+  EMAIL
+  CSV
+  SMS
+  API
+}
+
+enum ParserFieldType {
+  MONEY
+  DATETIME
+  TEXT
+  NUMBER
+  DIRECTION
+}
+
+enum ParserRunStatus {
+  SUCCESS
+  FAILED
+  PARTIAL
+}
+
 model User {
   id           String     @id @default(cuid())
   email        String     @unique
@@ -117,15 +184,18 @@ model User {
   deletedAt    DateTime?
   metadata     Json?
 
-  settings      UserSettings?
-  transactions  Transaction[]
-  rawEmails     RawEmail[]
-  categories    TransactionCategory[]
-  refreshTokens RefreshToken[]
-  auditLogs     AuditLog[]
-  accounts      FinancialAccount[]
-  budgets       Budget[]
-  merchantRules MerchantRule[]
+  settings         UserSettings?
+  transactions     Transaction[]
+  rawEmails        RawEmail[]
+  categories       TransactionCategory[]
+  refreshTokens    RefreshToken[]
+  auditLogs        AuditLog[]
+  accounts         FinancialAccount[]
+  budgets          Budget[]
+  merchantRules    MerchantRule[]
+  emailConnections EmailConnection[]
+  emailListenRules EmailListenRule[]
+  emailMessages    EmailMessage[]
 }
 
 model UserSettings {
@@ -202,6 +272,7 @@ model Transaction {
   id                       String                @id @default(cuid())
   userId                   String
   rawEmailId               String?
+  emailMessageId           String?               @unique
   categoryId               String?
   financialAccountId       String?
   bankProviderId           String?
@@ -232,12 +303,14 @@ model Transaction {
   createdAt                DateTime              @default(now())
   updatedAt                DateTime              @updatedAt
 
-  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rawEmail    RawEmail?            @relation(fields: [rawEmailId], references: [id], onDelete: SetNull)
-  category    TransactionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  account     FinancialAccount?    @relation(fields: [financialAccountId], references: [id], onDelete: SetNull)
-  duplicateOf Transaction?         @relation("TransactionDuplicate", fields: [duplicateOfTransactionId], references: [id], onDelete: SetNull)
-  duplicates  Transaction[]        @relation("TransactionDuplicate")
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rawEmail     RawEmail?            @relation(fields: [rawEmailId], references: [id], onDelete: SetNull)
+  emailMessage EmailMessage?        @relation(fields: [emailMessageId], references: [id], onDelete: SetNull)
+  category     TransactionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  account      FinancialAccount?    @relation(fields: [financialAccountId], references: [id], onDelete: SetNull)
+  duplicateOf  Transaction?         @relation("TransactionDuplicate", fields: [duplicateOfTransactionId], references: [id], onDelete: SetNull)
+  duplicates   Transaction[]        @relation("TransactionDuplicate")
+  parserRuns   ParserRun[]
 
   @@unique([userId, externalTransactionId])
   @@index([userId, transactionTime])
@@ -347,4 +420,212 @@ model MerchantRule {
 
   @@index([userId, isActive])
   @@index([userId, priority])
+}
+
+model BankProvider {
+  id                String             @id @default(cuid())
+  code              String             @unique
+  name              String
+  countryCode       String             @default("VN")
+  website           String?
+  logoUrl           String?
+  status            BankProviderStatus @default(ACTIVE)
+  supportedChannels String[]           @default(["email"])
+  metadata          Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  emailSenders    BankEmailSender[]
+  listenRules     EmailListenRule[]
+  emailMessages   EmailMessage[]
+  parserTemplates ParserTemplate[]
+
+  @@index([status, countryCode])
+}
+
+model BankEmailSender {
+  id              String                @id @default(cuid())
+  bankProviderId  String
+  senderEmail     String
+  senderDomain    String?
+  senderName      String?
+  isVerified      Boolean               @default(false)
+  confidenceScore Decimal?              @db.Decimal(5, 4)
+  status          BankEmailSenderStatus @default(ACTIVE)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  bankProvider BankProvider @relation(fields: [bankProviderId], references: [id], onDelete: Cascade)
+
+  @@unique([bankProviderId, senderEmail])
+  @@index([senderEmail, status])
+}
+
+model EmailConnection {
+  id                    String                @id @default(cuid())
+  userId                String
+  provider              EmailProvider
+  emailAddress          String
+  providerUserId        String?
+  accessTokenEncrypted  String
+  refreshTokenEncrypted String
+  tokenExpiresAt        DateTime
+  scopes                String[]              @default([])
+  status                EmailConnectionStatus @default(ACTIVE)
+  lastSyncedAt          DateTime?
+  connectedAt           DateTime              @default(now())
+  disconnectedAt        DateTime?
+  errorMessage          String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listenRules EmailListenRule[]
+  syncRuns    EmailSyncRun[]
+  messages    EmailMessage[]
+
+  @@unique([userId, provider, emailAddress])
+  @@index([userId, status])
+}
+
+model EmailListenRule {
+  id                String    @id @default(cuid())
+  userId            String
+  emailConnectionId String?
+  bankProviderId    String?
+  name              String
+  senderEmail       String?
+  senderDomain      String?
+  subjectContains   String?
+  bodyContains      String?
+  syncFromDate      DateTime?
+  isEnabled         Boolean   @default(true)
+  priority          Int       @default(100)
+  lastMatchedAt     DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailConnection EmailConnection? @relation(fields: [emailConnectionId], references: [id], onDelete: Cascade)
+  bankProvider    BankProvider?    @relation(fields: [bankProviderId], references: [id], onDelete: SetNull)
+  messages        EmailMessage[]
+
+  @@index([userId, isEnabled, priority])
+  @@index([emailConnectionId, isEnabled])
+}
+
+model EmailSyncRun {
+  id                  String               @id @default(cuid())
+  emailConnectionId   String
+  triggerType         EmailSyncTriggerType @default(MANUAL)
+  status              EmailSyncStatus      @default(RUNNING)
+  startedAt           DateTime             @default(now())
+  finishedAt          DateTime?
+  emailsFound         Int                  @default(0)
+  emailsMatched       Int                  @default(0)
+  emailsParsed        Int                  @default(0)
+  transactionsCreated Int                  @default(0)
+  errorMessage        String?
+  createdAt           DateTime             @default(now())
+
+  emailConnection EmailConnection @relation(fields: [emailConnectionId], references: [id], onDelete: Cascade)
+
+  @@index([emailConnectionId, startedAt])
+  @@index([status, startedAt])
+}
+
+model EmailMessage {
+  id                String                @id @default(cuid())
+  userId            String
+  emailConnectionId String
+  providerMessageId String
+  providerThreadId  String?
+  providerHistoryId String?
+  messageIdHeader   String?
+  senderEmail       String
+  senderName        String?
+  subject           String?
+  snippet           String?
+  receivedAt        DateTime
+  bodyHash          String?
+  processingStatus  EmailProcessingStatus @default(PENDING)
+  matchedRuleId     String?
+  bankProviderId    String?
+  errorMessage      String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailConnection EmailConnection  @relation(fields: [emailConnectionId], references: [id], onDelete: Cascade)
+  matchedRule     EmailListenRule? @relation(fields: [matchedRuleId], references: [id], onDelete: SetNull)
+  bankProvider    BankProvider?    @relation(fields: [bankProviderId], references: [id], onDelete: SetNull)
+  parserRuns      ParserRun[]
+  transaction     Transaction?
+
+  @@unique([emailConnectionId, providerMessageId])
+  @@index([userId, receivedAt])
+  @@index([emailConnectionId, processingStatus])
+  @@index([bankProviderId, receivedAt])
+}
+
+model ParserTemplate {
+  id             String                @id @default(cuid())
+  bankProviderId String
+  name           String
+  version        Int
+  channel        ParserChannel         @default(EMAIL)
+  language       String?
+  directionHint  TransactionDirection?
+  subjectPattern String?
+  bodyPattern    String?
+  isActive       Boolean               @default(true)
+  priority       Int                   @default(100)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  bankProvider BankProvider  @relation(fields: [bankProviderId], references: [id], onDelete: Cascade)
+  fields       ParserField[]
+  runs         ParserRun[]
+
+  @@unique([bankProviderId, name, version])
+  @@index([bankProviderId, channel, isActive, priority])
+}
+
+model ParserField {
+  id               String          @id @default(cuid())
+  parserTemplateId String
+  fieldName        String
+  fieldType        ParserFieldType
+  regexPattern     String
+  regexGroupIndex  Int             @default(1)
+  normalizer       String?
+  isRequired       Boolean         @default(false)
+  fallbackValue    String?
+  priority         Int             @default(100)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  parserTemplate ParserTemplate @relation(fields: [parserTemplateId], references: [id], onDelete: Cascade)
+
+  @@index([parserTemplateId, fieldName, priority])
+}
+
+model ParserRun {
+  id                   String          @id @default(cuid())
+  emailMessageId       String
+  parserTemplateId     String?
+  status               ParserRunStatus
+  confidenceScore      Decimal?        @db.Decimal(5, 4)
+  extractedPayload     Json
+  normalizedPayload    Json
+  errorMessage         String?
+  createdTransactionId String?
+  createdAt            DateTime        @default(now())
+
+  emailMessage       EmailMessage    @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
+  parserTemplate     ParserTemplate? @relation(fields: [parserTemplateId], references: [id], onDelete: SetNull)
+  createdTransaction Transaction?    @relation(fields: [createdTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([emailMessageId, createdAt])
+  @@index([parserTemplateId, status])
 }

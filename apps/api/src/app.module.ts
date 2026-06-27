@@ -10,6 +10,12 @@ import { TransactionsModule } from './modules/transactions/transactions.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AppLoggerModule } from './common/logging/logger.module';
 import { BaseResponseInterceptor } from './common/interceptors/base-response.interceptor';
+import { SecurityModule } from './common/security/security.module';
+import { BankProvidersModule } from './modules/bank-providers/bank-providers.module';
+import { EmailConnectionsModule } from './modules/email-connections/email-connections.module';
+import { EmailListenRulesModule } from './modules/email-listen-rules/email-listen-rules.module';
+import { EmailIngestionModule } from './modules/email-ingestion/email-ingestion.module';
+import { ParserModule } from './modules/parser/parser.module';
 
 @Module({
   imports: [
@@ -17,6 +23,7 @@ import { BaseResponseInterceptor } from './common/interceptors/base-response.int
       isGlobal: true,
     }),
     AppLoggerModule,
+    SecurityModule,
     PrismaModule,
     UsersModule,
     AuthModule,
@@ -24,6 +31,11 @@ import { BaseResponseInterceptor } from './common/interceptors/base-response.int
     TransactionCategoriesModule,
     TransactionsModule,
     AnalyticsModule,
+    BankProvidersModule,
+    EmailConnectionsModule,
+    EmailListenRulesModule,
+    EmailIngestionModule,
+    ParserModule,
   ],
   providers: [
     {

@@ -22,6 +22,7 @@ export const toTransactionResponse = (
   id: transaction.id,
   userId: transaction.userId,
   rawEmailId: transaction.rawEmailId,
+  emailMessageId: transaction.emailMessageId,
   categoryId: transaction.categoryId,
   financialAccountId: transaction.financialAccountId,
   bankProviderId: transaction.bankProviderId,
