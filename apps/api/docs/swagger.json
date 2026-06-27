@@ -994,6 +994,416 @@
           "Analytics"
         ]
       }
+    },
+    "/api/bank-providers": {
+      "get": {
+        "operationId": "BankProvidersController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "BankProviders"
+        ]
+      }
+    },
+    "/api/email-connections/gmail/connect": {
+      "post": {
+        "operationId": "EmailConnectionsController_connectGmail",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EmailConnections"
+        ]
+      }
+    },
+    "/api/email-connections/gmail/callback": {
+      "get": {
+        "operationId": "EmailConnectionsController_callback",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EmailConnections"
+        ]
+      }
+    },
+    "/api/email-connections": {
+      "get": {
+        "operationId": "EmailConnectionsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EmailConnections"
+        ]
+      }
+    },
+    "/api/email-connections/{id}": {
+      "delete": {
+        "operationId": "EmailConnectionsController_disconnect",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EmailConnections"
+        ]
+      }
+    },
+    "/api/email-listen-rules": {
+      "get": {
+        "operationId": "EmailListenRulesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EmailListenRules"
+        ]
+      },
+      "post": {
+        "operationId": "EmailListenRulesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEmailListenRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EmailListenRules"
+        ]
+      }
+    },
+    "/api/email-listen-rules/{id}": {
+      "patch": {
+        "operationId": "EmailListenRulesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEmailListenRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EmailListenRules"
+        ]
+      },
+      "delete": {
+        "operationId": "EmailListenRulesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EmailListenRules"
+        ]
+      }
+    },
+    "/api/email-connections/{id}/sync": {
+      "post": {
+        "operationId": "EmailIngestionController_sync",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EmailIngestion"
+        ]
+      }
+    },
+    "/api/email-connections/{id}/sync-runs": {
+      "get": {
+        "operationId": "EmailIngestionController_listRuns",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EmailIngestion"
+        ]
+      }
+    },
+    "/api/email-messages": {
+      "get": {
+        "operationId": "EmailIngestionController_listMessages",
+        "parameters": [
+          {
+            "name": "emailConnectionId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "processingStatus",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDING",
+                "IGNORED",
+                "FAILED",
+                "PARSED"
+              ]
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "EmailIngestion"
+        ]
+      }
+    },
+    "/api/parser-templates": {
+      "get": {
+        "operationId": "ParserController_listTemplates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parser"
+        ]
+      },
+      "post": {
+        "operationId": "ParserController_createTemplate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateParserTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parser"
+        ]
+      }
+    },
+    "/api/parser-templates/{id}": {
+      "patch": {
+        "operationId": "ParserController_updateTemplate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateParserTemplateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parser"
+        ]
+      }
+    },
+    "/api/email-messages/{id}/parse": {
+      "post": {
+        "operationId": "ParserController_parse",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Parser"
+        ]
+      }
+    },
+    "/api/email-messages/{id}/parser-runs": {
+      "get": {
+        "operationId": "ParserController_listRuns",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Parser"
+        ]
+      }
     }
   },
   "info": {
@@ -1735,6 +2145,259 @@
           "duplicateOfTransactionId": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "CreateEmailListenRuleDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "emailConnectionId": {
+            "type": "string"
+          },
+          "bankProviderId": {
+            "type": "string"
+          },
+          "senderEmail": {
+            "type": "string"
+          },
+          "senderDomain": {
+            "type": "string"
+          },
+          "subjectContains": {
+            "type": "string"
+          },
+          "bodyContains": {
+            "type": "string"
+          },
+          "syncFromDate": {
+            "type": "string"
+          },
+          "isEnabled": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "UpdateEmailListenRuleDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "emailConnectionId": {
+            "type": "string"
+          },
+          "bankProviderId": {
+            "type": "string"
+          },
+          "senderEmail": {
+            "type": "string"
+          },
+          "senderDomain": {
+            "type": "string"
+          },
+          "subjectContains": {
+            "type": "string"
+          },
+          "bodyContains": {
+            "type": "string"
+          },
+          "syncFromDate": {
+            "type": "string"
+          },
+          "isEnabled": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "ParserFieldDto": {
+        "type": "object",
+        "properties": {
+          "fieldName": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "fieldType": {
+            "type": "string",
+            "enum": [
+              "MONEY",
+              "DATETIME",
+              "TEXT",
+              "NUMBER",
+              "DIRECTION"
+            ]
+          },
+          "regexPattern": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "regexGroupIndex": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 20
+          },
+          "normalizer": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "isRequired": {
+            "type": "boolean"
+          },
+          "fallbackValue": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "priority": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "fieldName",
+          "fieldType",
+          "regexPattern"
+        ]
+      },
+      "CreateParserTemplateDto": {
+        "type": "object",
+        "properties": {
+          "bankProviderId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "EMAIL",
+              "CSV",
+              "SMS",
+              "API"
+            ]
+          },
+          "language": {
+            "type": "string",
+            "maxLength": 12
+          },
+          "directionHint": {
+            "type": "string",
+            "enum": [
+              "INCOME",
+              "EXPENSE",
+              "TRANSFER_IN",
+              "TRANSFER_OUT",
+              "ADJUSTMENT"
+            ]
+          },
+          "subjectPattern": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "bodyPattern": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "number",
+            "minimum": 0
+          },
+          "fields": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParserFieldDto"
+            }
+          }
+        },
+        "required": [
+          "bankProviderId",
+          "name",
+          "version",
+          "fields"
+        ]
+      },
+      "UpdateParserTemplateDto": {
+        "type": "object",
+        "properties": {
+          "bankProviderId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
+          },
+          "channel": {
+            "enum": [
+              "EMAIL",
+              "CSV",
+              "SMS",
+              "API"
+            ],
+            "type": "string"
+          },
+          "language": {
+            "type": "string",
+            "maxLength": 12
+          },
+          "directionHint": {
+            "enum": [
+              "INCOME",
+              "EXPENSE",
+              "TRANSFER_IN",
+              "TRANSFER_OUT",
+              "ADJUSTMENT"
+            ],
+            "type": "string"
+          },
+          "subjectPattern": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "bodyPattern": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "priority": {
+            "type": "number",
+            "minimum": 0
+          },
+          "fields": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParserFieldDto"
+            }
           }
         }
       }

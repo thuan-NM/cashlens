@@ -73,8 +73,22 @@ describe('CashLens current modules smoke test (e2e)', () => {
   let categoryId: string;
   let incomeTransactionId: string;
   let expenseTransactionId: string;
+  let listenRuleId: string;
+  let bankProviderId: string;
+  let emailConnectionId: string;
+  let parsedEmailMessageId: string;
+  let failedEmailMessageId: string;
+  let parserTemplateId: string;
 
   beforeAll(async () => {
+    process.env.EMAIL_TOKEN_ENCRYPTION_KEY =
+      'smoke-test-email-token-encryption-key-32';
+    process.env.GMAIL_CLIENT_ID = 'smoke-google-client-id';
+    process.env.GMAIL_CLIENT_SECRET = 'smoke-google-client-secret';
+    process.env.GMAIL_REDIRECT_URI =
+      'http://localhost:3000/api/email-connections/gmail/callback';
+    process.env.GMAIL_OAUTH_STATE_SECRET = 'smoke-oauth-state-secret';
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
@@ -96,6 +110,9 @@ describe('CashLens current modules smoke test (e2e)', () => {
   });
 
   afterAll(async () => {
+    await prisma.parserTemplate.deleteMany({
+      where: { name: { startsWith: 'VCB smoke parser ' } },
+    });
     await prisma.user.deleteMany({
       where: { email: { in: [email, managedUserEmail] } },
     });
@@ -289,6 +306,249 @@ describe('CashLens current modules smoke test (e2e)', () => {
     });
   });
 
+  describe('Email integration foundation', () => {
+    it('lists seeded bank providers', async () => {
+      const response = await agent.get('/api/bank-providers').expect(200);
+      const providers = bodyData<Array<{ id: string; code: string }>>(response);
+      bankProviderId = providers.find(
+        (provider) => provider.code === 'VCB',
+      )!.id;
+
+      expect(providers.map((provider) => provider.code)).toEqual(
+        expect.arrayContaining(['VCB', 'TCB', 'MBB', 'ACB']),
+      );
+    });
+
+    it('creates, lists, updates, and deletes a listen rule', async () => {
+      const createResponse = await agent
+        .post('/api/email-listen-rules')
+        .send({
+          name: 'Smoke Gmail Bank Rule',
+          senderDomain: 'example-bank.vn',
+          subjectContains: 'transaction',
+          syncFromDate: new Date(Date.now() - 86400000).toISOString(),
+          priority: 10,
+        })
+        .expect(201);
+      const rule = bodyData<{ id: string; isEnabled: boolean }>(createResponse);
+      listenRuleId = rule.id;
+      expect(rule.isEnabled).toBe(true);
+
+      const listResponse = await agent
+        .get('/api/email-listen-rules')
+        .expect(200);
+      expect(
+        bodyData<Array<{ id: string }>>(listResponse).some(
+          (item) => item.id === listenRuleId,
+        ),
+      ).toBe(true);
+
+      const updateResponse = await agent
+        .patch(`/api/email-listen-rules/${listenRuleId}`)
+        .send({ isEnabled: false, priority: 20 })
+        .expect(200);
+      expect(
+        bodyData<{ isEnabled: boolean; priority: number }>(updateResponse),
+      ).toMatchObject({ isEnabled: false, priority: 20 });
+
+      const deleteResponse = await agent
+        .delete(`/api/email-listen-rules/${listenRuleId}`)
+        .expect(200);
+      expect(bodyData<{ id: string }>(deleteResponse).id).toBe(listenRuleId);
+    });
+
+    it('creates a Gmail OAuth authorization URL with readonly scope', async () => {
+      const response = await agent
+        .post('/api/email-connections/gmail/connect')
+        .expect(201);
+      const { authorizationUrl } = bodyData<{ authorizationUrl: string }>(
+        response,
+      );
+      const url = new URL(authorizationUrl);
+
+      expect(url.origin).toBe('https://accounts.google.com');
+      expect(url.searchParams.get('client_id')).toBe('smoke-google-client-id');
+      expect(url.searchParams.get('scope')).toBe(
+        'https://www.googleapis.com/auth/gmail.readonly',
+      );
+      expect(url.searchParams.get('state')).toBeTruthy();
+    });
+
+    it('prepares email metadata fixtures for deterministic parsing', async () => {
+      const connection = await prisma.emailConnection.create({
+        data: {
+          userId,
+          provider: 'GMAIL',
+          emailAddress: email,
+          accessTokenEncrypted: 'fixture-access-token',
+          refreshTokenEncrypted: 'fixture-refresh-token',
+          tokenExpiresAt: new Date(Date.now() + 3600000),
+          scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
+        },
+      });
+      emailConnectionId = connection.id;
+
+      const parsedMessage = await prisma.emailMessage.create({
+        data: {
+          userId,
+          emailConnectionId,
+          bankProviderId,
+          providerMessageId: `gmail-success-${testRunId}`,
+          senderEmail: 'notify@vcb.example',
+          subject: 'VCB transaction notification',
+          snippet:
+            'Amount: 1,250,000 VND; Direction: EXPENSE; Time: 20/06/2026 15:30:00; Description: Grocery payment; Balance: 8,750,000 VND; Code: TXN123',
+          receivedAt: new Date('2026-06-20T08:30:00.000Z'),
+        },
+      });
+      parsedEmailMessageId = parsedMessage.id;
+
+      const failedMessage = await prisma.emailMessage.create({
+        data: {
+          userId,
+          emailConnectionId,
+          bankProviderId,
+          providerMessageId: `gmail-failed-${testRunId}`,
+          senderEmail: 'notify@vcb.example',
+          subject: 'VCB transaction notification',
+          snippet: 'Direction: EXPENSE; Time: 20/06/2026 15:30:00',
+          receivedAt: new Date('2026-06-20T08:30:00.000Z'),
+        },
+      });
+      failedEmailMessageId = failedMessage.id;
+    });
+  });
+
+  describe('Parser pipeline', () => {
+    it('creates a safe versioned parser template', async () => {
+      const response = await agent
+        .post('/api/parser-templates')
+        .send({
+          bankProviderId,
+          name: `VCB smoke parser ${testRunId}`,
+          version: 1,
+          channel: 'EMAIL',
+          language: 'en',
+          subjectPattern: 'VCB transaction',
+          priority: 10,
+          fields: [
+            {
+              fieldName: 'amount',
+              fieldType: 'MONEY',
+              regexPattern: 'Amount:\\s*([\\d,]+)',
+              normalizer: 'vnd_money',
+              isRequired: true,
+            },
+            {
+              fieldName: 'direction',
+              fieldType: 'DIRECTION',
+              regexPattern: 'Direction:\\s*(\\w+)',
+              isRequired: true,
+            },
+            {
+              fieldName: 'transaction_time',
+              fieldType: 'DATETIME',
+              regexPattern:
+                'Time:\\s*(\\d{2}/\\d{2}/\\d{4}\\s+\\d{2}:\\d{2}:\\d{2})',
+              normalizer: 'vi_datetime',
+              isRequired: true,
+            },
+            {
+              fieldName: 'description',
+              fieldType: 'TEXT',
+              regexPattern: 'Description:\\s*([^;]+)',
+            },
+            {
+              fieldName: 'balance_after',
+              fieldType: 'MONEY',
+              regexPattern: 'Balance:\\s*([\\d,]+)',
+              normalizer: 'vnd_money',
+            },
+            {
+              fieldName: 'transaction_code',
+              fieldType: 'TEXT',
+              regexPattern: 'Code:\\s*(\\w+)',
+            },
+          ],
+        })
+        .expect(201);
+      parserTemplateId = bodyData<{ id: string }>(response).id;
+      expect(parserTemplateId).toBeTruthy();
+
+      const listResponse = await agent.get('/api/parser-templates').expect(200);
+      expect(
+        bodyData<Array<{ id: string }>>(listResponse).some(
+          (template) => template.id === parserTemplateId,
+        ),
+      ).toBe(true);
+    });
+
+    it('parses an email into one idempotent transaction', async () => {
+      const firstResponse = await agent
+        .post(`/api/email-messages/${parsedEmailMessageId}/parse`)
+        .expect(201);
+      const first = bodyData<{ transactionId: string; created: boolean }>(
+        firstResponse,
+      );
+      expect(first.created).toBe(true);
+
+      const transaction = await prisma.transaction.findUniqueOrThrow({
+        where: { id: first.transactionId },
+      });
+      expect(Number(transaction.amount)).toBe(1250000);
+      expect(Number(transaction.balanceAfter)).toBe(8750000);
+      expect(transaction.direction).toBe('EXPENSE');
+      expect(transaction.sourceType).toBe('EMAIL');
+      expect(transaction.emailMessageId).toBe(parsedEmailMessageId);
+      expect(transaction.transactionCode).toBe('TXN123');
+
+      const secondResponse = await agent
+        .post(`/api/email-messages/${parsedEmailMessageId}/parse`)
+        .expect(201);
+      expect(
+        bodyData<{ transactionId: string; created: boolean }>(secondResponse),
+      ).toEqual({ transactionId: first.transactionId, created: false });
+
+      expect(
+        await prisma.transaction.count({
+          where: { emailMessageId: parsedEmailMessageId },
+        }),
+      ).toBe(1);
+    });
+
+    it('records a failed parser run without creating a transaction', async () => {
+      const response = await agent
+        .post(`/api/email-messages/${failedEmailMessageId}/parse`)
+        .expect(201);
+      const result = bodyData<{
+        created: boolean;
+        parserRun: { status: string; errorMessage: string };
+      }>(response);
+      expect(result.created).toBe(false);
+      expect(result.parserRun.status).toBe('FAILED');
+      expect(result.parserRun.errorMessage).toContain('amount');
+
+      expect(
+        await prisma.transaction.count({
+          where: { emailMessageId: failedEmailMessageId },
+        }),
+      ).toBe(0);
+      expect(
+        await prisma.emailMessage.findUniqueOrThrow({
+          where: { id: failedEmailMessageId },
+          select: { processingStatus: true },
+        }),
+      ).toEqual({ processingStatus: 'FAILED' });
+
+      const runsResponse = await agent
+        .get(`/api/email-messages/${failedEmailMessageId}/parser-runs`)
+        .expect(200);
+      expect(bodyData<Array<{ status: string }>>(runsResponse)[0].status).toBe(
+        'FAILED',
+      );
+    });
+  });
+
   describe('Transaction categories', () => {
     it('creates, lists, reads, and updates a category', async () => {
       const createResponse = await agent
@@ -426,9 +686,9 @@ describe('CashLens current modules smoke test (e2e)', () => {
       }>(summaryResponse);
       expect(summary).toMatchObject({
         income: 5000000,
-        expense: 250000,
-        netCashflow: 4750000,
-        transactionCount: 2,
+        expense: 1500000,
+        netCashflow: 3500000,
+        transactionCount: 3,
       });
 
       const breakdownResponse = await agent
@@ -459,8 +719,8 @@ describe('CashLens current modules smoke test (e2e)', () => {
       expect(cashflow).toContainEqual({
         date,
         income: 5000000,
-        expense: 250000,
-        netCashflow: 4750000,
+        expense: 1500000,
+        netCashflow: 3500000,
       });
     });
 
