@@ -1404,6 +1404,687 @@
           "Parser"
         ]
       }
+    },
+    "/api/budgets": {
+      "get": {
+        "operationId": "BudgetsController_list",
+        "parameters": [
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "WEEKLY",
+                "MONTHLY",
+                "YEARLY",
+                "CUSTOM"
+              ]
+            }
+          },
+          {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Budgets"
+        ]
+      },
+      "post": {
+        "operationId": "BudgetsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBudgetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Budgets"
+        ]
+      }
+    },
+    "/api/budgets/summary": {
+      "get": {
+        "operationId": "BudgetsController_summary",
+        "parameters": [
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Budgets"
+        ]
+      }
+    },
+    "/api/budgets/alerts": {
+      "get": {
+        "operationId": "BudgetsController_alerts",
+        "parameters": [
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Budgets"
+        ]
+      }
+    },
+    "/api/budgets/{id}": {
+      "get": {
+        "operationId": "BudgetsController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Budgets"
+        ]
+      },
+      "patch": {
+        "operationId": "BudgetsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBudgetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Budgets"
+        ]
+      },
+      "delete": {
+        "operationId": "BudgetsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Budgets"
+        ]
+      }
+    },
+    "/api/goals": {
+      "get": {
+        "operationId": "GoalsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "ARCHIVED",
+                "PAUSED",
+                "COMPLETED"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Goals"
+        ]
+      },
+      "post": {
+        "operationId": "GoalsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGoalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Goals"
+        ]
+      }
+    },
+    "/api/goals/{id}/simulation": {
+      "get": {
+        "operationId": "GoalsController_simulate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "months",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "scenario",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "FULL",
+                "INSTALLMENT"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Goals"
+        ]
+      }
+    },
+    "/api/goals/{id}": {
+      "get": {
+        "operationId": "GoalsController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Goals"
+        ]
+      },
+      "patch": {
+        "operationId": "GoalsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGoalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Goals"
+        ]
+      },
+      "delete": {
+        "operationId": "GoalsController_archive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Goals"
+        ]
+      }
+    },
+    "/api/goals/{id}/contribution": {
+      "post": {
+        "operationId": "GoalsController_contribute",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoalContributionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Goals"
+        ]
+      }
+    },
+    "/api/alerts": {
+      "get": {
+        "operationId": "AlertsController_list",
+        "parameters": [
+          {
+            "name": "severity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CRITICAL",
+                "INFO",
+                "WARNING"
+              ]
+            }
+          },
+          {
+            "name": "read",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Alerts"
+        ]
+      },
+      "post": {
+        "operationId": "AlertsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAlertDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/alerts/read-all": {
+      "patch": {
+        "operationId": "AlertsController_markAllRead",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/alerts/settings": {
+      "get": {
+        "operationId": "AlertsController_settings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Alerts"
+        ]
+      },
+      "patch": {
+        "operationId": "AlertsController_updateSetting",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAlertSettingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/alerts/{id}/read": {
+      "patch": {
+        "operationId": "AlertsController_markRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/dashboard/overview": {
+      "get": {
+        "operationId": "DashboardController_overview",
+        "parameters": [
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/api/dashboard/cashflow": {
+      "get": {
+        "operationId": "DashboardController_cashflow",
+        "parameters": [
+          {
+            "name": "months",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 24,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/api/dashboard/category-breakdown": {
+      "get": {
+        "operationId": "DashboardController_categoryBreakdown",
+        "parameters": [
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/api/dashboard/recent-transactions": {
+      "get": {
+        "operationId": "DashboardController_recentTransactions",
+        "parameters": [
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/api/dashboard/hot-budgets": {
+      "get": {
+        "operationId": "DashboardController_hotBudgets",
+        "parameters": [
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
+    },
+    "/api/dashboard/insights": {
+      "get": {
+        "operationId": "DashboardController_insights",
+        "parameters": [
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Dashboard"
+        ]
+      }
     }
   },
   "info": {
@@ -2400,6 +3081,219 @@
             }
           }
         }
+      },
+      "CreateBudgetDto": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 3
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "WEEKLY",
+              "MONTHLY",
+              "YEARLY",
+              "CUSTOM"
+            ]
+          },
+          "startsAt": {
+            "type": "string"
+          },
+          "endsAt": {
+            "type": "string"
+          },
+          "thresholdPercent": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "rollover": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "amount",
+          "startsAt"
+        ]
+      },
+      "UpdateBudgetDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateGoalDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "type": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "targetAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "savedAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 3
+          },
+          "targetDate": {
+            "type": "string"
+          },
+          "months": {
+            "type": "number",
+            "minimum": 1
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH",
+              "CRITICAL"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED",
+              "PAUSED",
+              "COMPLETED"
+            ]
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "targetAmount"
+        ]
+      },
+      "UpdateGoalDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "GoalContributionDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount"
+        ]
+      },
+      "CreateAlertDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "SYSTEM",
+              "BUDGET_THRESHOLD",
+              "LARGE_TRANSACTION",
+              "CATEGORY_SHIFT",
+              "GOAL_RISK",
+              "CASHFLOW_RISK",
+              "PARSER_ISSUE"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "CRITICAL",
+              "INFO",
+              "WARNING"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 180
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "resourceType": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "message"
+        ]
+      },
+      "UpdateAlertSettingDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "SYSTEM",
+              "BUDGET_THRESHOLD",
+              "LARGE_TRANSACTION",
+              "CATEGORY_SHIFT",
+              "GOAL_RISK",
+              "CASHFLOW_RISK",
+              "PARSER_ISSUE"
+            ]
+          },
+          "inAppEnabled": {
+            "type": "boolean"
+          },
+          "emailEnabled": {
+            "type": "boolean"
+          },
+          "threshold": {
+            "type": "number",
+            "minimum": 0
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "type"
+        ]
       }
     }
   }

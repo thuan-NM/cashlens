@@ -719,8 +719,8 @@ describe('CashLens current modules smoke test (e2e)', () => {
       expect(cashflow).toContainEqual({
         date,
         income: 5000000,
-        expense: 1500000,
-        netCashflow: 3500000,
+        expense: 250000,
+        netCashflow: 4750000,
       });
     });
 

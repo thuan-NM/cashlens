@@ -11,6 +11,70 @@ services:
       - "5432:5432"
     volumes:
       - cashlens_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cashlens -d cashlens_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    image: node:22-alpine
+    container_name: cashlens-api
+    working_dir: /workspace
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://cashlens:cashlens_password@postgres:5432/cashlens_db?schema=public
+      JWT_SECRET: change-me
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN_DAYS: 30
+      CORS_ORIGIN: http://localhost:5173
+      EMAIL_TOKEN_ENCRYPTION_KEY: replace-with-at-least-32-random-characters
+      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:-}
+      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:-}
+      GMAIL_REDIRECT_URI: ${GMAIL_REDIRECT_URI:-http://localhost:3000/api/email-connections/gmail/callback}
+      GMAIL_OAUTH_STATE_SECRET: ${GMAIL_OAUTH_STATE_SECRET:-replace-with-a-random-oauth-state-secret}
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/workspace
+      - cashlens_root_node_modules:/workspace/node_modules
+      - cashlens_api_node_modules:/workspace/apps/api/node_modules
+      - cashlens_web_node_modules:/workspace/apps/web/node_modules
+    command: >
+      sh -c "corepack enable &&
+      yarn install --immutable &&
+      yarn workspace api prisma migrate deploy &&
+      yarn workspace api start:dev"
+
+  web:
+    image: node:22-alpine
+    container_name: cashlens-web
+    working_dir: /workspace
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NODE_ENV: development
+      VITE_API_BASE_URL: http://localhost:3000/api
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/workspace
+      - cashlens_root_node_modules:/workspace/node_modules
+      - cashlens_api_node_modules:/workspace/apps/api/node_modules
+      - cashlens_web_node_modules:/workspace/apps/web/node_modules
+    command: >
+      sh -c "corepack enable &&
+      yarn install --immutable &&
+      yarn workspace web dev --host 0.0.0.0"
 
 volumes:
   cashlens_postgres_data:
+  cashlens_root_node_modules:
+  cashlens_api_node_modules:
+  cashlens_web_node_modules:

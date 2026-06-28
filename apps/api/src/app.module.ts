@@ -16,6 +16,10 @@ import { EmailConnectionsModule } from './modules/email-connections/email-connec
 import { EmailListenRulesModule } from './modules/email-listen-rules/email-listen-rules.module';
 import { EmailIngestionModule } from './modules/email-ingestion/email-ingestion.module';
 import { ParserModule } from './modules/parser/parser.module';
+import { BudgetsModule } from './modules/budgets/budgets.module';
+import { GoalsModule } from './modules/goals/goals.module';
+import { AlertsModule } from './modules/alerts/alerts.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -36,6 +40,10 @@ import { ParserModule } from './modules/parser/parser.module';
     EmailListenRulesModule,
     EmailIngestionModule,
     ParserModule,
+    BudgetsModule,
+    GoalsModule,
+    AlertsModule,
+    DashboardModule,
   ],
   providers: [
     {
