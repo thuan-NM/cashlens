@@ -101,6 +101,41 @@ enum BudgetPeriod {
   CUSTOM
 }
 
+enum GoalStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum GoalPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum GoalScenarioType {
+  FULL
+  INSTALLMENT
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertType {
+  BUDGET_THRESHOLD
+  LARGE_TRANSACTION
+  CATEGORY_SHIFT
+  GOAL_RISK
+  CASHFLOW_RISK
+  PARSER_ISSUE
+  SYSTEM
+}
+
 enum EmailProvider {
   GMAIL
   OUTLOOK
@@ -192,6 +227,9 @@ model User {
   auditLogs        AuditLog[]
   accounts         FinancialAccount[]
   budgets          Budget[]
+  goals            Goal[]
+  alerts           Alert[]
+  alertSettings    AlertSetting[]
   merchantRules    MerchantRule[]
   emailConnections EmailConnection[]
   emailListenRules EmailListenRule[]
@@ -381,25 +419,89 @@ model FinancialAccount {
 }
 
 model Budget {
-  id         String       @id @default(cuid())
-  userId     String
-  categoryId String?
-  name       String
-  amount     Decimal      @db.Decimal(18, 2)
-  currency   String       @default("VND")
-  period     BudgetPeriod @default(MONTHLY)
-  startsAt   DateTime
-  endsAt     DateTime?
-  rollover   Boolean      @default(false)
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-  deletedAt  DateTime?
+  id               String       @id @default(cuid())
+  userId           String
+  categoryId       String?
+  name             String
+  amount           Decimal      @db.Decimal(18, 2)
+  currency         String       @default("VND")
+  period           BudgetPeriod @default(MONTHLY)
+  startsAt         DateTime
+  endsAt           DateTime?
+  thresholdPercent Int          @default(80)
+  rollover         Boolean      @default(false)
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  deletedAt        DateTime?
 
   user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   category TransactionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@index([userId, period])
   @@index([userId, startsAt])
+  @@index([userId, isActive])
+}
+
+model Goal {
+  id           String       @id @default(cuid())
+  userId       String
+  name         String
+  type         String?
+  targetAmount Decimal      @db.Decimal(18, 2)
+  savedAmount  Decimal      @default(0) @db.Decimal(18, 2)
+  currency     String       @default("VND")
+  targetDate   DateTime?
+  months       Int?
+  priority     GoalPriority @default(MEDIUM)
+  status       GoalStatus   @default(ACTIVE)
+  metadata     Json?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, targetDate])
+}
+
+model Alert {
+  id           String        @id @default(cuid())
+  userId       String
+  type         AlertType
+  severity     AlertSeverity @default(INFO)
+  title        String
+  message      String
+  resourceType String?
+  resourceId   String?
+  isRead       Boolean       @default(false)
+  readAt       DateTime?
+  metadata     Json?
+  createdAt    DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, severity, createdAt])
+  @@index([resourceType, resourceId])
+}
+
+model AlertSetting {
+  id           String    @id @default(cuid())
+  userId       String
+  type         AlertType
+  inAppEnabled Boolean   @default(true)
+  emailEnabled Boolean   @default(false)
+  threshold    Decimal?  @db.Decimal(18, 2)
+  metadata     Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId, inAppEnabled])
 }
 
 model MerchantRule {
