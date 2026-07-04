@@ -49,6 +49,7 @@ services:
       sh -c "corepack enable &&
       yarn install --immutable &&
       yarn workspace api prisma migrate deploy &&
+      yarn workspace api prisma generate &&
       yarn workspace api start:dev"
 
   web:

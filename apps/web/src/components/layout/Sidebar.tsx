@@ -1,3 +1,4 @@
+﻿import type { ReactNode } from "react";
 import { Drawer } from "antd";
 import { AnimatePresence, motion } from "framer-motion";
 import { NavLink } from "react-router";
@@ -25,7 +26,7 @@ const sidebarSpring = {
   mass: 0.8,
 } as const;
 
-function AnimatedLabel({ visible, children }: { visible: boolean; children: React.ReactNode }) {
+function AnimatedLabel({ visible, children }: { visible: boolean; children: ReactNode }) {
   return (
     <AnimatePresence initial={false}>
       {visible && (
@@ -101,19 +102,6 @@ function SidebarContent({ mobile = false }: { mobile?: boolean }) {
                   </motion.span>
 
                   <AnimatedLabel visible={expanded}>{item.label}</AnimatedLabel>
-
-                  {item.icon === "alerts" && (
-                    <motion.span
-                      layout
-                      transition={sidebarSpring}
-                      className={cn(
-                        "flex min-w-[19px] items-center justify-center rounded-full bg-[var(--expense)] px-1.5 text-[10px] font-bold text-white shadow-sm",
-                        collapsed ? "absolute right-0.5 top-0.5 h-[18px]" : "ml-auto h-[19px]"
-                      )}
-                    >
-                      5
-                    </motion.span>
-                  )}
                 </motion.span>
               </>
             )}

@@ -1,10 +1,16 @@
 interface SparkProps { data: number[]; color: string; width?: number; height?: number; }
 
+const numberOrZero = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export function SparkLine({ data, color, width = 120, height = 34 }: SparkProps) {
-  const mn = Math.min(...data), mx = Math.max(...data), rg = (mx - mn) || 1;
-  const xs = (i: number) => data.length < 2 ? width / 2 : (i / (data.length - 1)) * width;
-  const ys = (v: number) => height - 2 - ((v - mn) / rg) * (height - 6);
-  const ln = data.map((v, i) => `${i ? "L" : "M"}${xs(i).toFixed(1)} ${ys(v).toFixed(1)}`).join(" ");
+  const points = data.length ? data.map(numberOrZero) : [0, 0];
+  const mn = Math.min(...points), mx = Math.max(...points), rg = (mx - mn) || 1;
+  const xs = (i: number) => points.length < 2 ? width / 2 : (i / (points.length - 1)) * width;
+  const ys = (v: number) => height - 2 - ((numberOrZero(v) - mn) / rg) * (height - 6);
+  const ln = points.map((v, i) => `${i ? "L" : "M"}${xs(i).toFixed(1)} ${ys(v).toFixed(1)}`).join(" ");
   const ar = ln + ` L${width} ${height} L0 ${height} Z`;
   const gid = `sp-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
@@ -17,7 +23,7 @@ export function SparkLine({ data, color, width = 120, height = 34 }: SparkProps)
       </defs>
       <path d={ar} fill={`url(#${gid})`} />
       <path d={ln} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={xs(data.length - 1)} cy={ys(data[data.length - 1])} r={2.6} fill={color} />
+      <circle cx={xs(points.length - 1)} cy={ys(points[points.length - 1])} r={2.6} fill={color} />
     </svg>
   );
 }
