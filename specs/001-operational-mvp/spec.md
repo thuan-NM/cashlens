@@ -13,6 +13,10 @@
 ### Session 2026-09-08
 
 - Q: Phạm vi release “Operational MVP” nên bao gồm mức nào? → A: Bao gồm toàn bộ P1: budget, mọi alert P1, in-app notification, email fallback và financial goals.
+- Q: Trong Operational MVP, administrator có được xem hoặc chỉnh sửa dữ liệu tài chính và nội dung email của người dùng không? → A: Admin chỉ quản lý tài khoản và cấu hình hệ thống; không được truy cập dữ liệu tài chính hoặc email của người dùng.
+- Q: Operational MVP phải tự động đồng bộ Gmail theo lịch hay chỉ cần người dùng chủ động bấm đồng bộ? → A: Chỉ bắt buộc manual sync và initial backfill có giới hạn; scheduler và background worker để sau MVP.
+- Q: Available cashflow dùng để đánh giá goal nên được tính từ khoảng lịch sử nào? → A: Dùng trung bình net cashflow của 3 tháng hoàn chỉnh gần nhất và yêu cầu tối thiểu 2 tháng dữ liệu.
+- Q: Sau khi budget đã tạo alert cho một ngưỡng, khi nào hệ thống được phép tạo lại alert cho chính ngưỡng đó? → A: Mỗi ngưỡng chỉ tạo một alert trong một kỳ budget; chỉ cảnh báo lại sau khi usage xuống dưới ngưỡng, alert cũ được resolve, usage vượt lại, và đã qua ít nhất 24 giờ.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -30,6 +34,7 @@ As a CashLens user, I can register, sign in, maintain a session, update my own s
 2. **Given** an authenticated ordinary user, **When** they attempt to read, update, or delete another user's account or financial resource, **Then** access is denied without revealing that resource's sensitive details.
 3. **Given** an ordinary user, **When** they submit changes to role, status, or another privileged field, **Then** the change is rejected and the privileged values remain unchanged.
 4. **Given** an expired short-lived session and a valid renewable session, **When** the user continues normal activity, **Then** the session is renewed without duplicating the action; otherwise the user is returned to sign-in with a clear message.
+5. **Given** an authenticated administrator, **When** they attempt to access a user's transactions, budgets, goals, email messages, provider tokens, or other private financial content, **Then** access is denied under the same ownership boundary as for an ordinary user.
 
 ---
 
@@ -65,6 +70,7 @@ As a user, I can connect Gmail with read-only consent, explicitly choose which b
 3. **Given** the same provider message or transaction is seen again, **When** synchronization is retried, **Then** no second active transaction is created.
 4. **Given** one malformed message among valid messages, **When** synchronization runs, **Then** the malformed message is recorded as failed, valid messages continue, and the final run reports a partial failure.
 5. **Given** a revoked or expired connection, **When** synchronization is requested, **Then** no messages are processed and the user receives an actionable reconnect state.
+6. **Given** a newly connected mailbox, **When** the user starts the initial import, **Then** the system processes only the configured bounded history and reports when that backfill is complete or requires another user-triggered continuation.
 
 ---
 
@@ -96,9 +102,10 @@ As a user, I can set a category budget and threshold, see usage calculated from 
 **Acceptance Scenarios**:
 
 1. **Given** an active budget at 80% warning and 100% critical thresholds, **When** eligible spending crosses 80%, **Then** one warning alert is created for that budget period.
-2. **Given** the same threshold condition remains true inside its cooldown, **When** evaluation repeats, **Then** no duplicate alert is created.
+2. **Given** the same threshold condition remains true, **When** evaluation repeats during the same budget period, **Then** no duplicate alert is created regardless of elapsed time.
 3. **Given** spending later crosses 100%, **When** evaluation runs, **Then** a critical alert may be created even if the earlier warning is still in cooldown.
 4. **Given** a related transaction is edited, deleted, ignored, duplicated, or recategorized, **When** totals change, **Then** budget usage and alert state are recalculated deterministically.
+5. **Given** usage fell below a previously alerted threshold and that alert was resolved, **When** usage crosses the same threshold again after at least 24 hours, **Then** one new alert may be created for that threshold and budget period.
 
 ---
 
@@ -113,8 +120,8 @@ As a user, I can create a financial goal and receive a transparent feasibility r
 **Acceptance Scenarios**:
 
 1. **Given** a goal amount, current savings, and future deadline, **When** feasibility is calculated, **Then** required periodic saving is derived from the remaining amount and remaining periods.
-2. **Given** sufficient eligible financial history, **When** feasibility is calculated, **Then** available cashflow is derived from that user's persisted income and expense data using a documented observation window.
-3. **Given** insufficient history, **When** feasibility is requested, **Then** no invented cashflow value is used and the user is told what additional input or history is required.
+2. **Given** at least two completed months of eligible financial history, **When** feasibility is calculated, **Then** available cashflow is the arithmetic mean of monthly net cashflow for up to the three most recent completed months.
+3. **Given** fewer than two completed months of eligible history, **When** feasibility is requested, **Then** the result is `insufficient data`, no invented cashflow value is used, and the user is told how much additional history is required.
 4. **Given** a goal or contributing transaction changes, **When** the result is recalculated, **Then** the updated result is reproducible from the same inputs.
 
 ---
@@ -204,7 +211,7 @@ The following baseline was established from the PRD/SRS, the implementation at c
 | Topic | PRD/SRS position | Current implementation | Operational MVP resolution |
 |-------|------------------|------------------------|----------------------------|
 | Goal route contract | Uses the `financial-goals` name and an explicit simulation action. | Uses the shorter `goals` name and a read-style simulation operation. | Preserve working clients; publish one canonical contract and maintain compatibility or a documented migration path. |
-| Email processing topology | Describes worker-queue processing as the target architecture. | Synchronization and parsing currently execute in the request-triggered application flow. | A separate queue/scheduler is not mandatory if bounded execution, concurrency protection, retry, idempotency, incremental progress, and observability meet all acceptance criteria. |
+| Email processing topology | Describes worker-queue processing as the target architecture. | Synchronization and parsing currently execute in the request-triggered application flow. | Operational MVP requires user-triggered manual sync and a bounded initial backfill only. Scheduled sync, a scheduler, and a separate background worker/queue are post-MVP; the request-triggered flow must still provide concurrency protection, retry, idempotency, incremental progress, and observability. |
 | Classification persistence | Defines classification rules and classification-event history. | Contains category/classification fields and a merchant-rule record but no complete executable classification lifecycle. | Complete the minimum deterministic rule and correction-history behavior; ML/LLM remain excluded. |
 | Goal simulation | Requires calculations based on available cashflow and projected data. | Uses a fixed assumed free-cashflow value in a production path. | Fixed or demo financial assumptions are prohibited in production results. |
 | Alerts/notifications | Defines rule evaluation, cooldown, in-app status, delivery records, and email fallback. | Exposes alert CRUD/read/settings and budget threshold projections without the complete generation/delivery lifecycle. | Complete budget-triggered in-app alerts and critical email fallback; defer push and complex providers. |
@@ -221,11 +228,12 @@ The following baseline was established from the PRD/SRS, the implementation at c
 - **AUTH-005**: Security-relevant authentication events MUST be auditable without recording passwords, raw tokens, or secrets.
 - **SEC-001**: Every user-owned financial, email, planning, alert, and settings operation MUST derive ownership from the authenticated identity and MUST prevent cross-user read or mutation.
 - **SEC-002**: Ordinary users MUST NOT list arbitrary users, create privileged users, or read/update/delete another user account.
-- **SEC-003**: Only an explicitly authorized administrator MAY perform administrative user or system-managed provider operations.
+- **SEC-003**: Only an explicitly authorized administrator MAY manage user account identity, role/status, supported bank providers/senders, and parser templates; administrator provisioning MUST use a controlled non-public process.
 - **SEC-004**: Ordinary user input MUST NOT modify role, account status, ownership identifiers, system classification provenance, or other privileged fields.
 - **SEC-005**: Missing authentication MUST return an unauthorized outcome; valid authentication without sufficient permission MUST return a forbidden outcome; owner-scoped lookups MUST follow one documented non-disclosure policy.
 - **SEC-006**: Sensitive actions including email connect/disconnect/sync, privileged changes, category corrections, and destructive financial-data actions MUST produce sanitized audit evidence.
 - **SEC-007**: Automated authorization tests MUST cover horizontal access, vertical privilege escalation, mass assignment, deleted/disabled users, and malformed identifiers.
+- **SEC-008**: Administrator status MUST NOT grant access to user-owned transactions, financial accounts, categories, budgets, goals, alert contents, email connections, provider tokens, email messages, listen rules, parser-run payloads, or sync-run details.
 
 #### Configuration and secrets
 
@@ -260,13 +268,13 @@ The following baseline was established from the PRD/SRS, the implementation at c
 - **EMAIL-009**: Transient provider failures and rate limits MUST use bounded retry with backoff or an equivalent user-safe retry policy; permanent message errors MUST not fail unrelated valid messages.
 - **EMAIL-010**: Parser selection MUST be deterministic by supported bank, channel, active version, and effective status, and every parse attempt MUST retain a sanitized success/failure record.
 - **EMAIL-011**: Invalid or incomplete parser output MUST NOT create a posted financial transaction and MUST leave the message in an observable failed or review-required state.
-- **EMAIL-012**: Raw email body MUST remain unpersisted by default; if explicitly enabled, consent, encryption, access restrictions, and retention/deletion behavior MUST be enforced and testable.
-- **EMAIL-013**: A dedicated queue or scheduler MUST NOT be a release prerequisite if all EMAIL lifecycle requirements pass with bounded manual synchronization; it becomes required only when the chosen execution model cannot meet those outcomes.
+- **EMAIL-012**: Operational MVP MUST NOT persist raw email bodies, even when an existing preference suggests otherwise; it MAY retain only the minimum message metadata, body hash, sanitized parser evidence, and derived transaction needed for duplicate prevention and troubleshooting.
+- **EMAIL-013**: Operational MVP MUST support user-triggered manual synchronization and a bounded initial backfill; automatic scheduled synchronization, a scheduler, and a separate background worker/queue are out of scope for this release.
 
 #### Deterministic classification
 
 - **CLASS-001**: The system MUST support active user-owned and system-owned classification rules based on documented transaction attributes, with an explicit numeric priority and enabled state.
-- **CLASS-002**: Rule evaluation MUST use a stable order: eligible manual correction protection first, then highest-priority user rule, then highest-priority system rule, then the fallback state; equal-priority ties MUST resolve by a stable documented key.
+- **CLASS-002**: Rule evaluation MUST protect an eligible manual correction first, then select the matching user rule with the highest numeric priority, then the matching system rule with the highest numeric priority, then the fallback state; equal-priority rules MUST resolve by earliest creation time and then lexicographically smallest stable identifier.
 - **CLASS-003**: Exactly one category outcome and one classification source MUST be selected per evaluation; conflicting matches MUST be explainable from the matched rules and tie-break result.
 - **CLASS-004**: When no rule matches, the transaction MUST use an explicit uncategorized/review-required fallback rather than an arbitrary category.
 - **CLASS-005**: Every applied or corrected category MUST record previous category, new category, source, matched rule when applicable, actor, reason, and time.
@@ -279,11 +287,11 @@ The following baseline was established from the PRD/SRS, the implementation at c
 - **BUDGET-002**: Budget usage MUST be derived from eligible persisted expense transactions within the budget's period and category according to TX-003.
 - **BUDGET-003**: Budget usage MUST be evaluated after relevant transaction creation, update, deletion, duplicate/ignore change, category change, and any explicit recalculation.
 - **ALERT-001**: Crossing a configured warning or critical budget threshold MUST create an owned in-app alert containing the budget, period, threshold, observed usage, severity, and trigger time.
-- **ALERT-002**: The same user, alert type, target, threshold, and budget period MUST NOT create another active alert inside its configurable cooldown unless a higher-severity threshold is newly crossed.
-- **ALERT-003**: Recalculation that removes the trigger condition MUST resolve or otherwise clearly mark the prior alert without erasing its audit history.
+- **ALERT-002**: The same user, alert type, target, threshold, and budget period MUST produce at most one alert while usage remains continuously at or above that threshold; a newly crossed higher-severity threshold is a distinct alert condition.
+- **ALERT-003**: Recalculation that moves usage below an alerted threshold MUST resolve that alert without erasing its history; the same threshold MAY create one new alert only after usage later crosses upward again and at least 24 hours have elapsed since the prior alert was triggered.
 - **ALERT-004**: Users MUST be able to see unread count and alert list, mark one or all alerts read, and dismiss an alert where dismissal is offered.
-- **ALERT-005**: Notification preferences MUST control channel and minimum severity; a disabled channel MUST produce no send attempt and MUST remain explainable as skipped.
-- **ALERT-006**: Eligible high-severity P1 alerts MUST use email fallback when the user has enabled that channel; delivery status, send time, bounded retry count, and sanitized failure MUST be observable.
+- **ALERT-005**: In-app delivery MUST default to enabled for every P1 alert type; email delivery MUST default to disabled, apply only to `CRITICAL` alerts when enabled by the user, and record disabled/ineligible outcomes as skipped without attempting delivery.
+- **ALERT-006**: An eligible `CRITICAL` P1 alert MUST use email fallback when the user has enabled that channel; delivery status and send time MUST be observable, failed delivery MUST make at most three total attempts, and the final sanitized failure MUST remain visible to operators without blocking the in-app alert.
 - **ALERT-007**: Email notifications MUST minimize sensitive financial detail and MUST never contain authentication credentials, provider tokens, or raw email content.
 - **ALERT-008**: Budget-threshold, large-transaction, goal-risk, cashflow-risk, and repeated system-failure alert types MUST be operational in this release; category-spike detection, push notifications, multi-provider orchestration, and generalized event infrastructure remain outside this feature.
 
@@ -291,9 +299,9 @@ The following baseline was established from the PRD/SRS, the implementation at c
 
 - **GOAL-001**: Users MUST be able to create, view, update, contribute to, and archive only their own goals with target amount, current saved amount, currency, deadline, priority, and status.
 - **GOAL-002**: Remaining amount MUST equal the greater of zero and target amount minus current saved amount; required periodic saving MUST divide remaining amount across the remaining user-visible periods using a documented rounding rule.
-- **GOAL-003**: Available cashflow MUST derive from the user's eligible persisted income and expense records over a documented recent observation window and MUST use the same transaction treatment and timezone rules as the dashboard.
-- **GOAL-004**: Feasibility MUST compare required periodic saving with available cashflow using published deterministic bands, and MUST expose the inputs, observation window, and reason for the resulting level.
-- **GOAL-005**: If the user lacks the minimum documented history, the system MUST return an insufficient-data outcome and MAY accept explicit user-provided planning inputs; it MUST NOT substitute a hidden fixed income, expense, interest, or free-cashflow value.
+- **GOAL-003**: Available cashflow MUST equal the arithmetic mean of monthly net cashflow across up to the three most recent completed user months, MUST require at least two completed months, and MUST use the same eligible-transaction, timezone, and month-start rules as the dashboard; the current incomplete month MUST be excluded.
+- **GOAL-004**: Feasibility score MUST equal available monthly cashflow divided by required monthly saving, multiplied by 100 and capped to the range 0–100; `SAFE` is 100, `ACCEPTABLE` is 80–99, `RISKY` is 50–79, and `NOT_RECOMMENDED` is below 50. The result MUST expose its inputs, observation months, score, level, and reason.
+- **GOAL-005**: If the user has fewer than two completed months of eligible history, the system MUST return an insufficient-data outcome and MAY accept an explicitly labeled user-provided planning input; it MUST NOT substitute a hidden fixed income, expense, interest, or free-cashflow value.
 - **GOAL-006**: Goal calculations MUST be reproducible from persisted/user-provided inputs and MUST recalculate when a goal, contribution, or eligible underlying transaction changes.
 - **GOAL-007**: Advanced scenario comparison, inferred interest rates, and AI financial advice are outside this feature; any retained prototype MUST be clearly identified and MUST not present fabricated production results.
 
@@ -306,6 +314,13 @@ The following baseline was established from the PRD/SRS, the implementation at c
 - **ERR-005**: Every critical frontend journey MUST provide loading, empty, success, validation, authorization, dependency-failure, and retry states appropriate to the action.
 - **ERR-006**: Errors and logs MUST include a correlation reference sufficient to trace a failed request or sync run without exposing secrets or raw sensitive content.
 
+#### Data retention and deletion
+
+- **DATA-001**: Raw email bodies MUST NOT be retained in the Operational MVP; any existing raw-body preference MUST remain disabled or clearly state that the capability is unavailable in this release.
+- **DATA-002**: Disconnecting Gmail MUST revoke or make unusable the stored provider credentials while retaining derived transactions and sanitized audit/sync evidence needed for financial history and troubleshooting.
+- **DATA-003**: Active-account financial records and minimum email metadata MAY remain until the user removes the relevant record or the account enters a future approved deletion workflow; Operational MVP documentation MUST disclose this behavior, and account-wide export/deletion automation remains post-MVP as stated by the PRD.
+- **DATA-004**: Soft-deleted financial records MUST be excluded from user calculations and normal views while remaining inaccessible to other users and protected by the same ownership rules.
+
 #### Runtime and operations
 
 - **OPS-001**: A new developer MUST be able to start the required database, application service, and web interface from a clean checkout using documented commands and example configuration.
@@ -316,6 +331,7 @@ The following baseline was established from the PRD/SRS, the implementation at c
 - **OPS-006**: A release configuration MUST not depend on source-mounted development behavior, automatic dependency mutation, or undocumented local tools.
 - **OPS-007**: The release checklist MUST validate configuration, database readiness, migrations, API readiness, web readiness, authentication, one transaction flow, dashboard correctness, and one duplicate-safe email sync flow.
 - **OPS-008**: Operational logs MUST cover startup validation, authentication security events, sync runs, parser failures, classification decisions, alert generation/delivery, and unexpected failures with sensitive fields redacted.
+- **OPS-009**: The reference Operational MVP deployment MUST support one small single-host installation with one web service, one application service, and one persistent database behind HTTPS; multi-node orchestration and horizontal scaling are post-MVP.
 
 #### Testing and release evidence
 
@@ -339,7 +355,7 @@ The following baseline was established from the PRD/SRS, the implementation at c
 
 ### Key Entities
 
-- **User and User Settings**: The authenticated owner, role/status boundary, regional settings, privacy consent, and notification preferences.
+- **User and User Settings**: The authenticated owner, role/status boundary, regional settings, privacy consent, and notification preferences; administrator status permits account and system-configuration management but does not transfer ownership of private user data.
 - **Session and Audit Event**: Renewable authentication state and sanitized evidence of security-sensitive actions.
 - **Financial Account**: A user-owned source or destination associated with transactions.
 - **Transaction and Category**: The normalized financial event and its reporting classification, source trace, duplicate/ignore status, and user correction.
@@ -376,11 +392,14 @@ The following baseline was established from the PRD/SRS, the implementation at c
 - The operational MVP serves individual users and a small controlled deployment; enterprise multi-tenancy, high-volume distributed processing, and financial-institution certification are not implied.
 - Email/password authentication and Gmail read-only OAuth remain the supported MVP authentication/integration methods; Outlook is not required for this feature.
 - MVP parser support may be limited to the bank/template fixtures explicitly declared in release documentation; unsupported banks must fail safely and visibly.
-- Manual, user-triggered, bounded Gmail synchronization is acceptable for MVP. Scheduled/background synchronization is optional unless required to satisfy the lifecycle outcomes in EMAIL-005 through EMAIL-009.
+- Operational MVP uses manual, user-triggered, bounded Gmail synchronization plus a bounded initial backfill. Automatic schedules and separate background workers/queues are post-MVP, while EMAIL-005 through EMAIL-009 remain mandatory for every manual run.
 - All PRD P1 capabilities are included in the Operational MVP: budgets, budget/large-transaction/goal-risk/cashflow-risk/system-error alerts, in-app notification, preference-controlled email fallback, financial goals, and deterministic feasibility calculation.
 - Advanced goal scenario comparison, ML classification, LLM insights, push notifications, Novu, direct bank APIs, CSV/SMS imports, trading, automated transfers, microservices, Kubernetes, Kafka, complex event-driven infrastructure, and premature generalized abstractions are out of scope.
 - Financial amounts use exact decimal semantics and deterministic business rules. AI output, if retained elsewhere, cannot calculate or override release-critical financial values.
+- Goal available cashflow uses the arithmetic mean of up to three most recent completed user months, requires at least two completed months, and excludes the current incomplete month.
 - Multi-currency aggregation is not required unless an authoritative conversion source is explicitly added; otherwise incompatible currencies remain separated or excluded with a visible explanation.
+- Raw email bodies are never persisted in this release. Gmail disconnect invalidates provider credentials but does not silently delete derived financial history; automated account-wide export/deletion remains post-MVP and must be disclosed.
+- The reference release target is a small single-host deployment behind HTTPS using the repository's existing service composition and persistent database model; managed equivalents are acceptable only if they preserve the same security and lifecycle outcomes.
 - The PRD/SRS remains a planning draft; where it conflicts with verified working behavior, the conflict table in this specification controls this feature until stakeholders approve a different resolution.
 
 ## Definition of Done

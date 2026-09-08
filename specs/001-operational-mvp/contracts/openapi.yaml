@@ -1,0 +1,180 @@
+openapi: 3.1.0
+info:
+  title: CashLens Operational MVP contract delta
+  version: 0.1.0
+  description: >-
+    Design contract for production-readiness changes. Existing documented routes remain;
+    implementation must merge these additions into generated Swagger and preserve the global response envelope.
+servers:
+  - url: /api
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: accessToken
+  schemas:
+    Envelope:
+      type: object
+      required: [success, data]
+      properties:
+        success: { type: boolean }
+        data: {}
+        message: { type: string }
+        correlationId: { type: string }
+    Error:
+      type: object
+      required: [statusCode, message, code, correlationId]
+      properties:
+        statusCode: { type: integer }
+        message: { oneOf: [{type: string}, {type: array, items: {type: string}}] }
+        code: { type: string }
+        correlationId: { type: string }
+        fields: { type: object, additionalProperties: {type: array, items: {type: string}} }
+    SyncResult:
+      type: object
+      required: [runId, status, found, matched, parsed, created, failed, hasMore]
+      properties:
+        runId: { type: string }
+        status: { enum: [RUNNING, SUCCEEDED, PARTIAL, FAILED] }
+        found: { type: integer }
+        matched: { type: integer }
+        parsed: { type: integer }
+        created: { type: integer }
+        failed: { type: integer }
+        hasMore: { type: boolean }
+        continuationAvailable: { type: boolean }
+        failureSummary: { type: string }
+    GoalFeasibility:
+      type: object
+      required: [goalId, remainingAmount, requiredMonthlySaving, status, observationMonths]
+      properties:
+        goalId: { type: string }
+        remainingAmount: { type: number }
+        requiredMonthlySaving: { type: number }
+        availableMonthlyCashflow: { type: [number, 'null'] }
+        score: { type: [integer, 'null'], minimum: 0, maximum: 100 }
+        status: { enum: [SAFE, ACCEPTABLE, RISKY, NOT_RECOMMENDED, INSUFFICIENT_DATA] }
+        observationMonths: { type: array, items: {type: string, pattern: '^\\d{4}-\\d{2}$'} }
+        monthsRequired: { type: integer, minimum: 0 }
+        reason: { type: string }
+security:
+  - cookieAuth: []
+paths:
+  /health/live:
+    get:
+      security: []
+      responses:
+        '200': { description: Process is alive }
+  /health/ready:
+    get:
+      security: []
+      responses:
+        '200': { description: Required dependencies are ready }
+        '503': { description: Not ready }
+  /auth/refresh:
+    post:
+      security: []
+      responses:
+        '200': { description: Rotated authenticated session }
+        '401': { description: Missing, expired, revoked, or reused refresh token }
+  /users:
+    post:
+      summary: Administrator creates a non-public managed account
+      responses:
+        '201': { description: Account created }
+        '403': { description: Administrator role required }
+  /users/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    get:
+      summary: Administrator reads account identity/status only
+      responses:
+        '200': { description: Non-financial account fields }
+        '403': { description: Administrator role required }
+    patch:
+      summary: Administrator updates identity/role/status
+      responses:
+        '200': { description: Account updated }
+        '403': { description: Administrator role required }
+  /email-connections/{id}/sync:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    post:
+      summary: Run one bounded owner-triggered sync batch
+      responses:
+        '200':
+          description: Terminal or continuable run result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SyncResult' }
+        '409': { description: A non-expired sync lease already exists }
+        '503': { description: Reconnect or provider recovery required }
+  /transactions/{id}/category:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    patch:
+      summary: Apply authoritative manual category correction
+      responses:
+        '200': { description: Transaction and decision evidence }
+        '404': { description: Owner-safe absence }
+  /transactions/{id}/reclassify:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    post:
+      summary: Explicitly allow deterministic automatic reclassification
+      responses:
+        '200': { description: Transaction and winning-rule evidence }
+  /transactions/{id}/category-history:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    get:
+      responses:
+        '200': { description: Append-only owner-visible category events }
+  /budgets/{id}/recalculate:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    post:
+      responses:
+        '200': { description: Current usage and alert condition changes }
+  /alerts/{id}/dismiss:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    patch:
+      responses:
+        '200': { description: Owned alert dismissed }
+  /goals/{id}/simulation:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    get:
+      responses:
+        '200':
+          description: Reproducible feasibility or insufficient-data result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GoalFeasibility' }
+        '404': { description: Owner-safe absence }
