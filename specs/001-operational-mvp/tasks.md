@@ -106,7 +106,7 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
 
 ### Tests for User Story 1
 
-- [ ] T010 [P] [US1] [SEC-007, TEST-003, TEST-008] Add the e2e test-database harness and the shared synthetic fixture helper; depends on T002. Apply the strategy in research.md "E2E test database strategy".
+- [X] T010 [P] [US1] [SEC-007, TEST-003, TEST-008] Add the e2e test-database harness and the shared synthetic fixture helper; depends on T002. Apply the strategy in research.md "E2E test database strategy".
   - **Files:** `apps/api/test/helpers/test-database.ts`, `apps/api/test/jest-e2e.global-setup.ts`, `apps/api/test/jest-e2e.json` (globalSetup), `apps/api/package.json` (`test:e2e` uses `--runInBand`), `apps/api/test/helpers/auth-fixtures.ts`.
   - **Database guard:** use `E2E_DATABASE_URL`, and refuse to run unless the database name contains `test`.
   - **Global setup:** migrate the shared test schema once, and drop leftover `e2e_*` schemas older than 24 hours.
