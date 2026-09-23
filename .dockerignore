@@ -1,0 +1,28 @@
+# Build context for apps/api/Dockerfile and apps/web/Dockerfile is the
+# repository root. Keep secrets, host dependencies, and build output out of it.
+
+# Environment files: no env file may reach an image (CFG-002).
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Host-installed dependencies and build output (rebuilt inside the image)
+**/node_modules
+**/dist
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+.yarn
+
+# Repository metadata and tooling that images never need
+.git
+.claude
+.agents
+.cursor
+.gitnexus
+.specify
+specs
+docs
+scripts
+*.log

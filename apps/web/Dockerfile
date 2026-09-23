@@ -1,37 +1,29 @@
-# This Dockerfile uses `serve` npm package to serve the static files with node process.
-# You can find the Dockerfile for nginx in the following link:
-# https://github.com/refinedev/dockerfiles/blob/main/vite/Dockerfile.nginx
-FROM refinedev/node:18 AS base
+# syntax=docker/dockerfile:1
+#
+# CashLens web release image (OPS-006). Build context: the repository root.
+#   docker build -f apps/web/Dockerfile .
+#
+# Same-origin production routing (OPS-009): the operator's proxy sends /api/ to
+# the API and / to this image, so the bundle is always built with the relative
+# VITE_API_BASE_URL=/api and never embeds an absolute API origin.
 
-FROM base as deps
+ARG NODE_IMAGE=node:22-alpine
 
-COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* .npmrc* ./
+FROM ${NODE_IMAGE} AS build
+WORKDIR /app
+RUN corepack enable
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
+COPY packages/eslint-config/package.json packages/eslint-config/package.json
+COPY packages/typescript-config/package.json packages/typescript-config/package.json
+RUN yarn workspaces focus web
+COPY apps/web apps/web
+ARG VITE_API_BASE_URL=/api
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+RUN yarn workspace web build
 
-RUN \
-  if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
-  elif [ -f package-lock.json ]; then npm ci; \
-  elif [ -f pnpm-lock.yaml ]; then yarn global add pnpm && pnpm i --frozen-lockfile; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
-
-FROM base as builder
-
-ENV NODE_ENV production
-
-COPY --from=deps /app/refine/node_modules ./node_modules
-
-COPY . .
-
-RUN npm run build
-
-FROM base as runner
-
-ENV NODE_ENV production
-
-RUN npm install -g serve
-
-COPY --from=builder /app/refine/dist ./
-
-USER refine
-
-CMD ["serve"]
+FROM nginx:1.27-alpine AS runtime
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+EXPOSE 80
