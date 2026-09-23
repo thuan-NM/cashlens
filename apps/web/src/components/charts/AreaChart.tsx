@@ -3,16 +3,26 @@ import { formatMoney } from "@/utils/format";
 
 interface MonthData { m: string; income: number; expense: number; }
 
+const numberOrZero = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export function AreaChart({ data }: { data: MonthData[] }) {
   const [hover, setHover] = useState<number | null>(null);
   const W = 580, H = 246, pl = 12, pr = 12, pt = 18, pb = 30;
   const innerW = W - pl - pr, innerH = H - pt - pb;
-  const max = Math.max(...data.flatMap((m) => [m.income, m.expense])) * 1.14;
-  const n = data.length;
+  const chartData = (data.length ? data : [{ m: "-", income: 0, expense: 0 }]).map((item) => ({
+    m: item.m ?? "-",
+    income: numberOrZero(item.income),
+    expense: numberOrZero(item.expense),
+  }));
+  const max = Math.max(1, ...chartData.flatMap((m) => [m.income, m.expense])) * 1.14;
+  const n = chartData.length;
   const xs = (i: number) => pl + (n < 2 ? innerW / 2 : (innerW * i) / (n - 1));
-  const yv = (v: number) => pt + innerH * (1 - v / max);
+  const yv = (v: number) => pt + innerH * (1 - numberOrZero(v) / max);
   const lineP = (k: "income" | "expense") =>
-    data.map((m, i) => `${i ? "L" : "M"}${xs(i).toFixed(1)} ${yv(m[k]).toFixed(1)}`).join(" ");
+    chartData.map((m, i) => `${i ? "L" : "M"}${xs(i).toFixed(1)} ${yv(m[k]).toFixed(1)}`).join(" ");
   const areaP = (k: "income" | "expense") =>
     lineP(k) + ` L${xs(n - 1).toFixed(1)} ${pt + innerH} L${xs(0).toFixed(1)} ${pt + innerH} Z`;
   const incomeColor = "var(--income)", expenseColor = "var(--expense)";
@@ -41,11 +51,11 @@ export function AreaChart({ data }: { data: MonthData[] }) {
         {hover != null && (
           <>
             <line x1={xs(hover)} y1={pt} x2={xs(hover)} y2={pt + innerH} stroke="var(--border)" strokeWidth={1.5} strokeDasharray="3 3" />
-            <circle cx={xs(hover)} cy={yv(data[hover].income)} r={4.5} fill="var(--surface)" stroke={incomeColor} strokeWidth={2.5} />
-            <circle cx={xs(hover)} cy={yv(data[hover].expense)} r={4.5} fill="var(--surface)" stroke={expenseColor} strokeWidth={2.5} />
+            <circle cx={xs(hover)} cy={yv(chartData[hover].income)} r={4.5} fill="var(--surface)" stroke={incomeColor} strokeWidth={2.5} />
+            <circle cx={xs(hover)} cy={yv(chartData[hover].expense)} r={4.5} fill="var(--surface)" stroke={expenseColor} strokeWidth={2.5} />
           </>
         )}
-        {data.map((_, i) => {
+        {chartData.map((_, i) => {
           const bw = innerW / (n - 1 || 1);
           return (
             <rect key={i} x={(xs(i) - bw / 2).toFixed(1)} y={0} width={bw} height={H}
@@ -53,7 +63,7 @@ export function AreaChart({ data }: { data: MonthData[] }) {
               onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} />
           );
         })}
-        {data.map((m, i) => (
+        {chartData.map((m, i) => (
           <text key={i} x={xs(i)} y={H - 9} textAnchor="middle" fill="var(--muted)"
             fontSize={11} fontFamily="Be Vietnam Pro">{m.m}</text>
         ))}
@@ -61,18 +71,18 @@ export function AreaChart({ data }: { data: MonthData[] }) {
       {hover != null && (
         <div className="absolute top-1.5 pointer-events-none rounded-[11px] p-3 min-w-[140px] z-10 text-[11px]"
           style={{ left: `${(xs(hover) / W) * 100}%`, transform: "translateX(-50%)", background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "var(--shadow)" }}>
-          <div className="font-bold mb-1.5">Tháng {data[hover].m.replace("T", "")}</div>
+          <div className="font-bold mb-1.5">Tháng {chartData[hover].m.replace("T", "")}</div>
           <div className="flex justify-between gap-3 mb-0.5">
             <span style={{ color: "var(--muted)" }}>Thu</span>
-            <b style={{ color: "var(--income)" }}>{formatMoney(data[hover].income)}</b>
+            <b style={{ color: "var(--income)" }}>{formatMoney(chartData[hover].income)}</b>
           </div>
           <div className="flex justify-between gap-3 mb-0.5">
             <span style={{ color: "var(--muted)" }}>Chi</span>
-            <b style={{ color: "var(--expense)" }}>{formatMoney(data[hover].expense)}</b>
+            <b style={{ color: "var(--expense)" }}>{formatMoney(chartData[hover].expense)}</b>
           </div>
           <div className="flex justify-between gap-3 pt-1 mt-1 border-t" style={{ borderColor: "var(--border)" }}>
-            <span style={{ color: "var(--muted)" }}>Net</span>
-            <b>+{formatMoney(data[hover].income - data[hover].expense)}</b>
+            <span style={{ color: "var(--muted)" }}>Ròng</span>
+            <b>{formatMoney(chartData[hover].income - chartData[hover].expense)}</b>
           </div>
         </div>
       )}

@@ -170,7 +170,100 @@ button {
 .ant-modal-content {
   border: 1px solid var(--cardborder);
   background: var(--cardbg) !important;
+  color: var(--text);
   backdrop-filter: blur(26px) saturate(1.5);
+}
+
+.ant-modal-content {
+  padding: 28px 30px 30px !important;
+  box-shadow: var(--shadow);
+}
+
+.ant-modal-header {
+  margin-bottom: 18px !important;
+  background: transparent !important;
+}
+
+.ant-modal-title {
+  color: var(--text) !important;
+  font-size: 20px !important;
+  font-weight: 800 !important;
+  line-height: 1.25 !important;
+}
+
+.ant-modal-close {
+  top: 18px !important;
+  right: 20px !important;
+  color: var(--muted) !important;
+}
+
+.ant-form-item {
+  margin-bottom: 18px !important;
+}
+
+.ant-form-item-label > label {
+  color: var(--text) !important;
+  font-weight: 700;
+}
+
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-input-group-addon,
+.ant-select-selector {
+  border-color: var(--border) !important;
+  background: var(--surface) !important;
+  color: var(--text) !important;
+}
+
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-select-selector {
+  min-height: 40px;
+  border-radius: 12px !important;
+}
+
+.ant-input-affix-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px !important;
+  box-shadow: none !important;
+}
+
+.ant-input-affix-wrapper > input.ant-input,
+.ant-input-group-wrapper .ant-input {
+  min-height: auto;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.ant-input-group-addon {
+  border-left: 0 !important;
+  border-radius: 0 12px 12px 0 !important;
+  padding-inline: 12px !important;
+  font-weight: 700;
+}
+
+.ant-input-suffix,
+.ant-input-prefix {
+  color: var(--text) !important;
+}
+
+.ant-input::placeholder,
+.ant-input-affix-wrapper input::placeholder {
+  color: var(--faint) !important;
+}
+
+.ant-input:hover,
+.ant-input:focus,
+.ant-input-affix-wrapper:hover,
+.ant-input-affix-wrapper-focused,
+.ant-select-focused .ant-select-selector,
+.ant-select-selector:hover {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border)) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent) !important;
 }
 
 @media (max-width: 720px) {

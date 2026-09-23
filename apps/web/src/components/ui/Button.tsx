@@ -11,7 +11,7 @@ export function Button({ children, variant = "secondary", icon, className, ...pr
   return (
     <button
       className={cn(
-        "inline-flex h-10 items-center justify-center gap-2 rounded-[11px] px-4 text-[12px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex h-11 items-center justify-center gap-2 rounded-[12px] px-5 text-[12.5px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-50",
         variant === "primary" &&
           "border border-transparent bg-[var(--accent)] text-white shadow-[0_8px_20px_-8px_rgba(217,119,87,.7)] hover:brightness-105",
         variant === "secondary" &&

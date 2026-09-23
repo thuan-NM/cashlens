@@ -8,6 +8,9 @@ import { setupSwagger } from './swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
+  // SIGTERM/SIGINT close the app gracefully: providers' shutdown hooks run and
+  // Prisma disconnects before the process exits (OPS-005).
+  app.enableShutdownHooks();
 
   app.use(cookieParser());
 

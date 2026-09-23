@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { validateEnvironment } from './config/configuration';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -20,11 +21,13 @@ import { BudgetsModule } from './modules/budgets/budgets.module';
 import { GoalsModule } from './modules/goals/goals.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      validate: validateEnvironment,
     }),
     AppLoggerModule,
     SecurityModule,
@@ -44,6 +47,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     GoalsModule,
     AlertsModule,
     DashboardModule,
+    HealthModule,
   ],
   providers: [
     {

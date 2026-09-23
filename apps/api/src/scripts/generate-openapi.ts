@@ -1,12 +1,14 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Test } from '@nestjs/testing';
-import { AppModule } from '../app.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { createOpenApiDocument } from '../swagger';
 
 async function generateOpenApi(): Promise<void> {
+  // Configuration is validated when AppModule is imported, so this offline-only
+  // value must be set before the module is loaded.
   process.env.JWT_SECRET ??= 'openapi-generation-only';
+  const { AppModule } = await import('../app.module.js');
 
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],

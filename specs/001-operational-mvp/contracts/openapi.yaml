@@ -1,0 +1,493 @@
+openapi: 3.1.0
+info:
+  title: CashLens Operational MVP contract delta
+  version: 0.2.0
+  description: >-
+    Design contract for production-readiness changes. Existing documented routes remain;
+    implementation must merge these additions into generated Swagger.
+
+    Envelope rule: every 2xx response body is the existing global BaseResponseDto envelope
+    produced by the APP_INTERCEPTOR-registered BaseResponseInterceptor:
+    {success, data, message, timestamp} (+ additive correlationId from T064/P2.1).
+    Payload schemas below describe only `data`; each 2xx response composes them with `Envelope`
+    via allOf. Error responses are not enveloped (Nest exception shape + additive code/correlationId/fields).
+
+    Compatibility rule: existing field names and enum values are retained; new fields are additive.
+    Intentional changes are listed in plan.md "API Compatibility".
+
+    Deployment rule (OPS-009): in production the web app and this API share one public origin;
+    the proxy routes /api/ to the API and / to the web app, and the web app calls this API by the relative path /api.
+servers:
+  - url: /api
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: accessToken
+  schemas:
+    Envelope:
+      description: Existing BaseResponseDto shape (apps/api/src/common/dto/base-response.dto.ts).
+      type: object
+      required: [success, data, message, timestamp]
+      properties:
+        success: { type: boolean, const: true }
+        data: {}
+        message: { type: string, example: Success }
+        timestamp: { type: string, format: date-time }
+        correlationId: { type: string, description: Additive (T064); absent before P2.1 lands }
+    Error:
+      description: Nest exception shape retained; code/correlationId/fields added by the global safe exception filter (T064).
+      type: object
+      required: [statusCode, message]
+      properties:
+        statusCode: { type: integer }
+        message: { oneOf: [{type: string}, {type: array, items: {type: string}}] }
+        error: { type: string, description: Existing Nest reason phrase }
+        code: { type: string }
+        correlationId: { type: string }
+        fields: { type: object, additionalProperties: {type: array, items: {type: string}} }
+
+    EmailSyncRun:
+      description: >-
+        Existing EmailSyncRun response (toEmailSyncRunResponse) with existing field names and
+        status values. emailsFailed, hasMore, and EXPIRED are additive (DB-M1).
+      type: object
+      required: [id, emailConnectionId, triggerType, status, startedAt, emailsFound, emailsMatched, emailsParsed, transactionsCreated, emailsFailed, hasMore]
+      properties:
+        id: { type: string }
+        emailConnectionId: { type: string }
+        triggerType: { enum: [MANUAL, SCHEDULED, WEBHOOK, BACKFILL] }
+        status: { enum: [RUNNING, SUCCESS, PARTIAL_FAILED, FAILED, EXPIRED] }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        emailsFound: { type: integer, minimum: 0 }
+        emailsMatched: { type: integer, minimum: 0 }
+        emailsParsed: { type: integer, minimum: 0 }
+        transactionsCreated: { type: integer, minimum: 0 }
+        emailsFailed: { type: integer, minimum: 0, description: Additive }
+        hasMore: { type: boolean, description: Additive; true when a bounded batch stopped with remaining messages }
+        errorMessage: { type: [string, 'null'], description: Sanitized failure summary (existing field) }
+
+    GoalFeasibility:
+      description: >-
+        Existing simulation response fields retained (the web reads monthlyRequired and feasibilityScore).
+        Status values change intentionally; feasibilityScore is null for INSUFFICIENT_DATA.
+      type: object
+      required: [goalId, months, horizonSource, pastDeadline, targetAmount, savedAmount, remainingAmount, monthlyRequired, feasibilityScore, status, observationMonths]
+      properties:
+        goalId: { type: string }
+        scenario: { enum: [FULL, INSTALLMENT], description: 'Retained; INSTALLMENT handling pending product decision (no inferred interest rate may be applied, GOAL-007)' }
+        months: { type: integer, minimum: 0, description: 'Remaining periods used as divisor: user months from current through deadline month inclusive; 0 when past deadline (data-model GOAL rules)' }
+        horizonSource: { enum: [QUERY, TARGET_DATE, GOAL_MONTHS, DEFAULT], description: 'Additive; which horizon determined the deadline month (DEFAULT = visible 6-month default)' }
+        pastDeadline: { type: boolean, description: 'Additive; true when months = 0 and remainingAmount > 0 (whole remaining amount due now)' }
+        targetAmount: { type: number }
+        savedAmount: { type: number }
+        remainingAmount: { type: number, minimum: 0 }
+        totalCost: { type: number, description: Retained; equals remainingAmount unless an approved scenario rule exists }
+        monthlyRequired: { type: number, minimum: 0, description: 'Required monthly saving (GOAL-002): ceil(remainingAmount / months) to the currency unit (whole VND); remainingAmount when pastDeadline; 0 when remainingAmount = 0' }
+        feasibilityScore: { type: [integer, 'null'], minimum: 0, maximum: 100, description: 'floor(available * 100 / monthlyRequired) capped 0-100; 100 when monthlyRequired = 0; null when INSUFFICIENT_DATA' }
+        status: { enum: [SAFE, ACCEPTABLE, RISKY, NOT_RECOMMENDED, INSUFFICIENT_DATA] }
+        availableMonthlyCashflow: { type: [number, 'null'], description: 'Additive; floor of mean completed-month net cashflow in the goal currency (GOAL-003)' }
+        observationMonths: { type: array, items: {type: string, pattern: '^\d{4}-\d{2}$'}, description: Additive }
+        monthsRequired: { type: integer, minimum: 0, description: Additive; additional completed months needed when INSUFFICIENT_DATA }
+        reason: { type: string, description: Additive; sanitized explanation }
+
+    BudgetWrite:
+      description: Threshold fields of budget create/update (other existing fields unchanged). All existing period values remain accepted; only MONTHLY budgets are evaluated for alerts (BUDGET-005).
+      type: object
+      properties:
+        thresholdPercent:
+          type: integer
+          minimum: 1
+          maximum: 99
+          default: 80
+          description: Warning threshold percent. Critical is fixed at 100 and not writable. Values >= 100 are rejected with 400 (intentional tightening from 1-200).
+    BudgetThresholdView:
+      description: Additive fields on existing budget responses.
+      type: object
+      properties:
+        thresholdPercent: { type: integer, description: Stored value; legacy rows may hold 100-200 }
+        warningThresholdActive: { type: boolean, description: false when stored thresholdPercent >= 100 (legacy) }
+        criticalThresholdPercent: { type: integer, const: 100 }
+        alertsSupported: { type: boolean, description: 'Additive (BUDGET-005); true only for period = MONTHLY' }
+        usageBasis: { enum: [PERIOD_INSTANCE, CALENDAR_MONTH_APPROXIMATION], description: 'Additive; MONTHLY budgets use the user-month period instance; other period types keep the existing calendar-month projection' }
+
+    Alert:
+      description: Existing alert fields plus DB-M4 lifecycle; read state (isRead/readAt) is independent of status.
+      type: object
+      required: [id, type, severity, title, message, isRead, status, triggeredAt, createdAt]
+      properties:
+        id: { type: string }
+        type: { enum: [BUDGET_THRESHOLD, LARGE_TRANSACTION, CATEGORY_SHIFT, GOAL_RISK, CASHFLOW_RISK, PARSER_ISSUE, SYSTEM] }
+        severity: { enum: [INFO, WARNING, CRITICAL] }
+        title: { type: string }
+        message: { type: string }
+        resourceType: { type: [string, 'null'] }
+        resourceId: { type: [string, 'null'] }
+        isRead: { type: boolean }
+        readAt: { type: [string, 'null'], format: date-time }
+        status: { enum: [ACTIVE, DISMISSED, RESOLVED] }
+        conditionKey: { type: [string, 'null'], description: null for legacy and user-authored alerts }
+        thresholdValue: { type: [number, 'null'] }
+        observedValue: { type: [number, 'null'] }
+        periodStart: { type: [string, 'null'], format: date-time }
+        periodEnd: { type: [string, 'null'], format: date-time }
+        triggeredAt: { type: string, format: date-time }
+        resolvedAt: { type: [string, 'null'], format: date-time }
+        resolutionReason: { type: [string, 'null'] }
+        dismissedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        emailDelivery: { oneOf: [{ $ref: '#/components/schemas/AlertDelivery' }, { type: 'null' }], description: 'null for legacy and user-authored alerts (no delivery row)' }
+    AlertDelivery:
+      type: object
+      required: [channel, status, attemptCount]
+      properties:
+        channel: { enum: [EMAIL] }
+        status: { enum: [PENDING, SENT, SKIPPED, FAILED] }
+        skipReason: { type: [string, 'null'], enum: [NOT_CRITICAL, EMAIL_DISABLED, NOTIFICATIONS_DISABLED, TRANSPORT_DISABLED, null] }
+        attemptCount: { type: integer, minimum: 0, maximum: 3 }
+        lastAttemptAt: { type: [string, 'null'], format: date-time }
+        sentAt: { type: [string, 'null'], format: date-time }
+        failureCode: { type: [string, 'null'], description: 'e.g. TIMEOUT, AUTH, REJECTED, INTERRUPTED' }
+    AlertSetting:
+      description: Existing per-type setting; emailEnabled default becomes false for every type.
+      type: object
+      required: [type, inAppEnabled, emailEnabled]
+      properties:
+        type: { enum: [BUDGET_THRESHOLD, LARGE_TRANSACTION, CATEGORY_SHIFT, GOAL_RISK, CASHFLOW_RISK, PARSER_ISSUE, SYSTEM] }
+        inAppEnabled: { type: boolean, default: true }
+        emailEnabled: { type: boolean, default: false }
+        threshold: { type: [number, 'null'], exclusiveMinimum: 0, description: 'LARGE_TRANSACTION amount in user base currency; null = default 5,000,000 when base currency is VND, otherwise inactive' }
+        emailAvailable: { type: boolean, description: Additive; false when EMAIL_TRANSPORT=disabled }
+
+    UserSettingsWrite:
+      description: Relevant field of existing PATCH /users/me/settings (other existing fields unchanged).
+      type: object
+      properties:
+        storeRawEmailBody: { type: boolean, const: false, description: 'DATA-001; true is rejected with 400 code RAW_EMAIL_BODY_UNAVAILABLE' }
+    UserSettingsView:
+      description: Additive field on existing settings responses.
+      type: object
+      properties:
+        storeRawEmailBody: { type: boolean, description: 'Stored value; legacy true is preserved but has no effect' }
+        rawEmailBodyAvailable: { type: boolean, const: false, description: 'Additive; raw body retention is unavailable in this release' }
+
+    AdminUserWrite:
+      description: Admin-only account identity/status fields. Non-admin bodies containing role/status are rejected with 400.
+      type: object
+      properties:
+        fullName: { type: string }
+        role: { enum: [USER, ADMIN] }
+        status: { enum: [ACTIVE, DISABLED, PENDING_DELETE] }
+
+  responses:
+    Unauthorized: { description: 'Missing, expired, or invalid session', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden: { description: Authenticated but insufficient role, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    OwnerSafeNotFound: { description: Absent or not owned (non-disclosing), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    ValidationError: { description: Field-level validation failure, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    HttpsRequired: { description: 'Production only (OPS-009): request not received over HTTPS via the trusted proxy; code HTTPS_REQUIRED', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    EmptyOk:
+      description: Enveloped success with no specific payload
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Envelope' }
+
+security:
+  - cookieAuth: []
+paths:
+  /health/live:
+    get:
+      security: []
+      responses:
+        '200':
+          description: Process is alive (enveloped by the global interceptor; probes check status code only)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { type: object, properties: { status: { const: ok } } } }
+  /health/ready:
+    get:
+      security: []
+      responses:
+        '200':
+          description: Required dependencies are ready
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { type: object, properties: { status: { const: ready }, database: { const: up } } } }
+        '503': { description: Not ready, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /auth/register:
+    post:
+      security: []
+      summary: Public registration; body has no role/status and always creates USER
+      responses:
+        '201': { $ref: '#/components/responses/EmptyOk' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/HttpsRequired' }
+  /auth/login:
+    post:
+      security: []
+      summary: Existing; production sets Secure; HttpOnly; SameSite=Lax cookies and refuses non-HTTPS
+      responses:
+        '200': { description: Authenticated session (enveloped), content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/HttpsRequired' }
+  /auth/refresh:
+    post:
+      security: []
+      responses:
+        '200': { description: Rotated authenticated session, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/HttpsRequired' }
+  /auth/logout:
+    post:
+      security: []
+      summary: Existing; production refuses non-HTTPS (OPS-009)
+      responses:
+        '200': { $ref: '#/components/responses/EmptyOk' }
+        '403': { $ref: '#/components/responses/HttpsRequired' }
+  /email-connections/gmail/callback:
+    get:
+      security: []
+      summary: Existing OAuth redirect target (<origin>/api/email-connections/gmail/callback); production refuses non-HTTPS
+      responses:
+        '302': { description: Redirect back to the web app with a sanitized connection outcome }
+        '403': { $ref: '#/components/responses/HttpsRequired' }
+  /users/me/settings:
+    patch:
+      summary: Existing self-service settings; storeRawEmailBody can only be false (DATA-001)
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/UserSettingsWrite' } } } }
+      responses:
+        '200':
+          description: Updated settings (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/UserSettingsView' } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+  /users:
+    post:
+      summary: Administrator creates a managed account (no network path grants ADMIN to a non-admin caller)
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/AdminUserWrite' } } } }
+      responses:
+        '201': { $ref: '#/components/responses/EmptyOk' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /users/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    get:
+      summary: Administrator reads account identity/status only
+      responses:
+        '200': { description: Non-financial account fields, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    patch:
+      summary: Administrator updates identity/role/status (audited)
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/AdminUserWrite' } } } }
+      responses:
+        '200': { $ref: '#/components/responses/EmptyOk' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /email-connections/{id}/sync:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    post:
+      summary: Run one bounded owner-triggered sync batch
+      responses:
+        '200':
+          description: Terminal or continuable run result (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/EmailSyncRun' } }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+        '409': { description: A non-expired sync lease already exists, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: Reconnect or provider recovery required, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /email-connections/{id}/sync-runs:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    get:
+      responses:
+        '200':
+          description: Owner-visible sync runs, newest first (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { type: array, items: { $ref: '#/components/schemas/EmailSyncRun' } } }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+  /transactions/{id}/category:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    patch:
+      summary: Apply authoritative manual category correction
+      responses:
+        '200': { description: Transaction and decision evidence, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+  /transactions/{id}/reclassify:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    post:
+      summary: Explicitly allow deterministic automatic reclassification
+      responses:
+        '200': { description: Transaction and winning-rule evidence, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+  /transactions/{id}/category-history:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    get:
+      responses:
+        '200': { description: Append-only owner-visible category events, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+  /budgets:
+    get:
+      summary: Existing list; each item carries the additive threshold/support fields
+      responses:
+        '200':
+          description: Owner budgets (enveloped; existing pagination/usage fields retained)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { type: array, items: { $ref: '#/components/schemas/BudgetThresholdView' } } }
+    post:
+      summary: Create budget (thresholdPercent 1-99 warning; critical fixed 100)
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/BudgetWrite' } } } }
+      responses:
+        '201': { $ref: '#/components/responses/EmptyOk' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+  /budgets/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    get:
+      summary: Existing read; carries the additive threshold/support fields
+      responses:
+        '200':
+          description: Owned budget (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/BudgetThresholdView' } }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+    patch:
+      summary: Update budget; triggers budget alert evaluation (ALERT-009)
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/BudgetWrite' } } } }
+      responses:
+        '200': { $ref: '#/components/responses/EmptyOk' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+  /budgets/alerts:
+    get:
+      summary: Existing read-only near-threshold projection; uses the shared threshold function and never writes alerts
+      responses:
+        '200': { description: Projection (enveloped), content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+  /budgets/{id}/recalculate:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    post:
+      responses:
+        '200': { description: Current usage and alert condition changes (enveloped), content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+  /alerts:
+    get:
+      parameters:
+        - { in: query, name: status, schema: { enum: [ACTIVE, DISMISSED, RESOLVED] } }
+        - { in: query, name: isRead, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Owner alerts (enveloped; existing pagination fields retained)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { type: object, properties: { data: { type: array, items: { $ref: '#/components/schemas/Alert' } } } } }
+    post:
+      summary: Existing user-authored alert; conditionKey null, never evaluated/resolved, in-app only with no delivery row (retention pending decision)
+      responses:
+        '201': { $ref: '#/components/responses/EmptyOk' }
+  /alerts/unread-count:
+    get:
+      responses:
+        '200':
+          description: Count of the user's alerts with isRead=false
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { type: object, required: [count], properties: { count: { type: integer, minimum: 0 } } } }
+  /alerts/{id}/read:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    patch:
+      summary: Existing; changes only isRead/readAt, never status
+      responses:
+        '200': { $ref: '#/components/responses/EmptyOk' }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+  /alerts/read-all:
+    patch:
+      summary: Existing; changes only isRead/readAt
+      responses:
+        '200': { $ref: '#/components/responses/EmptyOk' }
+  /alerts/{id}/dismiss:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    patch:
+      summary: ACTIVE -> DISMISSED; sets dismissedAt and marks read; RESOLVED alerts return 409
+      responses:
+        '200':
+          description: Owned alert dismissed (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/Alert' } }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+        '409': { description: Alert already resolved, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /alerts/settings:
+    get:
+      responses:
+        '200':
+          description: Per-type settings (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { type: array, items: { $ref: '#/components/schemas/AlertSetting' } } }
+    patch:
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/AlertSetting' } } } }
+      responses:
+        '200': { $ref: '#/components/responses/EmptyOk' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+  /goals/{id}/simulation:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    get:
+      summary: Side-effect free; never creates or resolves alerts
+      responses:
+        '200':
+          description: Reproducible feasibility or insufficient-data result (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/GoalFeasibility' } }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }

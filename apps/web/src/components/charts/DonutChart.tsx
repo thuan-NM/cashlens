@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 
 interface Segment {
   label: string;
@@ -50,3 +50,4 @@ export function DonutChart({ segments }: { segments: Segment[] }) {
     </svg>
   );
 }
+
