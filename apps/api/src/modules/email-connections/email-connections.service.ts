@@ -1,6 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { AuditActorType } from '@prisma/client';
 import { RequestUser } from '../../common/types/request-user.type';
 import { TokenEncryptionService } from '../../common/security/token-encryption.service';
+import { UsersRepository } from '../users/users.repository';
 import { EmailConnectionsRepository } from './email-connections.repository';
 import { toEmailConnectionResponse } from './email-connections.mapper';
 import { GmailOAuthService } from './gmail-oauth.service';
@@ -11,14 +17,26 @@ export class EmailConnectionsService {
     private readonly repository: EmailConnectionsRepository,
     private readonly gmail: GmailOAuthService,
     private readonly encryption: TokenEncryptionService,
+    private readonly users: UsersRepository,
   ) {}
 
+  /** Starts a flow bound to the calling browser through the returned nonce. */
   connectGmail(user: RequestUser) {
-    return { authorizationUrl: this.gmail.authorizationUrl(user.id) };
+    const nonce = this.gmail.createNonce();
+    return {
+      nonce,
+      response: {
+        authorizationUrl: this.gmail.authorizationUrl(user.id, nonce),
+      },
+    };
   }
 
-  async completeGmail(code: string, state: string) {
-    const userId = this.gmail.verifyState(state);
+  async completeGmail(code: string, state: unknown, nonce: unknown) {
+    // State, browser binding, and account status are checked before Google is called.
+    const userId = this.gmail.verifyState(state, nonce);
+    if (!(await this.repository.isActiveUser(userId))) {
+      throw new UnauthorizedException('Invalid OAuth state');
+    }
     const tokens = await this.gmail.exchangeCode(code);
     const profile = await this.gmail.profile(tokens.access_token);
     if (!tokens.refresh_token) {
@@ -38,6 +56,16 @@ export class EmailConnectionsService {
         status: 'ACTIVE',
       },
     );
+
+    // Sanitized evidence (SEC-006): no mailbox address, token, or provider payload.
+    await this.users.recordAudit({
+      actorType: AuditActorType.USER,
+      actorId: userId,
+      action: 'EMAIL_CONNECTED',
+      resourceType: 'email_connection',
+      resourceId: connection.id,
+      metadata: { provider: 'GMAIL' },
+    });
 
     return toEmailConnectionResponse(connection);
   }
@@ -62,9 +90,7 @@ export class EmailConnectionsService {
     ) {
       return {
         connection,
-        accessToken: this.encryption.decrypt(
-          connection.accessTokenEncrypted,
-        ),
+        accessToken: this.encryption.decrypt(connection.accessTokenEncrypted),
       };
     }
 
@@ -86,8 +112,16 @@ export class EmailConnectionsService {
   }
 
   async disconnect(user: RequestUser, id: string) {
-    await this.findOwned(user.id, id);
-    await this.repository.disconnect(id);
+    if (!(await this.repository.disconnect(user.id, id))) {
+      throw new NotFoundException('Email connection not found');
+    }
+    await this.users.recordAudit({
+      actorType: AuditActorType.USER,
+      actorId: user.id,
+      action: 'EMAIL_DISCONNECTED',
+      resourceType: 'email_connection',
+      resourceId: id,
+    });
     return { id };
   }
 }

@@ -8,6 +8,21 @@ export class UserSettingsResponseDto {
   metadata!: Record<string, unknown> | null;
 }
 
+/** Account identity and status as administrators see it (no settings). */
+export class AdminUserResponseDto {
+  id!: string;
+  email!: string;
+  fullName!: string | null;
+  role!: string;
+  timezone!: string;
+  locale!: string;
+  baseCurrency!: string;
+  status!: string;
+  lastLoginAt!: Date | null;
+  createdAt!: Date;
+  updatedAt!: Date;
+}
+
 export class UserResponseDto {
   id!: string;
   email!: string;

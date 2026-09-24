@@ -79,10 +79,10 @@ export const toCreateTransactionInput = (
   status: dto.status ?? 'POSTED',
   isDuplicate: dto.isDuplicate,
   duplicateOfTransactionId: dto.duplicateOfTransactionId,
-  classificationSource:
-    dto.classificationSource ??
-    (dto.categoryId ? ClassificationSource.MANUAL : ClassificationSource.UNKNOWN),
-  classificationConfidence: dto.classificationConfidence,
+  // Provenance is derived on the server, never taken from input (SEC-004).
+  classificationSource: dto.categoryId
+    ? ClassificationSource.MANUAL
+    : ClassificationSource.UNKNOWN,
   userNote: dto.userNote,
   metadata: dto.metadata,
 });
@@ -106,8 +106,15 @@ export const toUpdateTransactionInput = (
   status: dto.status,
   isDuplicate: dto.isDuplicate,
   duplicateOfTransactionId: dto.duplicateOfTransactionId,
-  classificationSource: dto.classificationSource,
-  classificationConfidence: dto.classificationConfidence,
+  // A category chosen by the owner is a manual classification (SEC-004).
+  ...(dto.categoryId === undefined
+    ? {}
+    : {
+        classificationSource: dto.categoryId
+          ? ClassificationSource.MANUAL
+          : ClassificationSource.UNKNOWN,
+        classificationConfidence: dto.categoryId ? 1 : null,
+      }),
   userNote: dto.userNote,
   metadata: dto.metadata,
 });

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { BaseRepository } from '../../common/repositories/base.repository';
+import { nullIfNotFound } from '../../common/utils/prisma-errors';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ListGoalsDto } from './dto/list-goals.dto';
 import { buildGoalWhere } from './query/goals.query';
@@ -28,21 +29,35 @@ export class GoalsRepository extends BaseRepository {
     return this.prisma.goal.create({ data });
   }
 
-  updateById(id: string, data: Prisma.GoalUncheckedUpdateInput) {
-    return this.prisma.goal.update({ where: { id }, data });
+  // Writes carry the owner predicate themselves (SEC-001); null means not found.
+  updateById(
+    userId: string,
+    id: string,
+    data: Prisma.GoalUncheckedUpdateInput,
+  ) {
+    return nullIfNotFound(
+      this.prisma.goal.update({
+        where: { id, userId, deletedAt: null },
+        data,
+      }),
+    );
   }
 
-  archiveById(id: string) {
-    return this.prisma.goal.update({
-      where: { id },
-      data: { deletedAt: new Date(), status: 'ARCHIVED' },
-    });
+  archiveById(userId: string, id: string) {
+    return nullIfNotFound(
+      this.prisma.goal.update({
+        where: { id, userId, deletedAt: null },
+        data: { deletedAt: new Date(), status: 'ARCHIVED' },
+      }),
+    );
   }
 
-  contribute(id: string, amount: number) {
-    return this.prisma.goal.update({
-      where: { id },
-      data: { savedAmount: { increment: amount } },
-    });
+  contribute(userId: string, id: string, amount: number) {
+    return nullIfNotFound(
+      this.prisma.goal.update({
+        where: { id, userId, deletedAt: null },
+        data: { savedAmount: { increment: amount } },
+      }),
+    );
   }
 }

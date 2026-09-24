@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { BaseRepository } from '../../common/repositories/base.repository';
+import { nullIfNotFound } from '../../common/utils/prisma-errors';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ListAlertsDto } from './dto/list-alerts.dto';
 import { UpdateAlertSettingDto } from './dto/update-alert-setting.dto';
@@ -38,11 +39,14 @@ export class AlertsRepository extends BaseRepository {
     return this.prisma.alert.create({ data });
   }
 
-  markRead(id: string) {
-    return this.prisma.alert.update({
-      where: { id },
-      data: { isRead: true, readAt: new Date() },
-    });
+  // The owner predicate is part of the write (SEC-001); null means not found.
+  markRead(userId: string, id: string) {
+    return nullIfNotFound(
+      this.prisma.alert.update({
+        where: { id, userId },
+        data: { isRead: true, readAt: new Date() },
+      }),
+    );
   }
 
   markAllRead(userId: string) {

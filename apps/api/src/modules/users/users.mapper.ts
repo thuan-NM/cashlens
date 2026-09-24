@@ -1,7 +1,8 @@
 import type { Prisma, User } from '@prisma/client';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { UserResponseDto } from './dto/user-response.dto';
+import { AdminUserResponseDto, UserResponseDto } from './dto/user-response.dto';
 
 type UserWithSettings = User & {
   settings?: {
@@ -42,9 +43,40 @@ export function toUserResponse(user: UserWithSettings): UserResponseDto {
   };
 }
 
+/**
+ * Administrator view of an account: identity and status only. Settings and
+ * metadata stay private to the account owner (SEC-008, contract AdminUserWrite).
+ */
+export function toAdminUserResponse(user: User): AdminUserResponseDto {
+  return {
+    id: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    role: user.role,
+    timezone: user.timezone,
+    locale: user.locale,
+    baseCurrency: user.baseCurrency,
+    status: user.status,
+    lastLoginAt: user.lastLoginAt,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+}
+
+export function toUpdateMyProfileInput(
+  dto: UpdateMyProfileDto,
+): Prisma.UserUpdateInput {
+  return {
+    fullName: dto.fullName,
+    timezone: dto.timezone,
+    locale: dto.locale,
+    baseCurrency: dto.baseCurrency,
+  };
+}
+
 export function toCreateUserInput(dto: CreateUserDto): Prisma.UserCreateInput {
   return {
-    email: dto.email,
+    email: dto.email.trim().toLowerCase(),
     fullName: dto.fullName,
     role: dto.role,
     timezone: dto.timezone,

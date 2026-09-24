@@ -28,6 +28,8 @@ import {
  * Administrator status grants no access to private planning data (SEC-008).
  */
 
+jest.setTimeout(30_000);
+
 type Method = 'get' | 'post' | 'patch' | 'delete';
 type Caller = Pick<Agent, Method>;
 type Kind = 'budget' | 'goal' | 'alert' | 'alertSetting';
@@ -283,8 +285,10 @@ describe('Ownership matrix: planning and alerts (T015)', () => {
 
   afterAll(async () => {
     // Owned budgets, goals, alerts, settings, categories and transactions cascade.
-    await cleanupUsers(prisma, [alice?.id, bob?.id, admin?.id]);
-    await app.close();
+    if (prisma) {
+      await cleanupUsers(prisma, [alice?.id, bob?.id, admin?.id]);
+    }
+    await app?.close();
   }, 60_000);
 
   const actors: Actor[] = [

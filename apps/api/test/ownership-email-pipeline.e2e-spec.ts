@@ -977,7 +977,7 @@ describe('Email pipeline ownership matrix (T016)', () => {
       },
     );
 
-    it('[red until fixed] USER gets 404, not 500, on every id route when the id contains a NUL byte', async () => {
+    it('USER gets 404, not 500, on every id route when the id contains a NUL byte', async () => {
       const id = `\u0000t016${randomBytes(4).toString('hex')}`;
       const statuses: Record<string, number> = {};
       for (const [name, send] of idRoutes) {
@@ -992,7 +992,7 @@ describe('Email pipeline ownership matrix (T016)', () => {
   // ------------------------------------- Gmail OAuth callback account linking
 
   describe('Gmail OAuth callback account linking (SEC-001: the state must be bound to the browser that started the flow)', () => {
-    it('[OAuth linking, red until fixed] a callback with bob’s state completed by a cookieless client (not the browser that started the flow) is refused and links nothing to bob', async () => {
+    it('a callback with bob’s state completed by a cookieless client (not the browser that started the flow) is refused and links nothing to bob', async () => {
       const state = await startConnect(bob.agent);
       const before = await connectionsOf(bob.id);
       const { inbox } = stubGoogleConsent('cookieless');
@@ -1007,7 +1007,7 @@ describe('Email pipeline ownership matrix (T016)', () => {
       expect(leaks(res)).toEqual([]);
     });
 
-    it('[OAuth linking, red until fixed] a callback with bob’s state completed in alice’s signed-in browser is refused and links the inbox to nobody', async () => {
+    it('a callback with bob’s state completed in alice’s signed-in browser is refused and links the inbox to nobody', async () => {
       const state = await startConnect(bob.agent);
       const before = {
         bob: await connectionsOf(bob.id),
@@ -1028,7 +1028,7 @@ describe('Email pipeline ownership matrix (T016)', () => {
       expect(leaks(res)).toEqual([]);
     });
 
-    it('[OAuth linking, control] the browser that started the flow (bob’s agent) completes it and the inbox is linked to bob only, with tokens stored encrypted', async () => {
+    it('the browser that started the flow (bob’s agent) completes it and the inbox is linked to bob only, with tokens stored encrypted', async () => {
       const state = await startConnect(bob.agent);
       const { inbox, accessPlain } = stubGoogleConsent('same-browser');
 
@@ -1043,7 +1043,7 @@ describe('Email pipeline ownership matrix (T016)', () => {
       expect(leaks(res)).toEqual([]);
     });
 
-    it('[OAuth state] a state whose payload was altered to name alice is refused and links nothing', async () => {
+    it('a state whose payload was altered to name alice is refused and links nothing', async () => {
       const state = await startConnect(bob.agent);
       const [payload, signature] = state.split('.');
       const claims = JSON.parse(
@@ -1064,7 +1064,7 @@ describe('Email pipeline ownership matrix (T016)', () => {
       expect(await connectionsOf(alice.id)).toEqual(before);
     });
 
-    it('[OAuth state, red until fixed] a callback without a state is refused with 4xx (unauthorized outcome), never 500', async () => {
+    it('a callback without a state is refused with 4xx (unauthorized outcome), never 500', async () => {
       const { inbox } = stubGoogleConsent('missing-state');
 
       const res = await completeCallback(bob.agent, undefined);
@@ -1080,7 +1080,7 @@ describe('Email pipeline ownership matrix (T016)', () => {
       ['PENDING_DELETE', { status: 'PENDING_DELETE' as const }],
       ['soft-deleted', { deletedAt: new Date() }],
     ])(
-      '[OAuth account state, red until fixed] a flow started by an account that is then %s cannot link an inbox, even from the same browser',
+      'a flow started by an account that is then %s cannot link an inbox, even from the same browser',
       async (label, change) => {
         const user = await registerUser(
           app,
@@ -1161,7 +1161,7 @@ describe('Email pipeline ownership matrix (T016)', () => {
       expect(leaks(res)).toEqual([]);
     });
 
-    it('[control] POST /email-connections/:id/sync (Gmail stubbed) records a run for alice; neither the run, the stored message, the message list nor its parser runs expose tokens or the raw body', async () => {
+    it('POST /email-connections/:id/sync (Gmail stubbed) records a run for alice; neither the run, the stored message, the message list nor its parser runs expose tokens or the raw body', async () => {
       const gmailId = `t016-gmail-${RUN_ID}-${randomBytes(4).toString('hex')}`;
       const message: GmailMessage = {
         id: gmailId,
@@ -1236,7 +1236,7 @@ describe('Email pipeline ownership matrix (T016)', () => {
       expect([...leaks(list), ...leaks(runs)]).toEqual([]);
     });
 
-    it('[control] POST /email-messages/:id/parse lets alice parse her own message and records a parser run without exposing tokens', async () => {
+    it('POST /email-messages/:id/parse lets alice parse her own message and records a parser run without exposing tokens', async () => {
       const before = await prisma.parserRun.count({
         where: { emailMessageId: aliceMessageId },
       });
@@ -1252,7 +1252,7 @@ describe('Email pipeline ownership matrix (T016)', () => {
       expect(leaks(res)).toEqual([]);
     });
 
-    it('[control] DELETE /email-connections/:id lets alice disconnect her own spare connection', async () => {
+    it('DELETE /email-connections/:id lets alice disconnect her own spare connection', async () => {
       const res = await alice.agent.delete(
         `/api/email-connections/${idPath(aliceSpare.id)}`,
       );

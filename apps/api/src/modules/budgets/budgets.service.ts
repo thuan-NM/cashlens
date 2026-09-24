@@ -92,15 +92,21 @@ export class BudgetsService {
     await this.findById(user, id);
     await this.assertCategory(user.id, dto.categoryId);
     const budget = await this.budgetsRepository.updateById(
+      user.id,
       id,
       toUpdateBudgetInput(dto),
     );
+    if (!budget) {
+      throw new NotFoundException('Budget not found');
+    }
     return toBudgetResponse(budget);
   }
 
   async archive(user: RequestUser, id: string) {
     await this.findById(user, id);
-    await this.budgetsRepository.archiveById(id);
+    if (!(await this.budgetsRepository.archiveById(user.id, id))) {
+      throw new NotFoundException('Budget not found');
+    }
     return { id };
   }
 

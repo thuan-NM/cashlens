@@ -1,13 +1,13 @@
 import '../support/synthetic-env'; // must stay first: seeds config before AppModule loads
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { ChildProcess, spawn } from 'child_process';
-import cookieParser from 'cookie-parser';
 import { randomBytes } from 'crypto';
 import { createServer } from 'net';
 import { join } from 'path';
 import { App } from 'supertest/types';
 import { AppModule } from '../../src/app.module';
+import { configureApp } from '../../src/app.setup';
 import { assertTestDatabaseUrl, resolveE2eDatabaseUrl } from './test-database';
 
 const API_ROOT = join(__dirname, '..', '..');
@@ -28,15 +28,7 @@ export async function createTestApp(
   }
   const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication<INestApplication<App>>();
-  app.use(cookieParser());
-  app.setGlobalPrefix('api');
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  configureApp(app); // the same request pipeline as main.ts
   await app.init();
   return app;
 }

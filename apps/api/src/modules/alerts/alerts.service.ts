@@ -38,7 +38,11 @@ export class AlertsService {
       throw new NotFoundException('Alert not found');
     }
 
-    return toAlertResponse(await this.alertsRepository.markRead(id));
+    const updated = await this.alertsRepository.markRead(user.id, id);
+    if (!updated) {
+      throw new NotFoundException('Alert not found');
+    }
+    return toAlertResponse(updated);
   }
 
   async markAllRead(user: RequestUser) {

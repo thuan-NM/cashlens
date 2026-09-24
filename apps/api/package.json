@@ -12,6 +12,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
+    "admin:bootstrap": "ts-node -r tsconfig-paths/register src/scripts/bootstrap-admin.ts",
     "swagger:generate": "nest build && node dist/src/scripts/generate-openapi.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",

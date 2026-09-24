@@ -8,6 +8,7 @@ import {
   MaxLength,
   Min,
   IsInt,
+  IsNotEmpty,
 } from 'class-validator';
 
 export class CreateTransactionCategoryDto {
@@ -22,6 +23,7 @@ export class CreateTransactionCategoryDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   parentId?: string;
 
   @IsOptional()

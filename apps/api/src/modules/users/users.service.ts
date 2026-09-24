@@ -1,45 +1,51 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { AuditActorType, Prisma, UserStatus } from '@prisma/client';
 import type { RequestUser } from '../../common/types/request-user.type';
 import type { ListQuery } from '../../common/types/list-query-config.type';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateMyProfileDto } from './dto/update-my-profile.dto';
 import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import {
+  toAdminUserResponse,
   toCreateUserInput,
+  toUpdateMyProfileInput,
   toUpdateUserInput,
   toUserResponse,
 } from './users.mapper';
-import { UsersRepository } from './users.repository';
+import { AuditEntry, UsersRepository } from './users.repository';
+
+/** Names of the fields a request actually set; values are never recorded. */
+const changedFields = (dto: object): string[] =>
+  Object.entries(dto)
+    .filter(([, value]) => value !== undefined)
+    .map(([key]) => key)
+    .sort();
 
 @Injectable()
 export class UsersService {
   constructor(private readonly usersRepository: UsersRepository) {}
 
+  // --- administrator operations (identity and status only) -------------------
+
   async list(query: ListQuery) {
     const result = await this.usersRepository.listUsers(query);
 
     return {
-      data: result.data.map(toUserResponse),
+      data: result.data.map(toAdminUserResponse),
       total: result.total,
     };
   }
 
   async findById(id: string) {
-    const user = await this.usersRepository.findById(id);
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    return toUserResponse(user);
+    return toAdminUserResponse(await this.loadActive(id));
   }
 
-  async findMe(user: RequestUser) {
-    return this.findById(user.id);
-  }
-
-  async create(dto: CreateUserDto) {
+  async create(actor: RequestUser, dto: CreateUserDto) {
     const existingUser = await this.usersRepository.findByEmail(dto.email);
 
     if (existingUser) {
@@ -47,18 +53,60 @@ export class UsersService {
     }
 
     const user = await this.usersRepository.create(toCreateUserInput(dto));
-    return toUserResponse(user);
+    await this.audit(actor, 'ADMIN_USER_CREATED', user.id, {
+      role: user.role,
+      status: user.status,
+    });
+    return toAdminUserResponse(user);
   }
 
-  async updateById(id: string, dto: UpdateUserDto) {
-    await this.findById(id);
+  async updateById(actor: RequestUser, id: string, dto: UpdateUserDto) {
+    await this.loadActive(id);
 
-    const user = await this.usersRepository.updateById(id, toUpdateUserInput(dto));
-    return toUserResponse(user);
+    const user = await this.usersRepository.updateById(
+      id,
+      toUpdateUserInput(dto),
+    );
+    // A disabled account keeps no renewable session (AUTH-002, SEC-005).
+    if (dto.status && dto.status !== UserStatus.ACTIVE) {
+      await this.usersRepository.revokeAllRefreshTokens(id);
+    }
+    // Privileged change: the new role and status are recorded, other fields by name.
+    await this.audit(actor, 'ADMIN_USER_UPDATED', id, {
+      fields: changedFields(dto),
+      ...(dto.role ? { role: dto.role } : {}),
+      ...(dto.status ? { status: dto.status } : {}),
+    });
+    return toAdminUserResponse(user);
+  }
+
+  async deleteById(actor: RequestUser, id: string) {
+    await this.loadActive(id);
+    await this.usersRepository.softDeleteById(id);
+    await this.usersRepository.revokeAllRefreshTokens(id);
+    await this.audit(actor, 'ADMIN_USER_DELETED', id);
+
+    return { id };
+  }
+
+  // --- self-service (the caller's own account, including settings) -----------
+
+  async findMe(user: RequestUser) {
+    return toUserResponse(await this.loadActive(user.id));
+  }
+
+  async updateMe(user: RequestUser, dto: UpdateMyProfileDto) {
+    await this.loadActive(user.id);
+    await this.usersRepository.updateById(user.id, toUpdateMyProfileInput(dto));
+    await this.audit(user, 'USER_PROFILE_UPDATED', user.id, {
+      fields: changedFields(dto),
+    });
+
+    return this.findMe(user);
   }
 
   async updateMySettings(user: RequestUser, dto: UpdateUserSettingsDto) {
-    await this.findById(user.id);
+    await this.loadActive(user.id);
 
     await this.usersRepository.upsertSettings(user.id, {
       storeRawEmailBody: dto.storeRawEmailBody,
@@ -69,14 +117,39 @@ export class UsersService {
       notificationEnabled: dto.notificationEnabled,
       metadata: dto.metadata as Prisma.InputJsonValue | undefined,
     });
+    await this.audit(user, 'USER_SETTINGS_UPDATED', user.id, {
+      fields: changedFields(dto),
+    });
 
-    return this.findById(user.id);
+    return this.findMe(user);
   }
 
-  async deleteById(id: string) {
-    await this.findById(id);
-    await this.usersRepository.softDeleteById(id);
+  /** Admin actions are recorded as ADMIN; changes to one's own account as USER. */
+  private audit(
+    actor: RequestUser,
+    action: string,
+    targetId: string,
+    metadata?: AuditEntry['metadata'],
+  ) {
+    return this.usersRepository.recordAudit({
+      actorType: action.startsWith('ADMIN_')
+        ? AuditActorType.ADMIN
+        : AuditActorType.USER,
+      actorId: actor.id,
+      action,
+      resourceType: 'user',
+      resourceId: targetId,
+      metadata,
+    });
+  }
 
-    return { id };
+  private async loadActive(id: string) {
+    const user = await this.usersRepository.findById(id);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
   }
 }
