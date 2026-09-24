@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -25,6 +26,23 @@ const changedFields = (dto: object): string[] =>
     .filter(([, value]) => value !== undefined)
     .map(([key]) => key)
     .sort();
+
+/**
+ * DATA-001: raw email body retention cannot be enabled in this release; the
+ * refusal names the field and changes nothing.
+ */
+export const rawEmailBodyUnavailable = () =>
+  new BadRequestException({
+    statusCode: 400,
+    message: 'Raw email body retention is unavailable in this release',
+    error: 'Bad Request',
+    code: 'RAW_EMAIL_BODY_UNAVAILABLE',
+    fields: {
+      storeRawEmailBody: [
+        'Raw email body retention is unavailable in this release',
+      ],
+    },
+  });
 
 @Injectable()
 export class UsersService {
@@ -107,6 +125,9 @@ export class UsersService {
 
   async updateMySettings(user: RequestUser, dto: UpdateUserSettingsDto) {
     await this.loadActive(user.id);
+    if (dto.storeRawEmailBody === true) {
+      throw rawEmailBodyUnavailable();
+    }
 
     await this.usersRepository.upsertSettings(user.id, {
       storeRawEmailBody: dto.storeRawEmailBody,

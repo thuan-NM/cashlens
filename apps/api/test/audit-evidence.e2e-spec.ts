@@ -194,7 +194,7 @@ describe('Sanitized audit evidence (T029)', () => {
     });
     const list = jest
       .spyOn(gmailApi, 'listMessageIds')
-      .mockResolvedValue([] as never);
+      .mockResolvedValue({ ids: [] });
 
     try {
       const connect = await alice.agent

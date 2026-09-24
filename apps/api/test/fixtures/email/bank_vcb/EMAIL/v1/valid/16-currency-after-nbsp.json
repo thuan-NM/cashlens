@@ -1,0 +1,27 @@
+{
+  "description": "A foreign currency after a non-breaking space is kept",
+  "message": {
+    "from": "Vietcombank <notify@vcb.example.test>",
+    "subject": "Vietcombank - Biến động số dư tài khoản",
+    "receivedAt": "2026-09-17T03:01:00.000Z",
+    "body": [
+      "Kính gửi Quý khách,",
+      "Vietcombank xin thông báo tài khoản của Quý khách vừa phát sinh giao dịch:",
+      "Số tài khoản: xxxxxxxxx0001",
+      "Loại giao dịch: Ghi nợ",
+      "Số tiền: -45,000 USD",
+      "Thời gian: 17/09/2026 10:00:00",
+      "Số tham chiếu: FT26260USD",
+      "Nội dung: Dich vu nuoc ngoai",
+      "Đây là email tự động, vui lòng không trả lời."
+    ]
+  },
+  "expected": {
+    "amount": 45000,
+    "currency": "USD",
+    "direction": "EXPENSE",
+    "transactionTime": "2026-09-17T03:00:00.000Z",
+    "transactionCode": "FT26260USD",
+    "description": "Dich vu nuoc ngoai"
+  }
+}

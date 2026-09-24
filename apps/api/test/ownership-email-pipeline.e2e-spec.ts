@@ -1191,7 +1191,7 @@ describe('Email pipeline ownership matrix (T016)', () => {
           ],
         },
       };
-      listIdsSpy.mockResolvedValue([gmailId]);
+      listIdsSpy.mockResolvedValue({ ids: [gmailId] });
       getMessageSpy.mockResolvedValue(message);
       const runsBefore = await prisma.emailSyncRun.count({
         where: { emailConnectionId: aliceConn.id },

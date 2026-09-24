@@ -59,7 +59,15 @@ components:
     EmailSyncRun:
       description: >-
         Existing EmailSyncRun response (toEmailSyncRunResponse) with existing field names and
-        status values. emailsFailed, hasMore, and EXPIRED are additive (DB-M1).
+        status values. emailsFailed, hasMore, and EXPIRED are additive (DB-M1). As built (T044): exactly
+        these fields are returned; the lease token and the opaque provider cursors (cursorBefore/cursorAfter)
+        stay internal. SUCCESS = every handled message succeeded (a budget stop is still SUCCESS with
+        hasMore); PARTIAL_FAILED = at least one message failed (a parser failure or a provider failure) or
+        the page was cut by a transient provider failure after some progress; FAILED = nothing could be
+        handled (listing failed, or refused access or a transient failure before the first message);
+        EXPIRED = the run lost its lease before finishing (recorded by the next lease holder or by its own
+        finish). errorMessage is one of a fixed set of sanitized strings (for example "2 message(s) failed",
+        "Gmail is temporarily unavailable; sync again later").
       type: object
       required: [id, emailConnectionId, triggerType, status, startedAt, emailsFound, emailsMatched, emailsParsed, transactionsCreated, emailsFailed, hasMore]
       properties:
@@ -75,8 +83,66 @@ components:
         emailsParsed: { type: integer, minimum: 0 }
         transactionsCreated: { type: integer, minimum: 0 }
         emailsFailed: { type: integer, minimum: 0, description: Additive }
-        hasMore: { type: boolean, description: Additive; true when a bounded batch stopped with remaining messages }
+        hasMore: { type: boolean, description: 'Additive; true when a non-FAILED run left work in the current window (a next page, a run-budget stop, or a transient cut); the next manual sync continues it. Always false for FAILED and EXPIRED.' }
         errorMessage: { type: [string, 'null'], description: Sanitized failure summary (existing field) }
+
+    EmailConnectionView:
+      description: >-
+        Existing connection fields (id, provider, emailAddress, providerUserId, tokenExpiresAt, scopes, status,
+        lastSyncedAt, connectedAt, disconnectedAt, errorMessage, createdAt, updatedAt) plus additive recovery and
+        progress fields (T041). Credentials, the provider cursor, and the lease token are never returned.
+      type: object
+      properties:
+        status: { enum: [ACTIVE, EXPIRED, REVOKED, ERROR], description: 'EXPIRED = the provider refused the grant (reconnect required); REVOKED = the user disconnected; ERROR = the last sync failed for a temporary reason' }
+        reconnectRequired: { type: boolean, description: Additive; true exactly when recoveryAction is RECONNECT }
+        recoveryAction: { enum: [NONE, RETRY, RECONNECT, CONNECT], description: 'Additive (EMAIL-003): RETRY = sync again; RECONNECT = new consent flow; CONNECT = disconnected' }
+        lastFailedAt: { type: [string, 'null'], format: date-time, description: Additive; last failed sync attempt }
+        backfillFrom: { type: [string, 'null'], format: date-time, description: Additive; initial import boundary fixed at the first sync }
+        backfillCompletedAt: { type: [string, 'null'], format: date-time, description: Additive; when the initial window was fully read }
+        syncInProgress: { type: boolean, description: Additive; an unexpired sync lease exists }
+
+    ParseOutcome:
+      description: >-
+        POST /email-messages/{id}/parse result (as built, T045). Either a transaction outcome or a sanitized failure.
+        A message already linked to a transaction returns created false. A certain repeat (the same bank
+        transaction code with the same amount, direction, and currency) returns the existing transaction with
+        duplicate true and creates nothing. Any other match creates a row flagged as a suspected duplicate
+        (isDuplicate, excluded from totals until cleared) and returns suspectedDuplicate true (EMAIL-008).
+      oneOf:
+        - type: object
+          required: [transactionId, created]
+          properties:
+            transactionId: { type: string }
+            created: { type: boolean }
+            duplicate: { type: boolean, const: true, description: Present only for a certain cross-message duplicate }
+            suspectedDuplicate: { type: boolean, const: true, description: Present only when a flagged suspected duplicate was created }
+        - type: object
+          required: [parserRun, created]
+          properties:
+            created: { const: false }
+            parserRun: { $ref: '#/components/schemas/ParserRun' }
+
+    ParserRun:
+      description: >-
+        Sanitized parse attempt (EMAIL-010, EMAIL-011). errorMessage is a code with field names only, for example
+        "INVALID_AMOUNT: amount", "MISSING_REQUIRED_FIELDS: amount, transaction_time", "AMBIGUOUS_VALUE: amount",
+        "AMBIGUOUS_DIRECTION: direction", "NO_TEMPLATE_MATCHED".
+        extractedPayload holds per-field match status only (MATCHED, FALLBACK, MISSING), never captured text.
+        normalizedPayload holds the deduplication decision only: { deduplication: { strategy, outcome: CREATED |
+        DUPLICATE | SUSPECTED_DUPLICATE, duplicateOfTransactionId?, sameFacts? } }. Legacy rows written before T045
+        may still hold captured values.
+      type: object
+      properties:
+        id: { type: string }
+        emailMessageId: { type: string }
+        parserTemplateId: { type: [string, 'null'] }
+        status: { enum: [SUCCESS, FAILED, PARTIAL] }
+        confidenceScore: { type: [number, 'null'] }
+        extractedPayload: { type: object }
+        normalizedPayload: { type: object }
+        errorMessage: { type: [string, 'null'] }
+        createdTransactionId: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
 
     GoalFeasibility:
       description: >-
@@ -405,14 +471,16 @@ paths:
       requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/UserSettingsWrite' } } } }
       responses:
         '200':
-          description: Updated settings (enveloped)
+          description: >-
+            The updated user view (enveloped), as GET /users/me returns it; its settings object carries the
+            UserSettingsView fields.
           content:
             application/json:
               schema:
                 allOf:
                   - $ref: '#/components/schemas/Envelope'
-                  - properties: { data: { $ref: '#/components/schemas/UserSettingsView' } }
-        '400': { $ref: '#/components/responses/ValidationError' }
+                  - properties: { data: { type: object, properties: { settings: { $ref: '#/components/schemas/UserSettingsView' } } } }
+        '400': { description: 'Validation error, or code RAW_EMAIL_BODY_UNAVAILABLE with fields.storeRawEmailBody for storeRawEmailBody true; nothing is stored', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /users/me:
     patch:
       summary: Self-service profile update of the caller's own account (audited field names only)
@@ -605,9 +673,16 @@ paths:
       - { in: path, name: id, required: true, schema: { type: string } }
     post:
       summary: Run one bounded owner-triggered sync batch
+      description: >-
+        One page of at most 50 messages inside a 25-second run budget, under the connection's sync lease (EMAIL-005
+        to EMAIL-007, EMAIL-013). Refusals come first and create no run: 404 (not the caller's connection), 503
+        (reconnect required or token endpoint unavailable), 400 (no enabled listen rule), 409 (lease held). After
+        the lease every outcome, including a provider failure, is a terminal run returned with 201.
       responses:
-        '200':
-          description: Terminal or continuable run result (enveloped)
+        '201':
+          description: >-
+            Terminal or continuable run result (enveloped). As built the endpoint answers 201 (the NestJS default for
+            POST), not 200; clients must accept any 2xx.
           content:
             application/json:
               schema:
@@ -615,8 +690,51 @@ paths:
                   - $ref: '#/components/schemas/Envelope'
                   - properties: { data: { $ref: '#/components/schemas/EmailSyncRun' } }
         '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
-        '409': { description: A non-expired sync lease already exists, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-        '503': { description: Reconnect or provider recovery required, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '400': { description: No enabled listen rule, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '409': { description: 'A non-expired sync lease already exists; code SYNC_IN_PROGRESS', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+        '503': { description: 'Reconnect required (code RECONNECT_REQUIRED; the connection becomes EXPIRED) or Google temporarily unavailable', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /email-connections:
+    get:
+      summary: The caller's connected (not disconnected) email connections
+      responses:
+        '200':
+          description: Enveloped array
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { type: array, items: { $ref: '#/components/schemas/EmailConnectionView' } } }
+  /email-connections/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    delete:
+      summary: >-
+        User disconnect (DATA-002): best-effort revocation at Google (the token goes in a form body), then the stored
+        credentials and any sync lease are cleared whatever Google answered; status REVOKED. Derived transactions,
+        messages, parser runs, and sync runs are kept. Connecting the same mailbox again reactivates the same
+        connection and its sync progress.
+      responses:
+        '200': { description: Enveloped connection view }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+  /email-messages/{id}/parse:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    post:
+      summary: >-
+        Parse one owned message again from its stored metadata (legacy rows may still carry a snippet). The raw body is
+        never stored, so a message with neither is refused with 409 EMAIL_BODY_UNAVAILABLE and nothing is recorded.
+      responses:
+        '201':
+          description: Enveloped ParseOutcome
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/ParseOutcome' } }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+        '409': { description: 'No stored body and none supplied; code EMAIL_BODY_UNAVAILABLE', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   /email-connections/{id}/sync-runs:
     parameters:
       - { in: path, name: id, required: true, schema: { type: string } }

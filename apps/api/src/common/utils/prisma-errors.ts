@@ -8,6 +8,14 @@ export function isRecordNotFound(error: unknown): boolean {
   );
 }
 
+/** P2002: a unique constraint rejected the write, e.g. a concurrent insert won. */
+export function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  );
+}
+
 /**
  * Resolves to null when an owner-scoped write matched no row, so services can
  * answer with the same owner-safe 404 as a missing record (SEC-001, SEC-005).

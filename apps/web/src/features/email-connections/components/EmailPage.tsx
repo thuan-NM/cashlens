@@ -1,10 +1,23 @@
-import { useState } from "react";
-import { Button as AntButton, Form, Input, Modal, Switch } from "antd";
+import { useRef, useState } from "react";
+import { Alert, Button as AntButton, Form, Input, Modal, Skeleton, Switch } from "antd";
 import { useCreate, useCustom, useCustomMutation, useList } from "@refinedev/core";
+import { describeApiError } from "@/api/mappers";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import {
+  type EmailConnection,
+  type SyncOutcome,
+  type SyncRun,
+  RUN_STATUS,
+  TONE_COLORS,
+  connectionState,
+  outcomeOfError,
+  outcomeOfRun,
+  runCounts,
+} from "../sync-state";
 
 const toArray = <T,>(value: unknown): T[] => {
   if (Array.isArray(value)) {
@@ -18,32 +31,59 @@ const toArray = <T,>(value: unknown): T[] => {
   return [];
 };
 
+const formatTime = (value: string | null | undefined) => (value ? new Date(value).toLocaleString("vi-VN") : "-");
+
 export function EmailPage() {
   const [syncing, setSyncing] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [outcome, setOutcome] = useState<SyncOutcome | null>(null);
+  // Guards against a second POST before the disabled state renders.
+  const syncInFlight = useRef(false);
   const [open, setOpen] = useState(false);
-  const { result: connectionsResult } = useList<any>({ resource: "email-connections", pagination: { mode: "off" } });
+  const { result: connectionsResult, query: connectionsQuery } = useList<EmailConnection>({ resource: "email-connections", pagination: { mode: "off" } });
   const { result: rulesResult, query: { refetch: refetchRules } } = useList<any>({ resource: "email-listen-rules", pagination: { mode: "off" } });
-  const connections = toArray<any>(connectionsResult?.data);
+  const connections = toArray<EmailConnection>(connectionsResult?.data);
   const rules = toArray<any>(rulesResult?.data);
   const firstConnection = connections[0];
-  const { result: runsResult } = useCustom<any[]>({ url: firstConnection ? `/email-connections/${firstConnection.id}/sync-runs` : "/email-connections/none/sync-runs", method: "get", queryOptions: { enabled: Boolean(firstConnection) } });
-  const runs = toArray<any>(runsResult?.data);
+  const { result: runsResult, query: runsQuery } = useCustom<SyncRun[]>({
+    url: firstConnection ? `/email-connections/${firstConnection.id}/sync-runs` : "/email-connections/none/sync-runs",
+    method: "get",
+    queryOptions: { enabled: Boolean(firstConnection) },
+  });
+  const runs = toArray<SyncRun>(runsResult?.data);
   const { mutateAsync } = useCustomMutation();
   const { mutateAsync: createRule } = useCreate();
+  const state = firstConnection ? connectionState(firstConnection) : null;
 
   const connect = async () => {
-    const response = await mutateAsync({ url: "/email-connections/gmail/connect", method: "post", values: {} });
-    const authUrl = (response as any)?.data?.authUrl;
-    if (authUrl) window.location.href = authUrl;
+    setConnecting(true);
+    try {
+      const response = await mutateAsync({ url: "/email-connections/gmail/connect", method: "post", values: {} });
+      const data = (response as { data?: { authorizationUrl?: string } })?.data;
+      if (data?.authorizationUrl) window.location.href = data.authorizationUrl;
+    } catch (error) {
+      setOutcome({ tone: "error", title: "Không thể bắt đầu kết nối Gmail", detail: describeApiError(error) });
+    } finally {
+      setConnecting(false);
+    }
   };
 
+  // One bounded batch per click (EMAIL-013); "continue" runs the next batch.
   const sync = async () => {
-    if (!firstConnection) return;
+    if (!firstConnection || syncInFlight.current) return;
+    syncInFlight.current = true;
     setSyncing(true);
+    setOutcome(null);
     try {
-      await mutateAsync({ url: `/email-connections/${firstConnection.id}/sync`, method: "post", values: {} });
+      const response = await mutateAsync({ url: `/email-connections/${firstConnection.id}/sync`, method: "post", values: {} });
+      setOutcome(outcomeOfRun((response as { data: SyncRun }).data));
+    } catch (error) {
+      setOutcome(outcomeOfError(error));
     } finally {
+      syncInFlight.current = false;
       setSyncing(false);
+      void connectionsQuery.refetch();
+      void runsQuery.refetch();
     }
   };
 
@@ -53,18 +93,107 @@ export function EmailPage() {
     refetchRules();
   };
 
+  const primaryAction = () => {
+    if (!firstConnection || state?.action === "RECONNECT" || state?.action === "CONNECT") {
+      const label = firstConnection ? "Kết nối lại Gmail" : "Kết nối Gmail";
+      return <Button variant="primary" onClick={connect} disabled={connecting} icon={<Icon name="plus" width={15} />}>{connecting ? "Đang chuyển tới Google..." : label}</Button>;
+    }
+    const label = syncing ? "Đang đồng bộ..." : state?.action === "RETRY" ? "Thử đồng bộ lại" : "Đồng bộ ngay";
+    return <Button onClick={sync} disabled={syncing || firstConnection.syncInProgress} icon={<Icon name="sync" width={15} className={syncing ? "animate-spin" : ""} />}>{label}</Button>;
+  };
+
+  const outcomeAction = (action: SyncOutcome["action"]) => {
+    if (action === "CONTINUE") return <Button onClick={sync} disabled={syncing}>Tiếp tục đồng bộ</Button>;
+    if (action === "RETRY") return <Button onClick={sync} disabled={syncing}>Thử lại</Button>;
+    if (action === "RECONNECT") return <Button variant="primary" onClick={connect} disabled={connecting}>Kết nối lại Gmail</Button>;
+    return undefined;
+  };
+
+  const renderConnection = () => {
+    if (connectionsQuery.isLoading) return <Skeleton active paragraph={{ rows: 1 }} title={false} />;
+    if (connectionsQuery.isError && !firstConnection) {
+      return (
+        <div className="flex flex-wrap items-center justify-between gap-3 text-[11.5px] text-[var(--muted)]">
+          <span>Không thể tải kết nối email. {describeApiError(connectionsQuery.error)}</span>
+          <Button onClick={() => void connectionsQuery.refetch()} disabled={connectionsQuery.isFetching}>Thử lại</Button>
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-wrap items-center gap-4">
+        <span className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-[var(--accent)] text-white"><Icon name="email" width={23} height={23} /></span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 text-[13.5px] font-bold">
+            {firstConnection?.emailAddress ?? "Chưa kết nối Gmail"}
+            {state && <Badge color={TONE_COLORS[state.tone]}>{state.label}</Badge>}
+          </div>
+          <div className="mt-1 text-[11px] text-[var(--muted)]">
+            {firstConnection
+              ? `Đồng bộ thành công gần nhất: ${formatTime(firstConnection.lastSyncedAt)} · Lỗi gần nhất: ${formatTime(firstConnection.lastFailedAt)}`
+              : "OAuth chỉ đọc"}
+          </div>
+          {firstConnection && (
+            <div className="mt-0.5 text-[10.5px] text-[var(--faint)]">
+              {firstConnection.backfillCompletedAt
+                ? `Đã nhập xong dữ liệu ban đầu (${formatTime(firstConnection.backfillCompletedAt)})`
+                : firstConnection.backfillFrom
+                  ? `Đang nhập dữ liệu ban đầu từ ${formatTime(firstConnection.backfillFrom)}`
+                  : "Chưa đồng bộ lần nào"}
+            </div>
+          )}
+          {firstConnection?.errorMessage && <div className="mt-1 text-[11px] text-[var(--warn)]">{firstConnection.errorMessage}</div>}
+        </div>
+        {primaryAction()}
+      </div>
+    );
+  };
+
+  const renderRuns = () => {
+    if (connectionsQuery.isLoading) return <Skeleton active paragraph={{ rows: 3 }} title={false} />;
+    if (!firstConnection) return <div className="py-6 text-center text-[12px] text-[var(--muted)]">Chưa có lượt đồng bộ.</div>;
+    if (runsQuery.isLoading) return <Skeleton active paragraph={{ rows: 3 }} title={false} />;
+    if (runsQuery.isError && !runs.length) {
+      return (
+        <div className="flex flex-col items-center gap-3 py-6 text-center text-[12px] text-[var(--muted)]">
+          <span>Không thể tải lịch sử đồng bộ. {describeApiError(runsQuery.error)}</span>
+          <Button onClick={() => void runsQuery.refetch()} disabled={runsQuery.isFetching}>Thử lại</Button>
+        </div>
+      );
+    }
+    if (!runs.length) return <div className="py-6 text-center text-[12px] text-[var(--muted)]">Chưa có lượt đồng bộ.</div>;
+    return runs.slice(0, 5).map((run) => {
+      const status = RUN_STATUS[run.status] ?? { label: run.status, tone: "info" as const };
+      return (
+        <div key={run.id} className="border-b border-[var(--border)] py-3 text-[11px] last:border-0">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span>{formatTime(run.startedAt)}</span>
+            <span className="flex items-center gap-2">
+              {run.hasMore && <Badge color={TONE_COLORS.info}>Còn email</Badge>}
+              <Badge color={TONE_COLORS[status.tone]}>{status.label}</Badge>
+            </span>
+          </div>
+          <div className="mt-1 text-[10.5px] text-[var(--muted)]">{runCounts(run)}</div>
+          {run.errorMessage && <div className="mt-0.5 text-[10.5px] text-[var(--faint)]">{run.errorMessage}</div>}
+        </div>
+      );
+    });
+  };
+
   return (
     <div className="space-y-5">
-      <Card accent>
-        <div className="flex flex-wrap items-center gap-4">
-          <span className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-[var(--accent)] text-white"><Icon name="email" width={23} height={23} /></span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[13.5px] font-bold">{firstConnection?.emailAddress ?? "Chưa kết nối Gmail"}</div>
-            <div className="mt-1 text-[11px] text-[var(--muted)]">{firstConnection ? `${firstConnection.provider} · ${firstConnection.status}` : "OAuth chỉ đọc"}</div>
-          </div>
-          {firstConnection ? <Button onClick={sync} disabled={syncing} icon={<Icon name="sync" width={15} className={syncing ? "animate-spin" : ""} />}>{syncing ? "Đang đồng bộ..." : "Đồng bộ ngay"}</Button> : <Button onClick={connect} icon={<Icon name="plus" width={15} />}>Kết nối Gmail</Button>}
-        </div>
-      </Card>
+      <Card accent>{renderConnection()}</Card>
+
+      {outcome && (
+        <Alert
+          type={outcome.tone}
+          showIcon
+          closable
+          onClose={() => setOutcome(null)}
+          message={outcome.title}
+          description={outcome.detail}
+          action={outcomeAction(outcome.action)}
+        />
+      )}
 
       <SectionHeading title="Rule lắng nghe" description="Chỉ email khớp rule mới được xử lý" action={<Button icon={<Icon name="plus" width={15} />} onClick={() => setOpen(true)}>Thêm rule</Button>} />
       <Card padding="p-0" className="overflow-hidden">
@@ -73,8 +202,8 @@ export function EmailPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <SectionHeading title="Lịch sử đồng bộ" description="Lần gần nhất" />
-          {runs.length ? runs.slice(0, 4).map((row: any) => <div key={row.id} className="grid grid-cols-3 border-b border-[var(--border)] py-3 text-[11px] last:border-0"><span>{new Date(row.startedAt).toLocaleString("vi-VN")}</span><span className="text-[var(--muted)]">{row.emailsFound} email</span><b className="text-right text-[var(--income)]">{row.transactionsCreated} giao dịch</b></div>) : <div className="py-6 text-center text-[12px] text-[var(--muted)]">Chưa có lượt đồng bộ.</div>}
+          <SectionHeading title="Lịch sử đồng bộ" description="Các lượt gần nhất" />
+          {renderRuns()}
         </Card>
         <Card><SectionHeading title="Email cần xem lại" description="Parser chưa đủ độ tin cậy" /><AntButton size="small">Mở danh sách email</AntButton></Card>
       </div>

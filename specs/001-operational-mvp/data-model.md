@@ -95,6 +95,13 @@ Add nullable fields such as `syncCursor`, `backfillFrom`, `backfillCompletedAt`,
 
 State: `ACTIVE -> EXPIRED|REVOKED|ERROR` using the existing `EmailConnectionStatus` enum. Reconnect returns to `ACTIVE`. Only a provider-authorization failure (expired/revoked grant, failed renewal) enters a reconnect-required state that feeds the `CRITICAL` reconnect-required alert. A user-initiated disconnect is recorded distinctly and never alerts. Acquiring a non-expired lease for an active run fails with conflict. Disconnect clears or cryptographically invalidates encrypted credentials while retaining sanitized history.
 
+As built (T038, T041, T042):
+- Migration `20260924100000_email_sync_progress` adds `lastFailedAt`, `syncCursor` (opaque JSON text), `backfillFrom`, `backfillCompletedAt`, `syncLeaseToken`, and `syncLeaseExpiresAt`.
+- A provider-auth failure sets `EXPIRED`, with `errorMessage` "Gmail access expired or was revoked; reconnect Gmail" and `lastFailedAt`.
+- A run-level temporary failure sets `ERROR`, which is retryable.
+- A user disconnect sets `REVOKED` with `disconnectedAt`, and clears the credentials and the lease.
+- The response adds `reconnectRequired`, `recoveryAction` (`NONE`, `RETRY`, `RECONNECT`, or `CONNECT`), `lastFailedAt`, `backfillFrom`, `backfillCompletedAt`, and `syncInProgress`. It never returns the cursor or the lease token.
+
 ### EmailSyncRun lifecycle (DB-M1)
 
 Retain the existing `EmailSyncStatus` values `RUNNING`, `SUCCESS`, `PARTIAL_FAILED`, and `FAILED`, and add one value, `EXPIRED`, for a run whose lease expired before it reached a terminal state. Retain the existing counters (`emailsFound`, `emailsMatched`, `emailsParsed`, `transactionsCreated`) and `errorMessage`.
@@ -110,6 +117,12 @@ Every started run must end `SUCCESS`, `PARTIAL_FAILED`, or `FAILED`, or be recov
 
 The repeated-sync-failure alert counts `FAILED`, `EXPIRED`, and `PARTIAL_FAILED` as failures, and only `SUCCESS` resolves it. The new enum value must not be used inside the same migration that adds it.
 
+As built (T038, T044):
+- The run also stores `leaseToken`, `cursorBefore`, and `cursorAfter` as internal continuation evidence; none of them is returned.
+- Index `(emailConnectionId, status)`.
+- A message whose parse fails counts in `emailsFailed`.
+- `hasMore` is true only for a non-`FAILED` run that left work in its window.
+
 ### Transaction deduplication (DB-M2)
 
 Add nullable `deduplicationFingerprint` and a strategy/evidence field if existing metadata is insufficient. Owner-scoped uniqueness applies when a fingerprint exists.
@@ -121,6 +134,14 @@ Resolution order:
 3. `(userId, deterministic fingerprint)` covers missing transaction identity.
 
 Invalid parser output remains observable but cannot create a posted transaction.
+
+As built (T040, T045):
+- **Schema.** Migration `20260924100100_transaction_deduplication` adds the enum `TransactionDeduplicationStrategy` (`TRANSACTION_CODE` or `FINGERPRINT`), the columns `deduplicationFingerprint` and `deduplicationStrategy`, and the unique index `(userId, deduplicationFingerprint)`.
+- **Backfill.** Only existing `EMAIL` transactions with a bank and a non-blank code get a key. A key that collides within one user is reported with `RAISE NOTICE` and left null, and the migration fails if any duplicate key remains before the index is created.
+- **Rows without a key.** Fingerprints of code-less legacy rows are not reconstructed, because their parsed time may carry the old server-timezone error. Legacy rows without a key therefore do not take part in deduplication.
+- **Suspected duplicates.** A fingerprint match, or a code match whose amount, direction, or currency differs, is kept as a flagged row (`isDuplicate: true`, `duplicateOfTransactionId`, strategy recorded, `deduplicationFingerprint` null), so the unique index never blocks it and it stays out of totals until the user clears the flag.
+- **Case mapping.** The backfill upper-cases with PostgreSQL `upper()` and the application with JavaScript `toUpperCase()`; they agree for the ASCII codes banks use, and could differ only for non-ASCII legacy codes.
+- **Keys.** The key formats are listed in research.md, under "Parsing and deduplication".
 
 ### MerchantRule ownership (DB-M3)
 

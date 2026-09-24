@@ -237,6 +237,15 @@ docker compose @c down -v
 - Retry transient 429/5xx responses within the configured bound; permanent message failure does not stop valid messages.
 - Continue a bounded run when `hasMore` is true; next run resumes from persisted progress.
 - Disconnect/reconnect and verify credentials are unusable while derived transactions and sanitized history remain.
+- As built (T046–T049), the automated evidence for this section is:
+
+  ```powershell
+  cd apps/api
+  $env:E2E_DATABASE_URL = "<test database URL>"
+  npx jest --config ./test/jest-e2e.json --runInBand test/email-ingestion.e2e-spec.ts test/parser-fixture-rates.e2e-spec.ts test/raw-body-preference.e2e-spec.ts
+  ```
+
+  The rate gate prints `Parser | Exact/valid | Rate | Malformed | Malformed posted | Gate`; copy that table into release evidence. The declared parser (`bank_vcb` EMAIL v1) reads a synthetic format and is not yet confirmed against a real Vietcombank email; see `docs/operations/supported-parsers.md`.
 
 ## 11. Shutdown and release decision
 

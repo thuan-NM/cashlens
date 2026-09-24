@@ -1,0 +1,20 @@
+{
+  "description": "An unknown currency code",
+  "message": {
+    "from": "Vietcombank <notify@vcb.example.test>",
+    "subject": "Vietcombank - Biến động số dư tài khoản",
+    "receivedAt": "2026-09-17T02:01:00.000Z",
+    "body": [
+      "Kính gửi Quý khách,",
+      "Vietcombank xin thông báo tài khoản của Quý khách vừa phát sinh giao dịch:",
+      "Số tài khoản: xxxxxxxxx0001",
+      "Loại giao dịch: Ghi nợ",
+      "Số tiền: -500,000 XYZ",
+      "Thời gian: 17/09/2026 09:00:00",
+      "Số tham chiếu: FT26260CUR",
+      "Nội dung: Tien te la",
+      "Đây là email tự động, vui lòng không trả lời."
+    ]
+  },
+  "expectedFailure": "INVALID_CURRENCY: currency"
+}

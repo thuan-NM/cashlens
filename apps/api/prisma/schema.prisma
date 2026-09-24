@@ -22,6 +22,11 @@ enum TransactionSourceType {
   API
 }
 
+enum TransactionDeduplicationStrategy {
+  TRANSACTION_CODE
+  FINGERPRINT
+}
+
 enum TransactionStatus {
   PENDING
   POSTED
@@ -168,6 +173,7 @@ enum EmailSyncStatus {
   SUCCESS
   PARTIAL_FAILED
   FAILED
+  EXPIRED
 }
 
 enum BankProviderStatus {
@@ -307,39 +313,41 @@ model RawEmail {
 }
 
 model Transaction {
-  id                       String                @id @default(cuid())
+  id                       String                            @id @default(cuid())
   userId                   String
   rawEmailId               String?
-  emailMessageId           String?               @unique
+  emailMessageId           String?                           @unique
   categoryId               String?
   financialAccountId       String?
   bankProviderId           String?
   bankName                 String?
   merchantName             String?
   counterpartyName         String?
-  sourceType               TransactionSourceType @default(MANUAL)
+  sourceType               TransactionSourceType             @default(MANUAL)
   sourceId                 String?
   externalTransactionId    String?
   transactionCode          String?
-  amount                   Decimal               @db.Decimal(18, 2)
-  currency                 String                @default("VND")
+  amount                   Decimal                           @db.Decimal(18, 2)
+  currency                 String                            @default("VND")
   direction                TransactionDirection
   transactionTime          DateTime
   postedDate               DateTime?
   description              String?
   normalizedDescription    String?
-  balanceAfter             Decimal?              @db.Decimal(18, 2)
-  feeAmount                Decimal?              @db.Decimal(18, 2)
-  status                   TransactionStatus     @default(POSTED)
-  isDuplicate              Boolean               @default(false)
+  balanceAfter             Decimal?                          @db.Decimal(18, 2)
+  feeAmount                Decimal?                          @db.Decimal(18, 2)
+  status                   TransactionStatus                 @default(POSTED)
+  isDuplicate              Boolean                           @default(false)
   duplicateOfTransactionId String?
-  classificationSource     ClassificationSource  @default(UNKNOWN)
-  classificationConfidence Decimal?              @db.Decimal(5, 4)
+  deduplicationFingerprint String?
+  deduplicationStrategy    TransactionDeduplicationStrategy?
+  classificationSource     ClassificationSource              @default(UNKNOWN)
+  classificationConfidence Decimal?                          @db.Decimal(5, 4)
   userNote                 String?
   confidence               Float?
   metadata                 Json?
-  createdAt                DateTime              @default(now())
-  updatedAt                DateTime              @updatedAt
+  createdAt                DateTime                          @default(now())
+  updatedAt                DateTime                          @updatedAt
 
   user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   rawEmail     RawEmail?            @relation(fields: [rawEmailId], references: [id], onDelete: SetNull)
@@ -351,6 +359,7 @@ model Transaction {
   parserRuns   ParserRun[]
 
   @@unique([userId, externalTransactionId])
+  @@unique([userId, deduplicationFingerprint])
   @@index([userId, transactionTime])
   @@index([userId, direction])
   @@index([userId, status])
@@ -578,6 +587,12 @@ model EmailConnection {
   connectedAt           DateTime              @default(now())
   disconnectedAt        DateTime?
   errorMessage          String?
+  lastFailedAt          DateTime?
+  syncCursor            String?
+  backfillFrom          DateTime?
+  backfillCompletedAt   DateTime?
+  syncLeaseToken        String?
+  syncLeaseExpiresAt    DateTime?
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
 
@@ -627,12 +642,18 @@ model EmailSyncRun {
   emailsMatched       Int                  @default(0)
   emailsParsed        Int                  @default(0)
   transactionsCreated Int                  @default(0)
+  emailsFailed        Int                  @default(0)
+  hasMore             Boolean              @default(false)
+  leaseToken          String?
+  cursorBefore        String?
+  cursorAfter         String?
   errorMessage        String?
   createdAt           DateTime             @default(now())
 
   emailConnection EmailConnection @relation(fields: [emailConnectionId], references: [id], onDelete: Cascade)
 
   @@index([emailConnectionId, startedAt])
+  @@index([emailConnectionId, status])
   @@index([status, startedAt])
 }
 

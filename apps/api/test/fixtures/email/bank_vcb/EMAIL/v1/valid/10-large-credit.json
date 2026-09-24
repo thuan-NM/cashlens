@@ -1,0 +1,29 @@
+{
+  "description": "A large credit one second before local 17:00",
+  "message": {
+    "from": "Vietcombank <notify@vcb.example.test>",
+    "subject": "Vietcombank - Biến động số dư tài khoản",
+    "receivedAt": "2026-08-31T10:00:30.000Z",
+    "body": [
+      "Kính gửi Quý khách,",
+      "Vietcombank xin thông báo tài khoản của Quý khách vừa phát sinh giao dịch:",
+      "Số tài khoản: xxxxxxxxx0001",
+      "Loại giao dịch: Ghi có",
+      "Số tiền: +120,000,000 VND",
+      "Thời gian: 31/08/2026 16:59:59",
+      "Số tham chiếu: FT26243BON",
+      "Nội dung: Thuong du an",
+      "Số dư: 151,322,000 VND",
+      "Đây là email tự động, vui lòng không trả lời."
+    ]
+  },
+  "expected": {
+    "amount": 120000000,
+    "currency": "VND",
+    "direction": "INCOME",
+    "transactionTime": "2026-08-31T09:59:59.000Z",
+    "transactionCode": "FT26243BON",
+    "description": "Thuong du an",
+    "balanceAfter": 151322000
+  }
+}
