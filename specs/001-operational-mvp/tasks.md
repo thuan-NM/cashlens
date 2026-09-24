@@ -241,6 +241,38 @@ These were found while implementing and reviewing US3 (T037–T049) and delibera
 | The declared parser reads a synthetic format that has not been confirmed against real Vietcombank email | FR-08, SC-005 | Operator validation; T104 |
 | The web ESLint config still cannot load; this existed before US2 | ERR-005, TEST-006 | T096 |
 
+### US4 follow-ups (deferred, not part of US4)
+
+These were found while implementing and reviewing US4 (T050–T057) and deliberately left open. None of them blocks US4.
+
+| Issue | Requirement | Owner |
+|---|---|---|
+| User rules have an API (`/classification-rules`) but no management page; the drawer only shows rule decisions | CLASS-001 | UI follow-up (unassigned) |
+| System rules have no operator tooling (no seed, script, or admin route); they can only be written through `ClassificationRepository.createSystemRule` | CLASS-001, SEC-003 | Ops/product decision |
+| The automatic rerun (`applyAutomatic`) has no trigger: rule changes never reclassify existing rows, and there is no "re-run rules" action or job | CLASS-006 | Product decision |
+| The list shows "Chưa phân loại" for a null category, which is also the name of the seeded `sys_cat_uncategorized` category, which classification never assigns | CLASS-004 | Product/UX decision |
+| Deleting a rule clears `Transaction.classificationRuleId`, while the source stays `USER_RULE` or `SYSTEM_RULE`; the event keeps the rule id | CLASS-005 | Documented trade-off |
+| After the rule lock, a doubly-rare race remains: the row's reference changes between the read and the row lock while that new rule is deleted. PostgreSQL then aborts one side with a deadlock error; no data is lost. There is no global mapping of deadlocks to a retryable status | CLASS-005, ERR-003 | T064 (exception filter) |
+| The legacy enum values `RULE`, `ML`, `LLM`, and `SYSTEM` remain in `ClassificationSource` (removing values is not additive); they are never written | CLASS-007 | Schema cleanup (unassigned) |
+| Category corrections and imports will need `onTransactionsChanged` for budget alerts | ALERT-009, BUDGET-003 | T080, T083 |
+| No component tests cover the classification drawer; evidence is the headless-browser run | TEST-006 | T096 |
+
+### US6 follow-ups (deferred, not part of US6)
+
+These were found while implementing and reviewing US6 (T058–T063) and deliberately left open. None of them blocks US6.
+
+| Issue | Requirement | Owner |
+|---|---|---|
+| `CreateGoalDto.currency` accepts any string of up to 3 characters, not an ISO code. Feasibility is safe (a non-code observes nothing), but the value is stored. Tightening it is a write-contract change | GOAL-001, ERR-001 | Contract decision (with the budget DTO, T070) |
+| The web create form sends no currency, so goals get the database default `VND` even for accounts with another base currency | GOAL-001, GOAL-003 | UI follow-up (unassigned) |
+| A contribution has no sign or minimum, so `savedAmount` can go negative. Step 1 still gives a well-defined remaining amount | GOAL-001 | Contract decision |
+| A goal archived with `PATCH status=ARCHIVED` (not `DELETE`) is hidden from the list but can still be read and simulated | GOAL-001 | Product decision |
+| A date-only `targetDate` is stored at UTC midnight. West of UTC it falls on the previous local day, and on the previous user month when that day starts a month | GOAL-002 | Product decision (date vs instant) |
+| The unit is 0.01 for every currency other than VND (data-model rule). Zero-decimal currencies such as JPY are rounded to 0.01, not to the spec's "smallest unit" | GOAL-002, GOAL-003 | Product decision |
+| The dashboard's `eligibleCashflowBuckets` matches currency case-insensitively but does not trim padding. Goals use the documented case-and-padding rule, so a legacy padded code (`'VND '`) counts in goals and totals but not in the cashflow chart. `ILIKE` also treats `%` and `_` as wildcards; the base currency is validated, so this is not reachable today | TX-003, DASH-001 | US2 follow-up (HIGH-risk shared helper) |
+| `apps/api/docs/swagger.json` has not been regenerated since before US1 | DOC | T101 (Swagger regeneration and contract comparison) |
+| The GOAL-005 option of an explicitly labeled, user-provided planning input is not implemented (it is a MAY) | GOAL-005 | Product decision |
+
 ---
 
 ## Phase 3: P1 — User Story 2: Trustworthy Transactions and Dashboard (Priority: P1)
@@ -368,14 +400,99 @@ These were found while implementing and reviewing US3 (T037–T049) and delibera
 
 **Independent Test**: Overlapping system/user rules, equal priorities, no match, manual correction, ingestion replay, and explicit reclassification produce one reproducible result and event history.
 
-- [ ] T050 [US4] [CLASS-001, CLASS-005, OPS-003] **DB-M3 (3/5)**: Add nullable system-rule ownership, classification winner/manual metadata, and `TransactionCategoryEvent`. Files: `apps/api/prisma/schema.prisma` and a new `apps/api/prisma/migrations/<ts3>_classification_events/migration.sql` with `ts3 > ts2`. Depends on T040. Verify existing MANUAL rows remain protected, no fake history is backfilled, and T008 passes.
-- [ ] T051 [P] [US4] [CLASS-001–CLASS-007, TX-004, TEST-002] Add failing precedence, numeric priority, createdAt/ID tie-break, fallback, manual-lock, conflict, and explicit-reclassification tests in `apps/api/src/modules/transactions/classification.service.spec.ts`; depends on T030. Verify exactly one explained outcome for every matrix row.
-- [ ] T052 [US4] [CLASS-001–CLASS-004] Add owner/system rule query and validation methods around existing `MerchantRule` in `apps/api/src/modules/transactions/classification.repository.ts`; depends on T050 and T051. Verify system rules target system categories and user rules cannot target another user's category.
-- [ ] T053 [US4] [CLASS-002–CLASS-007] Implement deterministic matching and winner explanation in `apps/api/src/modules/transactions/classification.service.ts`; depends on T052. Verify no ML/LLM path exists and all T051 tests pass.
-- [ ] T054 [US4] [CLASS-005, CLASS-006, TX-004, SEC-006] Make manual category correction and explicit reclassification update current state and append events atomically in `apps/api/src/modules/transactions/transactions.service.ts` and `apps/api/src/modules/transactions/transactions.repository.ts`; depends on T034, T045, and T053. Verify automatic calls leave manual classifications unchanged.
-- [ ] T055 [US4] [CLASS-002, CLASS-006, EMAIL-010] Invoke classification from manual transaction creation and successful email parsing in `apps/api/src/modules/transactions/transactions.service.ts` and `apps/api/src/modules/email-ingestion/email-ingestion.service.ts`, without overwriting manual decisions; depends on T054. Verify retries are idempotent.
-- [ ] T056 [US4] [CLASS-005, CLASS-006, ERR-005] Add reclassify and category-history endpoints and the correction/conflict UI. Files: `apps/api/src/modules/transactions/transactions.controller.ts`, `apps/api/src/modules/transactions/dto/*`, `apps/web/src/features/transactions/components/TransactionsPage.tsx`. Depends on T035 and T055. Verify an explicit warning before reclassification and a visible decision reason.
-- [ ] T057 [US4] [CLASS-001–CLASS-007, TEST-004, TEST-005, SC-006] Add rule, correction, history, and ingestion-replay integration tests in `apps/api/test/classification.e2e-spec.ts`; depends on T052–T056. Verify the US4 independent test and append-only history.
+- [X] T050 [US4] [CLASS-001, CLASS-005, OPS-003] **DB-M3 (3/5)**: Add nullable system-rule ownership, classification winner/manual metadata, and `TransactionCategoryEvent`. Files: `apps/api/prisma/schema.prisma` and a new `apps/api/prisma/migrations/<ts3>_classification_events/migration.sql` with `ts3 > ts2`. Depends on T040. Verify existing MANUAL rows remain protected, no fake history is backfilled, and T008 passes.
+  **As built:** Migration `20260924120000_classification_events`:
+  - adds the enums `CategoryDecisionSource`, `CategoryDecisionTrigger`, and `CategoryDecisionReason`;
+  - adds `USER_RULE`, `SYSTEM_RULE`, and `FALLBACK` to `ClassificationSource`;
+  - makes `MerchantRule.userId` nullable, with the target-scope trigger;
+  - adds `Transaction.classificationRuleId` (FK, `SET NULL`) and `classifiedAt`;
+  - creates `TransactionCategoryEvent` with a per-transaction `sequence` and triggers that refuse updates and direct deletes.
+
+  **Protection backfill.** Rows with a category and `UNKNOWN` become `MANUAL`, with no events, so no fake history is written. Existing `MANUAL` rows are kept.
+
+  **Verified** on a scratch database seeded with legacy rows:
+  - the legacy row was protected and `updatedAt` untouched;
+  - 0 events were written;
+  - every trigger case behaved as specified, and cascades are allowed.
+
+  T008 passes with 13 migrations. Schema and semantics are in data-model.md ("MerchantRule ownership", "TransactionCategoryEvent").
+- [X] T051 [P] [US4] [CLASS-001–CLASS-007, TX-004, TEST-002] Add failing precedence, numeric priority, createdAt/ID tie-break, fallback, manual-lock, conflict, and explicit-reclassification tests in `apps/api/src/modules/transactions/classification.service.spec.ts`; depends on T030. Verify exactly one explained outcome for every matrix row.
+  **As built:** 40 tests, written first against a stub that threw: 39 failed and 1 passed (the static ML/LLM scan). Every matrix row asserts one outcome and its explanation. The tests cover:
+  - the manual lock with and without a category, and its release by an explicit request;
+  - user over system (`SCOPE`);
+  - ties in both scopes (`PRIORITY`, `CREATED_AT`, `ID`);
+  - the fallback;
+  - conflict explanations;
+  - eight kinds of skipped rules, which never cause a conflict;
+  - matching semantics;
+  - all 120 orderings of a 5-rule fixture, giving the same winner.
+
+  Four tests added after the review cover holding the winning rule (below). Total: 44, all passing.
+- [X] T052 [US4] [CLASS-001–CLASS-004] Add owner/system rule query and validation methods around existing `MerchantRule` in `apps/api/src/modules/transactions/classification.repository.ts`; depends on T050 and T051. Verify system rules target system categories and user rules cannot target another user's category.
+  **As built:** `ClassificationRepository` provides:
+  - owner-scoped candidate rules (own plus system);
+  - the `autoClassificationEnabled` read (a missing row means on);
+  - `ruleTargetAllowed`;
+  - user-rule CRUD and `createSystemRule` (no HTTP route);
+  - the row lock;
+  - `lockRule` (`FOR KEY SHARE`);
+  - event append;
+  - history and readable category names.
+
+  The target scope is enforced twice, in the application and by the DB trigger. Rule CRUD is exposed at `/classification-rules`, because CLASS-001 needs user-owned rules and plan P1.4 lists a rules contract. `updateRule` merges the DTO field by field: with ES2023 class fields every DTO key is an own `undefined`, and T057 caught a spread that erased stored patterns.
+- [X] T053 [US4] [CLASS-002–CLASS-007] Implement deterministic matching and winner explanation in `apps/api/src/modules/transactions/classification.service.ts`; depends on T052. Verify no ML/LLM path exists and all T051 tests pass.
+  **As built:** `decide()` is pure.
+  - **Matching:** literal and normalized (no diacritics, case, or extra spaces; `đ` read as `d`). Contains-match for merchant (falling back to the counterparty) and description, equals for bank and direction, AND across criteria, and at least one text criterion. No regular expressions.
+  - **Precedence:** CLASS-002, with ids compared by code unit.
+  - **Explanation:** ranked candidates, winner, runner-up, tie-break, and conflict, as ids and codes only.
+  - **Winner hold (review fix):** the winning rule is held `FOR KEY SHARE` until commit, and a winner deleted after the read triggers a new decision (409 after 3 attempts). This fixes a confirmed 500 (`P2003`) when a rule was deleted during a classification.
+  - **No ML/LLM:** the static-scan test checks that no ML or LLM path exists.
+- [X] T054 [US4] [CLASS-005, CLASS-006, TX-004, SEC-006] Make manual category correction and explicit reclassification update current state and append events atomically in `apps/api/src/modules/transactions/transactions.service.ts` and `apps/api/src/modules/transactions/transactions.repository.ts`; depends on T034, T045, and T053. Verify automatic calls leave manual classifications unchanged.
+  **As built:** One database transaction per category write. It locks the referenced rule and then the row (same order as a rule delete, so they cannot deadlock; the deadlock was a confirmed review finding). It then writes the five decision columns, appends the event, and writes the audit row.
+  - **Manual correction.** `PATCH /:id/category`, and `PATCH /:id` with `categoryId`, set `MANUAL`, including a locked clear with `null`. A repeated identical choice writes nothing. `TRANSACTION_CATEGORY_CORRECTED` is written only when the category changes.
+  - **Explicit reclassification.** It releases the lock and always writes `EXPLICIT_RECLASSIFY` and `TRANSACTION_RECLASSIFIED`.
+  - **Automatic runs.** `ClassificationService.applyAutomatic` returns `PROTECTED` for a `MANUAL` row. Its guarded write repeats the protection, and an unchanged decision writes nothing.
+  - **Audit helper.** `UsersRepository.recordAudit` gained an optional transaction client. GitNexus rated this CRITICAL because `recordAudit` is a hub, but the change is backward compatible.
+- [X] T055 [US4] [CLASS-002, CLASS-006, EMAIL-010] Invoke classification from manual transaction creation and successful email parsing in `apps/api/src/modules/transactions/transactions.service.ts` and `apps/api/src/modules/email-ingestion/email-ingestion.service.ts`, without overwriting manual decisions; depends on T054. Verify retries are idempotent.
+  **As built:**
+  - **Manual create.** A chosen category is a `MANUAL` `CREATE` event with actor USER. Otherwise the automatic decision applies, as a `CREATE` event with actor SYSTEM.
+  - **Email import.** The hook is in `ParserRepository.importOnce` (create branch, same transaction), so a created row, including a suspected duplicate, gets an `IMPORT` event. A replay, a certain duplicate, and a repeated manual parse create nothing, and the unique-violation retry re-runs the whole transaction. Retries are therefore idempotent (T057: 3 replays with no change).
+  - **Deviation.** `email-ingestion.service.ts` needed no change.
+  - **Auto off.** With `autoClassificationEnabled` false, rows stay `UNKNOWN` with no event.
+- [X] T056 [US4] [CLASS-005, CLASS-006, ERR-005] Add reclassify and category-history endpoints and the correction/conflict UI. Files: `apps/api/src/modules/transactions/transactions.controller.ts`, `apps/api/src/modules/transactions/dto/*`, `apps/web/src/features/transactions/components/TransactionsPage.tsx`. Depends on T035 and T055. Verify an explicit warning before reclassification and a visible decision reason.
+  **As built:** `POST /transactions/:id/reclassify` answers 200 and takes an empty body; any property gets 400. `GET /transactions/:id/category-history` lists events oldest first with readable category names. `UpdateTransactionCategoryDto` now requires the key (a category or `null`).
+
+  The drawer shows:
+  - the decision source and the recorded reason (winner, tie-break, conflict);
+  - a "Phân loại lại" confirmation that warns first, more strongly for a manual category;
+  - the history, with loading, empty, error-and-retry, and stale-refresh-warning states.
+
+  List rows without a category from the rules carry "Cần chọn nhóm". Settings no longer mentions a "model".
+
+  **Verified** by:
+  - the web type check, production build, and lint (approximate config, because the real one cannot load: T096);
+  - a headless-Edge run against a mock API, which passed 24/24 checks, including the three review fixes: no stale history across transactions, a visible refresh failure, and no request for `none`.
+- [X] T057 [US4] [CLASS-001–CLASS-007, TEST-004, TEST-005, SC-006] Add rule, correction, history, and ingestion-replay integration tests in `apps/api/test/classification.e2e-spec.ts`; depends on T052–T056. Verify the US4 independent test and append-only history.
+  **As built:** 30 tests covering:
+  - rule CRUD, validation, and ownership;
+  - the DB target trigger;
+  - precedence and the fallback;
+  - auto-off;
+  - equal-priority ties, with 5 reclassifications giving the same winner and 5 audits;
+  - corrections, the manual lock, and the no-op;
+  - refused requests writing nothing;
+  - automatic reruns (`PROTECTED`, `APPLIED`, `UNCHANGED`);
+  - rule deletion;
+  - a Gmail import with user, system, bank-AND, and fallback rules, a suspected duplicate, and a certain duplicate;
+  - 3 replays with no change;
+  - the manual lock surviving a replay and a manual parse;
+  - history, and 404 for others;
+  - append-only triggers and cascades;
+  - no transaction text in events;
+  - unchanged US2 totals;
+  - both concurrency races, each shown to fail without its fix.
+
+  The finance ownership suite gained the two new routes, and alice's event count. The admin privileged-field matrix gained `classificationRuleId`, `classifiedAt`, `USER_RULE`, and `/classification-rules` (`userId`, `userId: null`, `scope`). The raw-body suite now also scans category events. Full e2e: 18 suites, 688 tests.
 
 **Checkpoint**: US4 is deterministic, explainable, and independently releasable.
 
@@ -387,7 +504,7 @@ These were found while implementing and reviewing US3 (T037–T049) and delibera
 
 **Independent Test**: Positive, negative, zero-required, past-deadline, and 0/1/2/3-month histories reproduce hand-calculated inputs, score, level, or insufficient-data state.
 
-- [ ] T058 [P] [US6] [GOAL-002–GOAL-007, TEST-002, SC-008] Add failing tests in `apps/api/src/modules/goals/goals.service.spec.ts` that assert the data-model worked examples **G1–G10 exactly, to the VND**; depends on T033. The examples use a controlled clock (`now = 2026-09-23T10:00+07:00`) and cover:
+- [X] T058 [P] [US6] [GOAL-002–GOAL-007, TEST-002, SC-008] Add failing tests in `apps/api/src/modules/goals/goals.service.spec.ts` that assert the data-model worked examples **G1–G10 exactly, to the VND**; depends on T033. The examples use a controlled clock (`now = 2026-09-23T10:00+07:00`) and cover:
   - inclusive month counting, including a deadline in the current month and a past deadline (0 periods);
   - required saving rounded up;
   - available cashflow and score rounded down, including negative values;
@@ -397,24 +514,74 @@ These were found while implementing and reviewing US3 (T037–T049) and delibera
   - 0, 1, 2, and 3-month insufficient-data outcomes.
 
   Verify no fixed income, expense, interest, or free-cashflow value appears.
-- [ ] T059 [US6] [GOAL-003, GOAL-005, GOAL-006] Add the shared Prisma-backed completed-month aggregation `completedMonthCashflow(prisma, userId, currency, now)` in `apps/api/src/common/finance/completed-month-cashflow.ts` and consume it from `apps/api/src/modules/goals/goals.repository.ts`; depends on T032 and T058.
+  **As built:** `goals.service.spec.ts` holds 49 tests.
+  - **Red baseline.** Against stubs for `computeFeasibility` and `observationWindow` and the old simulation, 47 failed and 1 passed; the one pass was the owner-safe 404, behavior the old code already had.
+  - **Coverage.** G1–G10 exactly, to the VND, under `now = 2026-09-23T10:00+07:00`, including G5 with H1 and every G7 band edge. Beyond the examples:
+    - horizon precedence and a past `GOAL_MONTHS` deadline;
+    - 0.01-unit currencies, VND stored with cents, and the largest `Decimal(18,2)` amounts;
+    - insufficient history combined with a reached target or a past deadline;
+    - month-start day 25, a date-only target date in a UTC−5 account, and a target date beyond 2099;
+    - purity.
+  - **Service path.** The service is tested through a fake repository that reuses the real `observationWindow` and the shared eligibility functions.
+  - **Static scan.** A scan proves no fixed capacity (`3900000`, `assumedFreeCashflow`, `1.099`) remains in the goals module or `GoalsPage.tsx`.
+- [X] T059 [US6] [GOAL-003, GOAL-005, GOAL-006] Add the shared Prisma-backed completed-month aggregation `completedMonthCashflow(prisma, userId, currency, now)` in `apps/api/src/common/finance/completed-month-cashflow.ts` and consume it from `apps/api/src/modules/goals/goals.repository.ts`; depends on T032 and T058.
   - It returns observation months from the history start with empty months as 0, keeps at most the 3 most recent completed months, and excludes the current month.
   - It lives in `common/finance`, not in the goals module, so the alert inputs query can reuse it without importing `GoalsModule`.
 
   Verify the current partial month and ineligible or other-currency records are excluded.
-- [ ] T060 [US6] [GOAL-001–GOAL-007] Replace `assumedFreeCashflow` and the installment prototype math with the data-model GOAL rules; depends on T059.
+  **As built:** `completedMonthCashflow` in `common/finance/completed-month-cashflow.ts` imports nothing from the goals module.
+  - **History start.** One `groupBy` on the stored currency code finds the history start: the earliest eligible record of any direction.
+  - **Window.** The pure `observationWindow` keeps, of the 3 most recent completed months, those ending after the history start.
+  - **Nets.** One `findMany` sums eligible income and expense per window month with exact `Prisma.Decimal`.
+  - **Currency.** Codes are matched in code with `normalizeCurrency` (case and padding). A Prisma case-insensitive `equals` would become an unescaped `ILIKE`, where a free-form goal currency such as `%` matches every currency (review finding).
+  - **Shared helper left alone.** The dashboard's `eligibleCashflowBuckets` (GitNexus: HIGH risk) was not changed.
+  - **Verification.** `goals.e2e-spec.ts` checks each exclusion separately against real rows: the current month (boundary instants included), transfers, adjustments, suspected duplicates, ignored, deleted, pending, and needs-review records, and other currencies. It also covers timezone month assignment, the G8/G9 starts, owner isolation, exact cents, padded codes, a `%` currency, and equality with `/dashboard/cashflow` nets.
+- [X] T060 [US6] [GOAL-001–GOAL-007] Replace `assumedFreeCashflow` and the installment prototype math with the data-model GOAL rules; depends on T059.
   - **Files:** `apps/api/src/modules/goals/goal-feasibility.ts` (new), `apps/api/src/modules/goals/goals.service.ts`, `apps/api/src/modules/goals/goals.mapper.ts`.
   - **Pure function:** `computeFeasibility({ goal, now, queryMonths?, observation, userMonthPolicy })` has no Nest provider and is exported from the new file. It returns `remainingAmount`, `months` (remaining periods), `horizonSource`, `pastDeadline`, `monthlyRequired`, `availableMonthlyCashflow`, `feasibilityScore`, `status`, `observationMonths`, `monthsRequired`, and `reason`.
 
   Verify T058 passes and contribution/goal ownership remains intact.
-- [ ] T061 [US6] [GOAL-002, GOAL-004, GOAL-005, GOAL-007, ERR-001] Align the goal simulation DTO and controller with `contracts/openapi.yaml` `GoalFeasibility` in `apps/api/src/modules/goals/dto/*` and `apps/api/src/modules/goals/goals.controller.ts`; depends on T060.
+  **As built:** The pure `computeFeasibility` (`goal-feasibility.ts`) follows the data-model steps.
+  - **Precision.** It computes in a 64-digit decimal context, rounding only at the named steps (ROUND_CEIL, ROUND_FLOOR, and floor).
+  - **Month indices.** The shared policy supplies user months; a date outside 1900–2099 falls back to the local-date rule, so no horizon can fail the request.
+  - **Decisions:**
+    - `pastDeadline` requires a remaining amount (spec GOAL-002 and the contract; the data-model wording was corrected);
+    - insufficient history wins over a reached target (step 6 precedes step 8);
+    - `reason` lists every applicable code in a fixed order.
+  - **Service.** `GoalsService.simulate` reads the injectable `Clock`, the account's period settings, and the goal-currency observation, and is side-effect free.
+  - **Removed.** `simulateGoal`, with its `3900000` capacity, `1.099` multiplier, and `WATCH`/`RISK` statuses, is gone.
+  - **Goal responses.** `toGoalResponse.remainingAmount` is now exact.
+  - **Clearing the target date (review finding).** `PATCH` with `targetDate: null` now clears the date. It was silently ignored, so once US6 gave the target date precedence, a goal could never return to its planned months or the default.
+  - **Ownership.** Contribution and goal ownership are unchanged: the owner-scoped predicates are untouched, and the e2e tests plus the ownership suite pass.
+- [X] T061 [US6] [GOAL-002, GOAL-004, GOAL-005, GOAL-007, ERR-001] Align the goal simulation DTO and controller with `contracts/openapi.yaml` `GoalFeasibility` in `apps/api/src/modules/goals/dto/*` and `apps/api/src/modules/goals/goals.controller.ts`; depends on T060.
   - **Fields kept:** `monthlyRequired`, `feasibilityScore` (now nullable), and `months` (now the remaining periods).
   - **Fields added:** `horizonSource`, `pastDeadline`, `availableMonthlyCashflow`, `observationMonths`, `monthsRequired`, `reason`.
   - **INSTALLMENT (pending product-owner decision):** default is to accept the value, apply no inferred rate, set `totalCost = remainingAmount`, and state this in `reason`.
 
   Verify the response is enveloped.
-- [ ] T062 [US6] [GOAL-004, GOAL-005, ERR-005, SC-008] Render observation inputs, exact result levels, `horizonSource` and past-deadline states, and insufficient-history guidance in `apps/web/src/features/goals/components/GoalsPage.tsx` and `apps/web/src/types/goal.ts`. **Remove** the `3900000` fallback and the client-side feasibility formula. Depends on T027 and T061. Verify loading/empty/error states and no fabricated projection.
-- [ ] T063 [US6] [GOAL-001–GOAL-007, TEST-004, TEST-005, SC-008] Add real-data goal CRUD, contribution, and recalculation E2E tests in `apps/api/test/goals.e2e-spec.ts`; depends on T059–T062. They reproduce G1, G4, G6, and G8 through the API from persisted transactions. Verify the US6 independent test.
+  **As built:**
+  - **Response.** `toGoalFeasibilityResponse` returns exactly the contract fields. `months` is the remaining periods, `feasibilityScore` and `availableMonthlyCashflow` are nullable, and the rest are additive. JSON numbers never carry -0.
+  - **INSTALLMENT.** It is accepted with no inferred rate: `totalCost = remainingAmount`, and `INSTALLMENT_WITHOUT_INTEREST` is appended to `reason`.
+  - **Query DTO.** Its validation was already correct: `months` is an integer of 1 or more, and `scenario` is an enum. The DTO and controller now document the semantics.
+  - **Verification.** The e2e suite asserts the full envelope `{success, data, message, timestamp}`. It also asserts 400 field errors for `months=0`, `abc`, and `1.5` and for `scenario=BAD`, with the same body for an own and an absent goal.
+- [X] T062 [US6] [GOAL-004, GOAL-005, ERR-005, SC-008] Render observation inputs, exact result levels, `horizonSource` and past-deadline states, and insufficient-history guidance in `apps/web/src/features/goals/components/GoalsPage.tsx` and `apps/web/src/types/goal.ts`. **Remove** the `3900000` fallback and the client-side feasibility formula. Depends on T027 and T061. Verify loading/empty/error states and no fabricated projection.
+  **As built:**
+  - **Removed.** The `3900000` fallback, the client-side formula, and the "Trả góp 12 tháng" scenario control, which misrepresented a model the API does not have (GOAL-007).
+  - **API-only numbers.** Every number comes from the API, and a result is shown only for its own goal, because refine keeps the previous goal's data as a placeholder.
+  - **Horizon.** The default view is the goal's own horizon, sent without `months` and named by `horizonSource`. The slider is a what-if that sends `months`, and a reset returns to the goal's horizon.
+  - **States.** Past deadline, insufficient history (with `monthsRequired` guidance and no score), observation months, and available cashflow each have their own rendering. The list and the result each have loading, empty, error, and retry states.
+  - **Create form.** It validates its fields, shows server field errors, and sends only what was entered: no fabricated `months = 6`, an optional target date.
+  - **Mapper.** `mapGoal` in `api/mappers.ts` no longer fabricates `months: 6`. This file is not in the task's list (deviation).
+  - **Review fixes.** Deadlines show the calendar date in the account time zone: a new `formatDate` in `utils/format.ts`, fed the time zone from the dashboard overview. A failed list refresh now warns with a retry in every state, including right after the first goal is created. The slider handle has an accessible name and value text.
+  - **Verification.** Web type check, production build, and lint (approximate config, T096). A headless-Edge run against a mock API passed 37/37 checks.
+- [X] T063 [US6] [GOAL-001–GOAL-007, TEST-004, TEST-005, SC-008] Add real-data goal CRUD, contribution, and recalculation E2E tests in `apps/api/test/goals.e2e-spec.ts`; depends on T059–T062. They reproduce G1, G4, G6, and G8 through the API from persisted transactions. Verify the US6 independent test.
+  **As built:** `apps/api/test/goals.e2e-spec.ts` runs the application with the `Clock` provider fixed at the example instant, so the published numbers are reproduced through the API from real rows.
+  - **Worked examples.** G1, G4, G5, G6, and G8 run from transactions created with `POST /transactions`, and G10(b) through the API. G10(a) needs a stored `createdAt` and is unit-tested.
+  - **INSTALLMENT and validation.** INSTALLMENT and the 400 validation cases above.
+  - **Recalculation (GOAL-006).** Exact new values after each of: a contribution, a goal edit, an ignored income, a deleted expense, an edited amount, and clearing the target date (back to the default horizon). A record in the current month changes nothing, and a repeat read is identical.
+  - **Isolation.** Another owner's same-currency history, including an earlier record, changes nothing, and their read gets the owner-safe 404.
+  - **Other checks.** A `%` goal currency observes nothing. CRUD keeps exact amounts, and an archived goal is 404. Reads create no alert.
+  - **Totals.** 37 tests: 19 for T059, 18 for T061/T063.
 
 **Checkpoint**: US6 goal output is reproducible from persisted user data and exposes a pure feasibility function for alert evaluation.
 

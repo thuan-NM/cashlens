@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AuditActorType, TransactionStatus } from '@prisma/client';
+import { AuditActorType, Prisma, TransactionStatus } from '@prisma/client';
 import { userMonthForKey } from '../../common/finance/financial-period-policy';
 import type { RequestUser } from '../../common/types/request-user.type';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -17,6 +17,11 @@ import {
   toUpdateTransactionInput,
 } from './transactions.mapper';
 import { UsersRepository } from '../users/users.repository';
+import {
+  ClassificationService,
+  decisionColumns,
+  manualDecision,
+} from './classification.service';
 import { TransactionsRepository } from './transactions.repository';
 
 /** Fields every transaction carries: null cannot clear them (TX-002). */
@@ -35,6 +40,7 @@ export class TransactionsService {
   constructor(
     private readonly transactionsRepository: TransactionsRepository,
     private readonly users: UsersRepository,
+    private readonly classification: ClassificationService,
   ) {}
 
   /**
@@ -82,6 +88,11 @@ export class TransactionsService {
     return toTransactionResponse(transaction);
   }
 
+  /**
+   * A category chosen by the owner is a MANUAL decision; otherwise the
+   * automatic decision applies (T055). The row and its first category event
+   * are written together, after every validation has passed.
+   */
   async create(user: RequestUser, dto: CreateTransactionDto) {
     this.rejectNulls(dto);
     const duplicate = this.duplicateFields(dto);
@@ -91,10 +102,39 @@ export class TransactionsService {
       duplicateOfTransactionId: dto.duplicateOfTransactionId,
     });
 
-    const transaction = await this.transactionsRepository.create({
-      ...toCreateTransactionInput(user.id, dto),
-      ...duplicate,
-    });
+    const input = { ...toCreateTransactionInput(user.id, dto), ...duplicate };
+    const transaction = await this.transactionsRepository.runInTransaction(
+      async (tx) => {
+        const decision = dto.categoryId
+          ? manualDecision(dto.categoryId)
+          : await this.classification.decideNew(tx, {
+              userId: user.id,
+              merchantName: input.merchantName,
+              counterpartyName: input.counterpartyName,
+              description: input.description,
+              direction: input.direction,
+            });
+        const row = await this.transactionsRepository.createWithin(tx, {
+          ...input,
+          ...(decision
+            ? decisionColumns(decision, new Date())
+            : { classificationSource: 'UNKNOWN' as const }),
+        });
+        if (decision) {
+          await this.classification.record(tx, {
+            transactionId: row.id,
+            userId: user.id,
+            previousCategoryId: null,
+            decision,
+            trigger: 'CREATE',
+            actor: dto.categoryId
+              ? { type: 'USER', userId: user.id }
+              : { type: 'SYSTEM' },
+          });
+        }
+        return row;
+      },
+    );
 
     return toTransactionResponse(transaction);
   }
@@ -109,40 +149,117 @@ export class TransactionsService {
       duplicateOfTransactionId: dto.duplicateOfTransactionId,
     });
 
-    const transaction = this.found(
-      await this.transactionsRepository.updateById(user.id, id, {
-        ...toUpdateTransactionInput(dto),
-        ...duplicate,
-      }),
-    );
-    if (dto.categoryId !== undefined) {
-      await this.auditCategoryChange(user, before.categoryId, transaction);
+    const changes = { ...toUpdateTransactionInput(dto), ...duplicate };
+    if (dto.categoryId === undefined) {
+      // No category in the request: the classification is left as it is.
+      return toTransactionResponse(
+        this.found(
+          await this.transactionsRepository.updateById(user.id, id, changes),
+        ),
+      );
     }
-
+    const { transaction } = await this.correctCategory(
+      user,
+      id,
+      dto.categoryId ?? null,
+      changes,
+    );
     return toTransactionResponse(transaction);
   }
 
+  /** The authoritative manual correction (TX-004, CLASS-005). */
   async updateCategory(
     user: RequestUser,
     id: string,
     dto: UpdateTransactionCategoryDto,
   ) {
-    const before = await this.findById(user, id);
+    await this.findById(user, id);
 
     if (dto.categoryId) {
       await this.assertCategoryAllowed(user.id, dto.categoryId);
     }
 
-    const transaction = this.found(
-      await this.transactionsRepository.updateCategory(
-        user.id,
-        id,
-        dto.categoryId,
-      ),
+    const { transaction, decision, eventId } = await this.correctCategory(
+      user,
+      id,
+      dto.categoryId ?? null,
     );
-    await this.auditCategoryChange(user, before.categoryId, transaction);
+    return {
+      ...toTransactionResponse(transaction),
+      decision: { source: decision.source, reason: decision.reason, eventId },
+    };
+  }
 
-    return toTransactionResponse(transaction);
+  /**
+   * Explicit reclassification (CLASS-006): releases a manual lock and applies
+   * the rules now, recording who asked. Always appends an event and an audit
+   * row, even when the outcome is unchanged, because the user asked for it.
+   */
+  async reclassify(user: RequestUser, id: string) {
+    await this.findById(user, id);
+
+    const result = await this.transactionsRepository.runInTransaction(
+      async (tx) => {
+        const row = await this.classification.lock(tx, user.id, id);
+        if (!row) throw new NotFoundException('Transaction not found');
+        const decision = await this.classification.decideExisting(
+          tx,
+          row,
+          'EXPLICIT',
+        );
+        if (decision.outcome !== 'DECIDED') {
+          throw new Error('An explicit reclassification always decides');
+        }
+        const transaction =
+          await this.transactionsRepository.updateLockedWithin(
+            tx,
+            id,
+            decisionColumns(decision, new Date()),
+          );
+        const event = await this.classification.record(tx, {
+          transactionId: id,
+          userId: user.id,
+          previousCategoryId: row.categoryId,
+          decision,
+          trigger: 'EXPLICIT_RECLASSIFY',
+          actor: { type: 'USER', userId: user.id },
+        });
+        await this.users.recordAudit(
+          {
+            actorType: AuditActorType.USER,
+            actorId: user.id,
+            action: 'TRANSACTION_RECLASSIFIED',
+            resourceType: 'transaction',
+            resourceId: id,
+            metadata: {
+              fromCategoryId: row.categoryId,
+              toCategoryId: decision.categoryId,
+              source: decision.source,
+            },
+          },
+          tx,
+        );
+        return { transaction, decision, eventId: event.id };
+      },
+    );
+
+    return {
+      ...toTransactionResponse(result.transaction),
+      decision: {
+        source: result.decision.source,
+        categoryId: result.decision.categoryId,
+        ruleId: result.decision.ruleId,
+        reason: result.decision.reason,
+        explanation: result.decision.explanation,
+        eventId: result.eventId,
+      },
+    };
+  }
+
+  /** The owner's append-only category history, oldest first (T056). */
+  async categoryHistory(user: RequestUser, id: string) {
+    await this.findById(user, id);
+    return this.classification.history(user.id, id);
   }
 
   async markDuplicate(user: RequestUser, id: string, dto: MarkDuplicateDto) {
@@ -202,22 +319,61 @@ export class TransactionsService {
     return { id };
   }
 
-  /** Category corrections are audited with category ids only (SEC-006). */
-  private async auditCategoryChange(
+  /**
+   * A manual category decision (TX-004), in one database transaction with
+   * the row locked, so the event's previous category is the state it really
+   * replaced. The event is appended when the decision changes (category or
+   * source); the audit, with category ids only (SEC-006), when the category
+   * changes. Repeating the same manual choice writes nothing.
+   */
+  private correctCategory(
     user: RequestUser,
-    fromCategoryId: string | null,
-    transaction: { id: string; categoryId: string | null },
+    id: string,
+    categoryId: string | null,
+    changes: Prisma.TransactionUncheckedUpdateInput = {},
   ) {
-    if (fromCategoryId === transaction.categoryId) {
-      return;
-    }
-    await this.users.recordAudit({
-      actorType: AuditActorType.USER,
-      actorId: user.id,
-      action: 'TRANSACTION_CATEGORY_CORRECTED',
-      resourceType: 'transaction',
-      resourceId: transaction.id,
-      metadata: { fromCategoryId, toCategoryId: transaction.categoryId },
+    return this.transactionsRepository.runInTransaction(async (tx) => {
+      const row = await this.classification.lock(tx, user.id, id);
+      if (!row) throw new NotFoundException('Transaction not found');
+      const decision = manualDecision(categoryId);
+      const categoryChanged = row.categoryId !== categoryId;
+      const decisionChanged =
+        categoryChanged || row.classificationSource !== 'MANUAL';
+      const transaction = await this.transactionsRepository.updateLockedWithin(
+        tx,
+        id,
+        {
+          ...changes,
+          ...(decisionChanged ? decisionColumns(decision, new Date()) : {}),
+        },
+      );
+      const event = decisionChanged
+        ? await this.classification.record(tx, {
+            transactionId: id,
+            userId: user.id,
+            previousCategoryId: row.categoryId,
+            decision,
+            trigger: 'MANUAL_CORRECTION',
+            actor: { type: 'USER', userId: user.id },
+          })
+        : null;
+      if (categoryChanged) {
+        await this.users.recordAudit(
+          {
+            actorType: AuditActorType.USER,
+            actorId: user.id,
+            action: 'TRANSACTION_CATEGORY_CORRECTED',
+            resourceType: 'transaction',
+            resourceId: id,
+            metadata: {
+              fromCategoryId: row.categoryId,
+              toCategoryId: categoryId,
+            },
+          },
+          tx,
+        );
+      }
+      return { transaction, decision, eventId: event?.id ?? null };
     });
   }
 

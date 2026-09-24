@@ -203,9 +203,12 @@ docker compose @c down -v
 
 ## 8. Classification and budget smoke
 
-- Create overlapping user/system rules and verify manual → user → system → fallback precedence and deterministic ties.
-- Correct a category manually, rerun ingestion/classification, and verify no overwrite plus append-only history.
-- Explicitly reclassify and verify a new event.
+- Create overlapping user/system rules and verify manual → user → system → fallback precedence and deterministic ties. User rules use `POST /api/classification-rules`. System rules have no HTTP route; create them with `ClassificationRepository.createSystemRule`, as `apps/api/test/classification.e2e-spec.ts` does.
+- Correct a category manually, rerun ingestion/classification, and verify no overwrite plus append-only history (`GET /api/transactions/{id}/category-history`).
+  - "Rerun ingestion" means syncing the same mailbox again, or `POST /api/email-messages/{id}/parse` for an imported message. Both are replays: they create no transaction and no event.
+  - "Rerun classification" means the automatic rerun, `ClassificationService.applyAutomatic`. It leaves a `MANUAL` row unchanged and writes an `AUTOMATIC_RERUN` event only when a rule-decided row's decision changes. It has no HTTP route in the MVP: rule changes never reclassify existing rows by themselves.
+- Explicitly reclassify (the "Phân loại lại" action in the transaction drawer, which warns first, or `POST /api/transactions/{id}/reclassify`) and verify a new `EXPLICIT_RECLASSIFY` event and a `TRANSACTION_RECLASSIFIED` audit row.
+- The automated equivalent is `apps/api/test/classification.e2e-spec.ts` (T057) with the unit matrix `classification.service.spec.ts` (T051).
 - Create a MONTHLY budget with `thresholdPercent=80`. Saving `thresholdPercent=100` returns 400. A WEEKLY budget created through the API is accepted, shows `alertsSupported=false`, and never produces an alert.
 - Reach 80%: one `WARNING`. Reach 100%: one `CRITICAL`, while the warning stays open. Repeated evaluation creates nothing new.
 - Mark an alert read: only `isRead`/`readAt` change and `status` stays the same. Dismiss an open alert: `status=DISMISSED`, and no new alert appears while the condition holds.
@@ -219,6 +222,10 @@ docker compose @c down -v
 - With fewer than two completed months, expect `INSUFFICIENT_DATA` and no invented capacity.
 - Reproduce the data-model worked examples G1–G10 exactly: inclusive month counting, required saving rounded up to whole VND, available cashflow and score rounded down, past deadline meaning 0 periods, and a `horizonSource` in each response.
 - Verify current partial month, transfers, duplicates, ignored/deleted records, and incompatible currency do not contaminate input.
+- Automated equivalents:
+  - `apps/api/src/modules/goals/goals.service.spec.ts` (T058): G1–G10 and the rounding edges.
+  - `apps/api/test/goals.e2e-spec.ts` (T059/T063): real rows under a fixed `Clock` of 2026-09-23T10:00+07:00. It covers every exclusion, G1/G4/G5/G6/G8 through the API, and recalculation after a contribution, a goal edit, and transaction changes.
+- On the Goals page, the default view is the goal's own horizon: the target date, else the planned months, else the 6-month default. The slider is a what-if (`QUERY`), and "Dùng thời hạn của mục tiêu" returns to the goal's own horizon.
 
 ## 10. Gmail fixture and test-account smoke
 

@@ -130,16 +130,22 @@ export class UsersRepository extends BaseRepository {
   /**
    * Sanitized audit evidence for sensitive actions (SEC-006): who did what to
    * which resource. Metadata holds only ids, counts, statuses, and field
-   * names, never credentials, tokens, cookies, or email content.
+   * names, never credentials, tokens, cookies, or email content. Pass a
+   * transaction client to commit the audit with the change it records.
    */
-  recordAudit(entry: AuditEntry) {
-    return this.createAuditLog({
-      user: { connect: { id: entry.actorId } },
-      actorType: entry.actorType,
-      action: entry.action,
-      resourceType: entry.resourceType,
-      resourceId: entry.resourceId,
-      metadata: entry.metadata,
+  recordAudit(
+    entry: AuditEntry,
+    db: Pick<Prisma.TransactionClient, 'auditLog'> = this.prisma,
+  ) {
+    return db.auditLog.create({
+      data: {
+        user: { connect: { id: entry.actorId } },
+        actorType: entry.actorType,
+        action: entry.action,
+        resourceType: entry.resourceType,
+        resourceId: entry.resourceId,
+        metadata: entry.metadata,
+      },
     });
   }
 

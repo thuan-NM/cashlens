@@ -1,14 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { GoalScenarioType } from '@prisma/client';
+import { Clock } from '../../common/time/clock';
 import type { RequestUser } from '../../common/types/request-user.type';
 import { CreateGoalDto } from './dto/create-goal.dto';
 import { GoalContributionDto } from './dto/goal-contribution.dto';
 import { GoalSimulationQueryDto } from './dto/goal-simulation-query.dto';
 import { ListGoalsDto } from './dto/list-goals.dto';
 import { UpdateGoalDto } from './dto/update-goal.dto';
+import { computeFeasibility } from './goal-feasibility';
 import {
-  simulateGoal,
   toCreateGoalInput,
+  toGoalFeasibilityResponse,
   toGoalResponse,
   toUpdateGoalInput,
 } from './goals.mapper';
@@ -16,7 +18,10 @@ import { GoalsRepository } from './goals.repository';
 
 @Injectable()
 export class GoalsService {
-  constructor(private readonly goalsRepository: GoalsRepository) {}
+  constructor(
+    private readonly goalsRepository: GoalsRepository,
+    private readonly clock: Clock,
+  ) {}
 
   async list(user: RequestUser, query: ListGoalsDto) {
     const goals = await this.goalsRepository.listByUser(user.id, query);
@@ -73,6 +78,11 @@ export class GoalsService {
     return goal;
   }
 
+  /**
+   * Feasibility from the owner's persisted data (GOAL-002–GOAL-006): computed
+   * on every read, so a goal, contribution, or transaction change is reflected
+   * at once, and side-effect free (it never creates or resolves alerts).
+   */
   async simulate(user: RequestUser, id: string, query: GoalSimulationQueryDto) {
     const goal = await this.goalsRepository.findByIdForUser(user.id, id);
 
@@ -80,9 +90,23 @@ export class GoalsService {
       throw new NotFoundException('Goal not found');
     }
 
-    return simulateGoal(
+    const now = this.clock.now();
+    const { settings } = await this.goalsRepository.financialContext(user.id);
+    const observation = await this.goalsRepository.observation(
+      user.id,
+      goal.currency,
+      now,
+      settings,
+    );
+    return toGoalFeasibilityResponse(
       goal,
-      query.months ?? goal.months ?? 6,
+      computeFeasibility({
+        goal,
+        now,
+        queryMonths: query.months,
+        observation,
+        userMonthPolicy: settings,
+      }),
       query.scenario ?? GoalScenarioType.FULL,
     );
   }

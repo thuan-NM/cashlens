@@ -1,9 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import {
-  ClassificationSource,
-  Prisma,
-  TransactionStatus,
-} from '@prisma/client';
+import { Prisma, TransactionStatus } from '@prisma/client';
 import {
   TimeRange,
   visibleTransactionWhere,
@@ -81,11 +77,38 @@ export class TransactionsRepository extends BaseRepository {
     });
   }
 
-  create(data: Prisma.TransactionUncheckedCreateInput) {
-    return this.prisma.transaction.create({
-      data,
-      include: transactionInclude,
-    });
+  /** One database transaction for a write and its category event (T054). */
+  runInTransaction<T>(work: (tx: Prisma.TransactionClient) => Promise<T>) {
+    return this.prisma.$transaction(work);
+  }
+
+  createWithin(
+    tx: Prisma.TransactionClient,
+    data: Prisma.TransactionUncheckedCreateInput,
+  ) {
+    return tx.transaction.create({ data, include: transactionInclude });
+  }
+
+  /**
+   * Writes a row the caller has locked (owner already checked under the
+   * lock); an empty change reads the row instead, so a no-op stays a no-op.
+   */
+  updateLockedWithin(
+    tx: Prisma.TransactionClient,
+    id: string,
+    data: Prisma.TransactionUncheckedUpdateInput,
+  ) {
+    const changes = Object.values(data).some((value) => value !== undefined);
+    return changes
+      ? tx.transaction.update({
+          where: { id },
+          data,
+          include: transactionInclude,
+        })
+      : tx.transaction.findUniqueOrThrow({
+          where: { id },
+          include: transactionInclude,
+        });
   }
 
   // Every write carries the owner predicate itself (SEC-001), so a row that
@@ -96,14 +119,6 @@ export class TransactionsRepository extends BaseRepository {
     data: Prisma.TransactionUncheckedUpdateInput,
   ) {
     return this.updateOwned(userId, id, data);
-  }
-
-  updateCategory(userId: string, id: string, categoryId?: string | null) {
-    return this.updateOwned(userId, id, {
-      categoryId: categoryId ?? null,
-      classificationSource: ClassificationSource.MANUAL,
-      classificationConfidence: categoryId ? 1 : null,
-    });
   }
 
   markDuplicate(

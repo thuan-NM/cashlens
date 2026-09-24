@@ -1,9 +1,20 @@
 import { Goal, GoalScenarioType, Prisma } from '@prisma/client';
 import { CreateGoalDto } from './dto/create-goal.dto';
 import { UpdateGoalDto } from './dto/update-goal.dto';
+import type { Feasibility } from './goal-feasibility';
 
 const decimalToNumber = (value: Prisma.Decimal | null) =>
   value === null ? 0 : Number(value.toString());
+
+/** A JSON number; never -0. */
+const amount = (value: Prisma.Decimal) => {
+  const number = value.toNumber();
+  return number === 0 ? 0 : number;
+};
+
+/** GOAL-002 remaining amount, exact: the same value the simulation reports. */
+const remainingOf = (goal: Pick<Goal, 'targetAmount' | 'savedAmount'>) =>
+  Prisma.Decimal.max(0, goal.targetAmount.minus(goal.savedAmount));
 
 const optionalDateToIso = (value: Date | null) => value?.toISOString() ?? null;
 
@@ -22,7 +33,7 @@ export const toGoalResponse = (goal: Goal) => {
     type: goal.type,
     targetAmount,
     savedAmount,
-    remainingAmount: Math.max(0, targetAmount - savedAmount),
+    remainingAmount: amount(remainingOf(goal)),
     progressPercent,
     currency: goal.currency,
     targetDate: optionalDateToIso(goal.targetDate),
@@ -60,49 +71,49 @@ export const toUpdateGoalInput = (
   targetAmount: dto.targetAmount,
   savedAmount: dto.savedAmount,
   currency: dto.currency,
-  targetDate: dto.targetDate ? new Date(dto.targetDate) : undefined,
+  // null clears the date, so the planned months or the default horizon apply again (GOAL-002).
+  targetDate:
+    dto.targetDate === null
+      ? null
+      : dto.targetDate
+        ? new Date(dto.targetDate)
+        : undefined,
   months: dto.months,
   priority: dto.priority,
   status: dto.status,
   metadata: dto.metadata,
 });
 
-export const simulateGoal = (
+/**
+ * The GoalFeasibility contract (T061). Amounts become JSON numbers; nothing is
+ * rounded here. INSTALLMENT is accepted but no rate or term is inferred
+ * (GOAL-007): the whole remaining amount is the cost, and the reason says so.
+ */
+export const toGoalFeasibilityResponse = (
   goal: Goal,
-  months: number,
+  result: Feasibility,
   scenario: GoalScenarioType,
-) => {
-  const targetAmount = decimalToNumber(goal.targetAmount);
-  const savedAmount = decimalToNumber(goal.savedAmount);
-  const remainingAmount = Math.max(0, targetAmount - savedAmount);
-  const scenarioMultiplier =
-    scenario === GoalScenarioType.INSTALLMENT ? 1.099 : 1;
-  const totalCost = remainingAmount * scenarioMultiplier;
-  const monthlyRequired = months <= 0 ? totalCost : totalCost / months;
-  const assumedFreeCashflow = 3900000;
-  const feasibilityScore =
-    monthlyRequired === 0
-      ? 100
-      : Math.min(
-          100,
-          Math.round((assumedFreeCashflow / monthlyRequired) * 100),
-        );
-
-  return {
-    goalId: goal.id,
-    scenario,
-    months,
-    targetAmount,
-    savedAmount,
-    remainingAmount,
-    totalCost: Math.round(totalCost),
-    monthlyRequired: Math.round(monthlyRequired),
-    feasibilityScore,
-    status:
-      feasibilityScore >= 100
-        ? 'SAFE'
-        : feasibilityScore >= 70
-          ? 'WATCH'
-          : 'RISK',
-  };
-};
+) => ({
+  goalId: goal.id,
+  scenario,
+  months: result.months,
+  horizonSource: result.horizonSource,
+  pastDeadline: result.pastDeadline,
+  targetAmount: decimalToNumber(goal.targetAmount),
+  savedAmount: decimalToNumber(goal.savedAmount),
+  remainingAmount: amount(result.remainingAmount),
+  totalCost: amount(result.remainingAmount),
+  monthlyRequired: amount(result.monthlyRequired),
+  feasibilityScore: result.feasibilityScore,
+  status: result.status,
+  availableMonthlyCashflow:
+    result.availableMonthlyCashflow === null
+      ? null
+      : amount(result.availableMonthlyCashflow),
+  observationMonths: result.observationMonths,
+  monthsRequired: result.monthsRequired,
+  reason:
+    scenario === GoalScenarioType.INSTALLMENT
+      ? `${result.reason}, INSTALLMENT_WITHOUT_INTEREST`
+      : result.reason,
+});

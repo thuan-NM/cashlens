@@ -93,6 +93,15 @@
 **Rationale**: Reuses existing patterns/priority/category/provenance and adds only missing audit evidence.  
 **Alternatives considered**: Second rules subsystem or JSON history—duplicate or poorly queryable.
 
+As built (T050–T057):
+- **Manual lock.** The lock is `classificationSource = MANUAL` rather than a separate flag, so there is one source of truth; a cleared category (`null`) chosen by the owner is locked too.
+- **Fallback.** The fallback is `categoryId` null with source `FALLBACK`, rather than `sys_cat_uncategorized` or a `NEEDS_REVIEW` status. A status change would remove the row from totals, and the system category would split US2's uncategorized row in two.
+- **Matching.** Matching is literal and normalized: no diacritics, case, or extra spaces, and never regexes. Rule text therefore cannot cause catastrophic backtracking, and Vietnamese bank text with or without accents matches the same rule.
+- **Id tie-break.** The last tie-break compares ids by UTF-16 code unit in the application, not by a database collation, so the order is the same on every host (SC-006).
+- **Explanation storage.** The explanation is stored with each event as ids and codes, so a later rule change or deletion never rewrites why a past decision was made.
+- **Import hook.** The import hook lives in `ParserRepository.importOnce`, inside the transaction that creates the row. A replay or a certain duplicate never reaches it, so imports stay idempotent without extra checks. `email-ingestion.service.ts` (named by T055) needed no change.
+- **Rules UI.** User rules have a CRUD API (`/classification-rules`) because CLASS-001 requires user-owned rules. A rules management page and system-rule operator tooling are follow-ups.
+
 ## Financial calculations
 
 **Decision**: Share one eligibility/period/currency query policy across dashboard, budgets, alerts, and goals. Goals average up to three completed months and require two.  
@@ -426,6 +435,12 @@ Past deadline means 0 periods, with the whole remaining amount due now. The full
 **Alternatives considered**:
 - Round-half-even: harder to hand-calculate.
 - Excluding the current month: surprising for deadlines in the current month.
+
+As built (T058–T063):
+- **Precision.** The arithmetic uses a 64-digit decimal context rather than floating point. Division is then exact far below one unit for every `Decimal(18,2)` amount, and `ceil`/`floor` never see a rounded quotient.
+- **Observation query.** It reads the earliest eligible record per stored currency code (`groupBy`) and the window's eligible income and expense. The codes are matched in code with `normalizeCurrency`, so a free-form goal currency is never a database pattern. A Prisma case-insensitive `equals` would become `ILIKE`, where `%` or `_` match other currencies.
+- **Shared helper left alone.** The dashboard's `eligibleCashflowBuckets` (GitNexus: HIGH risk, feeding the dashboard and analytics cashflow) was not changed; the goal helper reuses the same eligibility, direction, and month primitives. An e2e test shows the goal nets equal `/dashboard/cashflow` for the same months.
+- **Clock.** A `Clock` provider (`common/time/clock.ts`) makes `now` controllable. The e2e suite overrides it to reproduce the worked examples through the API.
 
 ## Budget period types (BUDGET-005)
 

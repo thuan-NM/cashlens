@@ -12,10 +12,12 @@ import {
   describeApiError,
   mapCategory,
   mapTransactionRecord,
+  type CategoryEventPayload,
+  type DecisionExplanation,
   type TransactionPayload,
   type TransactionRecord,
 } from "@/api/mappers";
-import { formatMoney, formatMonthKey, formatPeriod, formatSign } from "@/utils/format";
+import { formatDateTime, formatMoney, formatMonthKey, formatPeriod, formatSign } from "@/utils/format";
 
 const PAGE_SIZE = 50;
 const MONTH_CHOICES = 24;
@@ -61,6 +63,51 @@ const neutralDirectionLabels: Record<string, string> = {
   ADJUSTMENT: "Điều chỉnh",
 };
 
+/** Who decided the current category (CLASS-003). */
+const classificationLabels: Record<string, string> = {
+  MANUAL: "Bạn đã chọn",
+  USER_RULE: "Rule của bạn",
+  SYSTEM_RULE: "Rule hệ thống",
+  FALLBACK: "Không có rule nào khớp",
+  UNKNOWN: "Chưa phân loại tự động",
+};
+
+/** What caused a category history event (CLASS-005). */
+const triggerLabels: Record<string, string> = {
+  CREATE: "Khi tạo giao dịch",
+  IMPORT: "Khi nhập từ email",
+  MANUAL_CORRECTION: "Bạn sửa nhóm",
+  EXPLICIT_RECLASSIFY: "Bạn yêu cầu phân loại lại",
+  AUTOMATIC_RERUN: "Hệ thống chạy lại rule",
+};
+
+const tieBreakLabels: Record<NonNullable<DecisionExplanation["tieBreak"]>, string> = {
+  SCOPE: "rule của bạn được ưu tiên hơn rule hệ thống",
+  PRIORITY: "mức ưu tiên cao hơn",
+  CREATED_AT: "cùng mức ưu tiên, rule tạo sớm hơn",
+  ID: "cùng mức ưu tiên và thời điểm tạo, mã rule nhỏ hơn",
+};
+
+/** A row the rules left without a category still needs the owner's choice (CLASS-004). */
+const needsCategory = (transaction: TransactionRecord) =>
+  !transaction.categoryId && (transaction.classificationSource === "FALLBACK" || transaction.classificationSource === "UNKNOWN");
+
+/** The winner and how conflicts were settled, from the recorded explanation only. */
+const describeExplanation = (explanation: DecisionExplanation | null) => {
+  if (!explanation) return null;
+  const winner = explanation.candidates.find((candidate) => candidate.ruleId === explanation.winnerRuleId);
+  if (!winner) return "Không có rule nào khớp: giao dịch để trống nhóm để bạn xem lại.";
+  const parts = [
+    `${explanation.candidates.length} rule khớp; chọn ${winner.scope === "USER" ? "rule của bạn" : "rule hệ thống"} (ưu tiên ${winner.priority})`,
+  ];
+  if (explanation.candidates.length > 1 && explanation.tieBreak) parts.push(`vì ${tieBreakLabels[explanation.tieBreak]}`);
+  if (explanation.conflict) parts.push("các rule khớp gợi ý nhóm khác nhau");
+  return parts.join(" · ");
+};
+
+const eventCategoryName = (category: CategoryEventPayload["previousCategory"]) =>
+  category ? (category.name ?? "Nhóm không còn truy cập được") : "Chưa phân loại";
+
 /** Month keys ending at `last`, newest first, by YYYY-MM arithmetic only. */
 const monthKeysEndingAt = (last: string, count: number) => {
   const [year, month] = last.split("-").map(Number);
@@ -100,6 +147,7 @@ function StateBadges({ transaction }: { transaction: TransactionRecord }) {
     <>
       {statusLabels[transaction.status] && <Badge color="#d99a3c">{statusLabels[transaction.status]}</Badge>}
       {transaction.isDuplicate && <Badge color="#d2604c">Trùng lặp</Badge>}
+      {needsCategory(transaction) && <Badge color="#8a8378">Cần chọn nhóm</Badge>}
       {neutralDirectionLabels[transaction.direction] && (
         <Badge color="#5b8def">{neutralDirectionLabels[transaction.direction]}</Badge>
       )}
@@ -171,6 +219,16 @@ export function TransactionsPage() {
     ? monthKeysEndingAt(overview.month, MONTH_CHOICES).map((key) => ({ label: `Tháng ${formatMonthKey(key)}`, value: key }))
     : [];
 
+  // The open transaction's append-only category history (CLASS-005).
+  const { query: historyQuery } = useCustom<CategoryEventPayload[]>({
+    url: `/transactions/${selected?.id ?? "none"}/category-history`,
+    method: "get",
+    queryOptions: { enabled: Boolean(selected) },
+  });
+  // refine keeps the previous query's data as a placeholder: that is another transaction's history.
+  const historyEvents = historyQuery.isPlaceholderData ? undefined : historyQuery.data?.data;
+  const historyRefreshFailed = Boolean(historyEvents) && historyQuery.isError && !historyQuery.isFetching;
+
   const { mutateAsync: send } = useCustomMutation<TransactionPayload, HttpError, MutationValues>();
 
   const resetPage = <T,>(setter: (value: T) => void) => (value: T) => {
@@ -192,7 +250,7 @@ export function TransactionsPage() {
   const runAction = async (
     key: string,
     transactionId: string,
-    request: { url: string; method: "patch" | "delete"; values?: Record<string, unknown> },
+    request: { url: string; method: "patch" | "post" | "delete"; values?: Record<string, unknown> },
     successText: string,
   ) => {
     if (busy.current) return undefined;
@@ -234,6 +292,11 @@ export function TransactionsPage() {
     setDuplicateTarget(undefined);
   };
 
+  /** Reloads the history only while the drawer still shows that transaction (never the "none" URL). */
+  const refreshHistory = (data: TransactionPayload | undefined, transactionId: string) => {
+    if (data && shownId.current === transactionId) void historyQuery.refetch();
+  };
+
   const changeCategory = async (transaction: TransactionRecord, value: string) => {
     const data = await runAction(
       "category",
@@ -242,6 +305,19 @@ export function TransactionsPage() {
       "Đã cập nhật nhóm giao dịch",
     );
     applyUpdate(data);
+    refreshHistory(data, transaction.id);
+  };
+
+  /** Explicit reclassification (CLASS-006): the confirmation warns first. */
+  const reclassify = async (transaction: TransactionRecord) => {
+    const data = await runAction(
+      "reclassify",
+      transaction.id,
+      { url: `/transactions/${transaction.id}/reclassify`, method: "post", values: {} },
+      "Đã phân loại lại giao dịch theo rule hiện tại",
+    );
+    applyUpdate(data);
+    refreshHistory(data, transaction.id);
   };
 
   const saveNote = async (transaction: TransactionRecord) => {
@@ -373,6 +449,12 @@ export function TransactionsPage() {
         .filter((row) => row.id !== selected.id)
         .map((row) => ({ label: `${row.desc} · ${row.time} · ${formatMoney(row.amount, row.currency)}`, value: row.id }))
     : [];
+  // The recorded reason for the current rule decision: the latest event, when it made that decision.
+  const latestEvent = historyEvents?.[historyEvents.length - 1];
+  const latestDecision =
+    selected && latestEvent && latestEvent.source === selected.classificationSource
+      ? describeExplanation(latestEvent.explanation)
+      : null;
   const duplicateOriginal = selected?.duplicateOfTransactionId
     ? rows.find((row) => row.id === selected.duplicateOfTransactionId)
     : undefined;
@@ -562,6 +644,83 @@ export function TransactionsPage() {
                   ...categories.map((item) => ({ label: item.name, value: item.id })),
                 ]}
               />
+              <div className="mt-2 space-y-1 text-[11px] text-[var(--muted)]">
+                <div>
+                  Nguồn: <b>{classificationLabels[selected.classificationSource] ?? selected.classificationSource}</b>
+                </div>
+                {selected.classificationSource === "MANUAL" ? (
+                  <div className="text-[var(--faint)]">Nhóm do bạn chọn được giữ nguyên khi hệ thống chạy lại rule tự động.</div>
+                ) : selected.classificationSource === "UNKNOWN" ? (
+                  <div className="text-[var(--faint)]">Giao dịch chưa được rule phân loại (phân loại tự động đang tắt hoặc giao dịch có từ trước).</div>
+                ) : (
+                  latestDecision && <div className="text-[var(--faint)]">{latestDecision}</div>
+                )}
+              </div>
+              <div className="mt-2 flex justify-end">
+                <Popconfirm
+                  title="Phân loại lại theo rule?"
+                  description={
+                    <div className="max-w-[260px]">
+                      {selected.classificationSource === "MANUAL"
+                        ? "Nhóm bạn đã chọn sẽ bị thay bằng kết quả của rule hiện tại, hoặc để trống nếu không rule nào khớp."
+                        : "Rule hiện tại sẽ được áp dụng lại và nhóm có thể thay đổi."}{" "}
+                      Thay đổi được ghi vào lịch sử phân loại.
+                    </div>
+                  }
+                  okText="Phân loại lại"
+                  okButtonProps={{ danger: selected.classificationSource === "MANUAL" }}
+                  cancelText="Hủy"
+                  disabled={actionsDisabled}
+                  onConfirm={() => reclassify(selected)}
+                >
+                  <Button disabled={actionsDisabled}>{pendingAction === "reclassify" ? "Đang phân loại..." : "Phân loại lại"}</Button>
+                </Popconfirm>
+              </div>
+            </div>
+            <div>
+              <div className="mb-1.5 text-[11.5px] font-semibold text-[var(--muted)]">Lịch sử phân loại</div>
+              {historyRefreshFailed && (
+                <Alert
+                  className="mb-2"
+                  type="warning"
+                  showIcon
+                  message={`Không thể làm mới lịch sử; đang hiển thị bản cũ. ${describeApiError(historyQuery.error)}`}
+                  action={<Button onClick={() => void historyQuery.refetch()}>Thử lại</Button>}
+                />
+              )}
+              {historyEvents ? (
+                historyEvents.length ? (
+                  <ol className="space-y-2">
+                    {[...historyEvents].reverse().map((event) => (
+                      <li key={event.id} className="rounded-lg bg-[var(--surface-2)] px-3 py-2 text-[11.5px]">
+                        <div className="flex flex-wrap justify-between gap-2">
+                          <b>{triggerLabels[event.trigger] ?? event.trigger}</b>
+                          <span className="text-[var(--faint)]">{formatDateTime(event.createdAt, timeZone)}</span>
+                        </div>
+                        <div>
+                          {eventCategoryName(event.previousCategory)} → {eventCategoryName(event.newCategory)}
+                        </div>
+                        <div className="text-[var(--faint)]">
+                          {classificationLabels[event.source] ?? event.source}
+                          {event.explanation && ` · ${describeExplanation(event.explanation)}`}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <div className="text-[11.5px] text-[var(--faint)]">
+                    Chưa có thay đổi nhóm nào được ghi lại. Lịch sử bắt đầu từ khi tính năng phân loại theo rule được bật.
+                  </div>
+                )
+              ) : historyQuery.isError ? (
+                <ErrorBlock
+                  text={`Không thể tải lịch sử phân loại. ${describeApiError(historyQuery.error)}`}
+                  onRetry={() => void historyQuery.refetch()}
+                  retrying={historyQuery.isFetching}
+                />
+              ) : (
+                <Skeleton active title={false} paragraph={{ rows: 2 }} />
+              )}
             </div>
             <div>
               <div className="mb-1.5 text-[11.5px] font-semibold text-[var(--muted)]">Ghi chú</div>

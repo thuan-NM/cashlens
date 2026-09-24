@@ -57,7 +57,8 @@ Revoking the last active administrator returns the deployment to the zero-admin 
 | `EMAIL_CONNECTED` | USER | `email_connection` | `provider` |
 | `EMAIL_DISCONNECTED` | USER | `email_connection` | none |
 | `EMAIL_SYNC` | USER | `email_connection` | `syncRunId`, `status`, counts |
-| `TRANSACTION_CATEGORY_CORRECTED` | USER | `transaction` | `fromCategoryId`, `toCategoryId` |
+| `TRANSACTION_CATEGORY_CORRECTED` (only when the category changes; in the same database transaction as the change, T054) | USER | `transaction` | `fromCategoryId`, `toCategoryId` |
+| `TRANSACTION_RECLASSIFIED` (every explicit reclassification, even when the result is unchanged, T054) | USER | `transaction` | `fromCategoryId`, `toCategoryId`, `source` |
 | `TRANSACTION_DELETED` | USER | `transaction` | none |
 | `FINANCIAL_ACCOUNT_ARCHIVED` | USER | `financial_account` | none |
 | `TRANSACTION_CATEGORY_ARCHIVED` | USER | `transaction_category` | none |
@@ -147,6 +148,19 @@ As built (T040, T045):
 
 Change `userId` from required to nullable: non-null means user rule; null means system rule. A database/application invariant requires system rules to target a system category and user rules to target an allowed user/system category. Order by scope precedence, numeric priority descending, `createdAt` ascending, then stable `id` ascending.
 
+As built (T050, T052, T053):
+- **Schema.** Migration `20260924120000_classification_events` makes `MerchantRule.userId` nullable and adds the index `(isActive, userId)`. The rule's `categoryId` keeps `ON DELETE SET NULL`.
+- **Target invariant.** The trigger `MerchantRule_target_scope` (`BEFORE INSERT OR UPDATE OF "userId", "categoryId"`) enforces the target scope in the database. A system rule must target a category with `userId IS NULL AND isSystem`. A user rule must target such a system category or one of its owner's categories. A violation raises `check_violation`. A null `categoryId` is allowed, for example after a category's deletion; such a rule is never eligible.
+- **Evaluation-time checks.** The application repeats the invariant when it evaluates a rule and also requires the target category to be `ACTIVE`. A rule whose category is archived or missing is skipped: it neither wins nor counts as a conflicting match.
+- **Rule writes.** User rules are created, changed, and deleted through `/classification-rules` (owner-scoped; another owner's rule is 404). System rules have no HTTP route: they are written by operators or tests through `ClassificationRepository.createSystemRule`. `GET /classification-rules` lists the caller's rules and the active system rules (`scope: SYSTEM`, read-only). A rule needs at least one text criterion. Priority is an integer from 0 to 1 000 000 and defaults to 100. Patterns are at most 200 characters.
+- **Matching (CLASS-001).** Text is compared after Unicode decomposition with diacritics removed (`đ` is read as `d`), lower-cased, with whitespace runs collapsed and the ends trimmed. Patterns are literal text, never regular expressions.
+  - `merchantPattern` is a contains-match on `merchantName`, or on `counterpartyName` when the merchant is blank.
+  - `descriptionPattern` is a contains-match on `description`.
+  - `bankName` is an equality match.
+  - `direction` is an equality match when set.
+  - Every criterion that is set must hold (AND). A missing transaction attribute fails its criterion.
+- **Rule changes.** Creating, changing, or deleting a rule never reclassifies existing transactions; it affects later decisions only. Deleting a rule sets `Transaction.classificationRuleId` to null (`SET NULL`). The row's category and source stay, and its events keep `merchantRuleId`.
+
 ### TransactionCategoryEvent (new, DB-M3)
 
 | Field | Meaning |
@@ -161,6 +175,45 @@ Change `userId` from required to nullable: non-null means user rule; null means 
 | `createdAt` | Immutable decision time |
 
 Events are append-only. A transaction with authoritative manual classification is not automatically overwritten. Explicit reclassification appends a new event and updates current classification atomically.
+
+As built (T050, T054, T055):
+- **Current state.** `Transaction` holds the current decision in five columns that are always written together:
+  - `categoryId`;
+  - `classificationSource`, which gains `USER_RULE`, `SYSTEM_RULE`, and `FALLBACK`. The legacy values `RULE`, `ML`, `LLM`, and `SYSTEM` stay in the enum, because removing enum values is not additive, but the application never wrote them and never writes them (CLASS-007). A row that somehow holds one is treated like any non-`MANUAL` row;
+  - `classificationRuleId` (FK to `MerchantRule`, `SET NULL`);
+  - `classifiedAt`;
+  - `classificationConfidence`: 1 when a category is set, and null for a clear or the fallback. The parser's own `confidence` is untouched.
+- **Manual lock.** The lock is `classificationSource = MANUAL`; there is no separate flag. CLASS-002's "eligible manual correction" is not defined further. It is read as every current `MANUAL` decision the user has not released, because TX-004 and SC-006 make the protection unconditional. A manual category that is later archived therefore stays in place until the user corrects or reclassifies. The migration backfills legacy rows that have a category and `UNKNOWN` to `MANUAL` without writing events, so no fake history is created. Existing `MANUAL` rows keep their state.
+- **Fallback (CLASS-004).** It is `categoryId` null with `classificationSource = FALLBACK`. The transaction status is unchanged and `sys_cat_uncategorized` is not assigned, so US2's uncategorized row (`categoryId: null`) keeps its meaning. Clients show it as needing a category.
+- **Event columns.** Beyond the table above, the event stores the following. Category, rule, and actor ids have no foreign key, so history outlives them. The transaction and user keys cascade on delete.
+  - `sequence`: 1, 2, 3… per transaction, unique with `transactionId`, and assigned under the row lock.
+  - `trigger`: `CREATE`, `IMPORT`, `MANUAL_CORRECTION`, `EXPLICIT_RECLASSIFY`, or `AUTOMATIC_RERUN`.
+  - `reason`: `MANUAL_SET`, `MANUAL_CLEARED`, `RULE_MATCHED`, or `NO_RULE_MATCHED`.
+  - `actorType`: `USER` or `SYSTEM`.
+  - `explanation` (JSON): the ranked matching rules as `{ruleId, scope, priority, createdAt, categoryId}`, plus `winnerRuleId`, `runnerUpRuleId`, `tieBreak` (`SCOPE`, `PRIORITY`, `CREATED_AT`, `ID`, or null), and `conflict` (whether the matches pointed to more than one category). It holds ids and codes only, never transaction or rule text (SEC-006).
+- **Immutability.** The trigger `TransactionCategoryEvent_no_update` refuses every update. `TransactionCategoryEvent_no_direct_delete` refuses a direct delete but allows the foreign-key cascade from a transaction or user (`pg_trigger_depth() < 1`). Both raise `TransactionCategoryEvent rows are append-only`.
+- **Atomicity.** Every category write runs in one database transaction that locks the row (`SELECT … FOR UPDATE`), updates the five columns, appends the event, and writes the audit row when required. The previous category of an event is therefore always the state it replaced.
+- **Concurrent rule changes.** Classification holds the winning rule with `FOR KEY SHARE` until commit.
+  - If the winner was deleted after the rules were read, the decision is taken again without it. After three such attempts the request gets 409.
+  - A rule delete that arrives later waits, and then clears `classificationRuleId` through its `SET NULL`.
+  - Locks are taken in the delete's order: the rule the row currently references, then the row. A delete of that rule therefore cannot deadlock with a correction or reclassification.
+  - One residual risk remains, a doubly unlikely one: if the row's reference changes between reading it and locking the row, a delete of the new rule could still deadlock. PostgreSQL then aborts one of the two, and the request fails and can be retried.
+  - `classification.e2e-spec.ts` reproduces both races, and each test fails without its fix.
+- **Decision matrix.**
+
+  | Path | Trigger / actor | MANUAL row | Other row | Event |
+  |---|---|---|---|---|
+  | `POST /transactions` with `categoryId` | `CREATE` / USER | — | `MANUAL`, `MANUAL_SET` | always |
+  | `POST /transactions` without category, auto on | `CREATE` / SYSTEM | — | rule winner or `FALLBACK` | always |
+  | Email import (created row, including a suspected duplicate), auto on | `IMPORT` / SYSTEM | — | rule winner or `FALLBACK` | always |
+  | Create or import, auto off (`UserSettings.autoClassificationEnabled = false`; a missing row counts as on) | — | — | `UNKNOWN` | none |
+  | Import of a certain duplicate, replay, or a repeated manual parse | — | unchanged | unchanged | none |
+  | `PATCH /transactions/:id/category` or `PATCH /transactions/:id` with `categoryId` (a category or null) | `MANUAL_CORRECTION` / USER | `MANUAL` (`MANUAL_SET` or `MANUAL_CLEARED`) | same | when category or source changes |
+  | `PATCH /transactions/:id` without `categoryId` | — | unchanged | unchanged (rules are not re-run on edits) | none |
+  | `POST /transactions/:id/reclassify` | `EXPLICIT_RECLASSIFY` / USER | released: rule winner or `FALLBACK` | rule winner or `FALLBACK` | always, plus audit |
+  | Automatic rerun (`ClassificationService.applyAutomatic`) | `AUTOMATIC_RERUN` / SYSTEM | unchanged (`PROTECTED`) | rule winner or `FALLBACK` | only when the decision changes |
+
+- **Record states.** Every non-`DELETED` status can be classified; classification never changes status, `isDuplicate`, or financial eligibility (US2). For a `DELETED` row, the reclassify and history routes return 404, and its events are kept.
 
 ### Budget thresholds (BUDGET-001, BUDGET-004): no schema change
 
@@ -300,7 +353,7 @@ All arithmetic uses exact decimals and rounds only at the named steps. "Unit" me
    | 3 | `goal.months = M` | `GOAL_MONTHS` | user month of `createdAt` + M − 1 |
    | 4 | None of the above | `DEFAULT` | current month + 5 |
 
-3. **Remaining periods:** `remainingPeriods = max(0, monthIndex(deadline) − monthIndex(current) + 1)`. Both the current month and the deadline month are counted. `pastDeadline = (remainingPeriods = 0)`.
+3. **Remaining periods:** `remainingPeriods = max(0, monthIndex(deadline) − monthIndex(current) + 1)`. Both the current month and the deadline month are counted. `pastDeadline = (remainingPeriods = 0 and remainingAmount > 0)`. This was corrected to match GOAL-002 and the contract: a goal whose target is already reached is never past deadline.
 4. **Required monthly saving** (`monthlyRequired`):
    - If `remainingAmount = 0`: 0.
    - Else if `remainingPeriods = 0`: `remainingAmount`, with reason `PAST_DEADLINE`.
@@ -322,7 +375,7 @@ All arithmetic uses exact decimals and rounds only at the named steps. "Unit" me
    | 0–49 | `NOT_RECOMMENDED` |
 
 10. **Alert inputs** apply exactly these rounding rules to the goal's **stored** horizon:
-    - The goal-risk condition is `monthlyRequired > availableMonthlyCashflow`, using the horizon precedence without the `QUERY` source (`TARGET_DATE` → `GOAL_MONTHS` → `DEFAULT`). The Goals page's what-if slider always sends `months`, so its displayed numbers may differ from the alert's stored-horizon numbers by design.
+    - The goal-risk condition is `monthlyRequired > availableMonthlyCashflow`, using the horizon precedence without the `QUERY` source (`TARGET_DATE` → `GOAL_MONTHS` → `DEFAULT`). The Goals page shows the goal's own horizon by default, which sends no `months`. Only its what-if slider sends `months`, so the what-if numbers may differ from the alert's stored-horizon numbers by design.
     - The cashflow-risk condition is `availableMonthlyCashflow < 0`, computed in the user's base currency.
 
 API fields retained:
@@ -345,12 +398,24 @@ Additive fields: `horizonSource`, `pastDeadline`, `availableMonthlyCashflow`, `o
 | G2 | Remainder rounds up | target 10,000,000; saved 0; query `months = 3`; H1 | periods 3; `monthlyRequired` ceil(3,333,333.33…) = **3,333,334**; score floor(269.99…) capped to **100 SAFE**; source QUERY |
 | G3 | Deadline in current month | target 5,000,000; saved 1,000,000; `targetDate` 2026-09-30; H1 | periods **1**; `monthlyRequired` 4,000,000; score **100 SAFE** |
 | G4 | Past deadline | target 20,000,000; saved 8,000,000; `targetDate` 2026-08-31; H1 | periods **0**; `pastDeadline = true`; `monthlyRequired` 12,000,000; score floor(75) = **75 RISKY**; reason `PAST_DEADLINE` |
-| G5 | Target complete | target 10,000,000; saved 12,000,000; any deadline, including past | remaining 0; `monthlyRequired` 0; score **100 SAFE**; goal-risk does not hold |
+| G5 | Target complete | target 10,000,000; saved 12,000,000; any deadline, including past; H1 | remaining 0; `monthlyRequired` 0; score **100 SAFE**; goal-risk does not hold |
 | G6 | Negative cashflow | target 20,000,000; saved 0; query `months = 2`; nets Jun −2,000,000, Jul −1,000,000, Aug −1,500,001 | available floor(−1,500,000.33…) = **−1,500,001**; `monthlyRequired` 10,000,000; score max(0, floor(−15.00001)) = **0 NOT_RECOMMENDED**; cashflow-risk holds (CRITICAL) |
 | G7 | Band edges | `monthlyRequired` 10,000,000 | available 9,999,999 → 99 ACCEPTABLE; 8,000,000 → 80 ACCEPTABLE; 7,999,999 → 79 RISKY; 5,000,000 → 50 RISKY; 4,999,999 → 49 NOT_RECOMMENDED |
 | G8 | History length | earliest transaction 2026-09-05 / 2026-08-12 / 2026-07-01 / 2026-03-01 | 0 months → INSUFFICIENT_DATA, `monthsRequired` 2 / 1 month → INSUFFICIENT_DATA, `monthsRequired` 1 / 2 months (Jul, Aug) → mean of 2 / 3 months (Jun, Jul, Aug) → mean of 3 |
 | G9 | Empty month counts as 0 | earliest 2026-06-10; nets Jun 3,000,000; Jul has no transactions; Aug 6,000,000 | observation months Jun, Jul, Aug; available floor(9,000,000 ÷ 3) = **3,000,000** |
 | G10 | Horizon sources | (a) `goal.months = 6`, created 2026-07-10, no `targetDate`; (b) no `targetDate`, no months, no query | (a) deadline 2026-12, periods 4, source GOAL_MONTHS; (b) deadline 2027-02, periods 6, source DEFAULT |
+
+As built (T058–T063):
+- **Code.** The steps are the pure `computeFeasibility` in `apps/api/src/modules/goals/goal-feasibility.ts`. The observation (step 5) is `completedMonthCashflow` in `apps/api/src/common/finance/completed-month-cashflow.ts`, which the alert inputs can reuse without `GoalsModule`. Time comes from the injectable `Clock` (`common/time/clock.ts`), so tests fix `now`. The unit spec reproduces all of G1–G10 under the example clock. The e2e suite reproduces G1, G4, G5, G6, G8, and G10(b) through the API from real rows, plus the G2 numbers through a what-if horizon.
+- **Exact arithmetic.** It runs in a 64-digit decimal context. Rounding happens only at steps 4, 7, and 8, as ROUND_CEIL, ROUND_FLOOR, and floor.
+- **Required saving at 0 periods.** It is the whole remaining amount, unrounded. The texts give no rounding step there, so a VND amount with cents stays as it is.
+- **Unit.** 1 for VND and 0.01 for every other currency. This is this document's rule; the spec says only "the currency's smallest unit". Zero-decimal currencies such as JPY are therefore rounded to 0.01 (follow-up).
+- **Insufficient history wins over a reached target.** With fewer than 2 observation months the result is `INSUFFICIENT_DATA` even when nothing remains: step 6 precedes step 8. `monthlyRequired` is still 0.
+- **`reason`.** It is one or more codes, comma-separated, in this order: `INSUFFICIENT_HISTORY`, `TARGET_REACHED`, `PAST_DEADLINE`. `COMPLETED_MONTHS_AVERAGE` appears alone when none of those applies. INSTALLMENT appends `INSTALLMENT_WITHOUT_INTEREST`. G4 is exactly `PAST_DEADLINE`, and a past deadline with short history is `INSUFFICIENT_HISTORY, PAST_DEADLINE`.
+- **History start.** The earliest eligible record of any direction starts the history: a transfer-only month has a net of 0. Stored currency codes are matched with the shared normalization (case and padding), never as a database pattern. A goal currency that is not a real code therefore observes nothing.
+- **Target date.** `targetDate` is the stored instant, and its month is the user month containing it. A date-only value is stored at UTC midnight, which is the same calendar date for accounts east of UTC. West of UTC it can fall on the previous local day (follow-up).
+- **Months beyond the supported calendar.** A month outside 1900-01 to 2099-12 uses the local-date rule directly. Periods are computed as month indices, so no horizon can fail the request.
+- **Simulation reads.** Reading the simulation is side-effect free and recomputes every time (GOAL-006).
 
 ## Migration sequencing
 

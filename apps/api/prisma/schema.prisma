@@ -42,6 +42,34 @@ enum ClassificationSource {
   MANUAL
   SYSTEM
   UNKNOWN
+  USER_RULE
+  SYSTEM_RULE
+  FALLBACK
+}
+
+/// Where a category decision came from (CLASS-005); events never carry ML/LLM.
+enum CategoryDecisionSource {
+  MANUAL
+  USER_RULE
+  SYSTEM_RULE
+  FALLBACK
+}
+
+/// What caused a category decision.
+enum CategoryDecisionTrigger {
+  CREATE
+  IMPORT
+  MANUAL_CORRECTION
+  EXPLICIT_RECLASSIFY
+  AUTOMATIC_RERUN
+}
+
+/// The outcome of a category decision.
+enum CategoryDecisionReason {
+  MANUAL_SET
+  MANUAL_CLEARED
+  RULE_MATCHED
+  NO_RULE_MATCHED
 }
 
 enum TransactionCategoryType {
@@ -237,6 +265,7 @@ model User {
   alerts           Alert[]
   alertSettings    AlertSetting[]
   merchantRules    MerchantRule[]
+  categoryEvents   TransactionCategoryEvent[]
   emailConnections EmailConnection[]
   emailListenRules EmailListenRule[]
   emailMessages    EmailMessage[]
@@ -343,20 +372,26 @@ model Transaction {
   deduplicationStrategy    TransactionDeduplicationStrategy?
   classificationSource     ClassificationSource              @default(UNKNOWN)
   classificationConfidence Decimal?                          @db.Decimal(5, 4)
+  /// The rule that won the current decision; null for MANUAL/FALLBACK, or when the rule was since deleted.
+  classificationRuleId     String?
+  /// When the current category decision was made; null for rows decided before US4.
+  classifiedAt             DateTime?
   userNote                 String?
   confidence               Float?
   metadata                 Json?
   createdAt                DateTime                          @default(now())
   updatedAt                DateTime                          @updatedAt
 
-  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rawEmail     RawEmail?            @relation(fields: [rawEmailId], references: [id], onDelete: SetNull)
-  emailMessage EmailMessage?        @relation(fields: [emailMessageId], references: [id], onDelete: SetNull)
-  category     TransactionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  account      FinancialAccount?    @relation(fields: [financialAccountId], references: [id], onDelete: SetNull)
-  duplicateOf  Transaction?         @relation("TransactionDuplicate", fields: [duplicateOfTransactionId], references: [id], onDelete: SetNull)
-  duplicates   Transaction[]        @relation("TransactionDuplicate")
-  parserRuns   ParserRun[]
+  user               User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rawEmail           RawEmail?                  @relation(fields: [rawEmailId], references: [id], onDelete: SetNull)
+  emailMessage       EmailMessage?              @relation(fields: [emailMessageId], references: [id], onDelete: SetNull)
+  category           TransactionCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  account            FinancialAccount?          @relation(fields: [financialAccountId], references: [id], onDelete: SetNull)
+  duplicateOf        Transaction?               @relation("TransactionDuplicate", fields: [duplicateOfTransactionId], references: [id], onDelete: SetNull)
+  duplicates         Transaction[]              @relation("TransactionDuplicate")
+  parserRuns         ParserRun[]
+  classificationRule MerchantRule?              @relation(fields: [classificationRuleId], references: [id], onDelete: SetNull)
+  categoryEvents     TransactionCategoryEvent[]
 
   @@unique([userId, externalTransactionId])
   @@unique([userId, deduplicationFingerprint])
@@ -367,6 +402,36 @@ model Transaction {
   @@index([userId, categoryId])
   @@index([userId, financialAccountId])
   @@index([userId, merchantName])
+  @@index([classificationRuleId])
+}
+
+/// Append-only history of category decisions (CLASS-005). Rows are never
+/// updated, and only foreign-key cascades may delete them (DB triggers).
+/// Category, rule, and actor ids are plain columns so later deletions never
+/// rewrite history.
+model TransactionCategoryEvent {
+  id                 String                  @id @default(cuid())
+  transactionId      String
+  userId             String
+  /// 1, 2, 3… per transaction: the append order.
+  sequence           Int
+  previousCategoryId String?
+  newCategoryId      String?
+  source             CategoryDecisionSource
+  trigger            CategoryDecisionTrigger
+  reason             CategoryDecisionReason
+  merchantRuleId     String?
+  actorType          AuditActorType
+  actorUserId        String?
+  /// Ranked candidate rules and the tie-break (ids and codes only).
+  explanation        Json?
+  createdAt          DateTime                @default(now())
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([transactionId, sequence])
+  @@index([userId, createdAt])
 }
 
 model TransactionCategory {
@@ -513,9 +578,12 @@ model AlertSetting {
   @@index([userId, inAppEnabled])
 }
 
+/// A classification rule (CLASS-001): userId null is a system rule. A DB
+/// trigger keeps system rules on system categories and user rules on their
+/// owner's or system categories.
 model MerchantRule {
   id                 String                @id @default(cuid())
-  userId             String
+  userId             String?
   categoryId         String?
   merchantPattern    String?
   descriptionPattern String?
@@ -526,11 +594,13 @@ model MerchantRule {
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
 
-  user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category TransactionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  user         User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     TransactionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  transactions Transaction[]
 
   @@index([userId, isActive])
   @@index([userId, priority])
+  @@index([isActive, userId])
 }
 
 model BankProvider {

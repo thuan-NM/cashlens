@@ -39,7 +39,7 @@ export class CreateGoalDto {
 
   @IsOptional()
   @IsDateString()
-  targetDate?: string;
+  targetDate?: string | null;
 
   @IsOptional()
   @Type(() => Number)

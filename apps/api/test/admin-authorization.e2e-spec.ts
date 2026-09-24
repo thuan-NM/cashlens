@@ -393,7 +393,14 @@ describe('Admin authorization and privileged fields (T011)', () => {
         privileged: [
           ['userId', 'userId', () => other.id],
           ['classificationSource', 'classificationSource', () => 'SYSTEM'],
+          [
+            'classificationSource: USER_RULE',
+            'classificationSource',
+            () => 'USER_RULE',
+          ],
           ['classificationConfidence', 'classificationConfidence', () => 0.99],
+          ['classificationRuleId', 'classificationRuleId', () => 'rule-x'],
+          ['classifiedAt', 'classifiedAt', () => new Date().toISOString()],
           ['sourceType', 'sourceType', () => 'EMAIL'],
         ],
         count: (userId) => prisma.transaction.count({ where: { userId } }),
@@ -421,6 +428,21 @@ describe('Admin authorization and privileged fields (T011)', () => {
         count: (userId) =>
           prisma.transactionCategory.count({ where: { userId } }),
         find: (id) => prisma.transactionCategory.findUnique({ where: { id } }),
+      },
+      {
+        // A system rule has no owner: userId null must never be accepted.
+        route: 'classification-rules',
+        body: () => ({
+          categoryId: 'sys_cat_expense_food',
+          descriptionPattern: `T011 rule ${unique()}`,
+        }),
+        privileged: [
+          ['userId', 'userId', () => other.id],
+          ['userId: null (system rule)', 'userId', () => null],
+          ['scope', 'scope', () => 'SYSTEM'],
+        ],
+        count: (userId) => prisma.merchantRule.count({ where: { userId } }),
+        find: (id) => prisma.merchantRule.findUnique({ where: { id } }),
       },
       {
         route: 'budgets',

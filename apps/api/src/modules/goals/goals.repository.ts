@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { completedMonthCashflow } from '../../common/finance/completed-month-cashflow';
+import type { PeriodSettings } from '../../common/finance/financial-period-policy';
+import { loadFinancialContext } from '../../common/finance/financial-summary.query';
 import { BaseRepository } from '../../common/repositories/base.repository';
 import { nullIfNotFound } from '../../common/utils/prisma-errors';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -50,6 +53,21 @@ export class GoalsRepository extends BaseRepository {
         data: { deletedAt: new Date(), status: 'ARCHIVED' },
       }),
     );
+  }
+
+  /** The account's timezone and month-start day (user months, DASH-002). */
+  financialContext(userId: string) {
+    return loadFinancialContext(this.prisma, userId);
+  }
+
+  /** Completed-month net cashflow of the goal's currency (GOAL-003). */
+  observation(
+    userId: string,
+    currency: string,
+    now: Date,
+    settings: PeriodSettings,
+  ) {
+    return completedMonthCashflow(this.prisma, userId, currency, now, settings);
   }
 
   contribute(userId: string, id: string, amount: number) {

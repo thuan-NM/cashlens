@@ -210,6 +210,10 @@ describe('Raw email body preference is locked off (T045a)', () => {
         where: { emailConnectionId: connection.id },
       }),
       audit: await prisma.auditLog.findMany({ where: { userId: alice.id } }),
+      // The import's category event (T055) holds ids and codes only.
+      categoryEvents: await prisma.transactionCategoryEvent.findMany({
+        where: { userId: alice.id },
+      }),
       connection: await prisma.emailConnection.findUnique({
         where: { id: connection.id },
       }),

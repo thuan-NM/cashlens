@@ -3,7 +3,7 @@ import type { Alert } from "@/types/alert";
 import type { Budget } from "@/types/budget";
 import type { Goal } from "@/types/goal";
 import type { Category, Transaction } from "@/types/transaction";
-import { formatDateTime } from "@/utils/format";
+import { formatDate, formatDateTime } from "@/utils/format";
 
 const alertTypeLabels: Record<string, string> = {
   BUDGET_THRESHOLD: "Ngân sách",
@@ -61,6 +61,9 @@ export type TransactionPayload = {
   duplicateOfTransactionId?: string | null;
   categoryId?: string | null;
   category?: { name?: string | null; color?: string | null } | null;
+  classificationSource?: string | null;
+  classificationRuleId?: string | null;
+  classifiedAt?: string | null;
   transactionTime?: string | null;
   userNote?: string | null;
   description?: string | null;
@@ -87,9 +90,35 @@ export interface TransactionRecord extends Transaction {
   categoryId: string | null;
   categoryName: string | null;
   categoryColor: string | null;
+  /** Who decided the current category: MANUAL, USER_RULE, SYSTEM_RULE, FALLBACK, or UNKNOWN. */
+  classificationSource: string;
   userNote: string;
   transactionTime: string;
 }
+
+/** Why the rules picked a winner (CLASS-003): the ranked matches and the deciding tie-break. */
+export type DecisionExplanation = {
+  candidates: Array<{ ruleId: string; scope: "USER" | "SYSTEM"; priority: number; createdAt: string; categoryId: string | null }>;
+  winnerRuleId: string | null;
+  runnerUpRuleId: string | null;
+  tieBreak: "SCOPE" | "PRIORITY" | "CREATED_AT" | "ID" | null;
+  conflict: boolean;
+};
+
+/** One append-only category history event (CLASS-005), oldest first. */
+export type CategoryEventPayload = {
+  id: string;
+  sequence: number;
+  createdAt: string;
+  source: string;
+  trigger: string;
+  reason: string;
+  actorType: string;
+  merchantRuleId: string | null;
+  previousCategory: { id: string; name: string | null } | null;
+  newCategory: { id: string; name: string | null } | null;
+  explanation: DecisionExplanation | null;
+};
 
 const toFlow = (direction?: string | null): TransactionRecord["flow"] => {
   if (direction === "INCOME") return "income";
@@ -109,6 +138,7 @@ export const mapTransactionRecord = (item: TransactionPayload, timeZone?: string
   categoryId: item.categoryId ?? null,
   categoryName: item.category?.name ?? null,
   categoryColor: item.category?.color ?? null,
+  classificationSource: item.classificationSource ?? "UNKNOWN",
   userNote: item.userNote ?? "",
   transactionTime: item.transactionTime ?? "",
 });
@@ -173,15 +203,19 @@ export const mapBudget = (item: any): Budget => ({
   threshold: Number(item.thresholdPercent ?? 80),
 });
 
-export const mapGoal = (item: any): Goal => ({
+/** A goal as the list shows it; its deadline is the calendar date in the account time zone (the one the API reads). */
+export const mapGoal = (item: any, timeZone?: string): Goal => ({
   id: item.id,
   name: item.name,
   type: goalTypeLabels[item.type] ?? item.type ?? "Mục tiêu",
   target: Number(item.targetAmount ?? 0),
   saved: Number(item.savedAmount ?? 0),
-  date: item.targetDate ? new Date(item.targetDate).toLocaleDateString("vi-VN") : "-",
-  months: Number(item.months ?? 6),
+  date: formatDate(item.targetDate, timeZone) || "-",
+  // No fabricated duration: a goal without one uses the API's visible default horizon.
+  months: item.months === null || item.months === undefined ? null : Number(item.months),
   priority: item.priority ?? "MEDIUM",
+  currency: item.currency ?? "VND",
+  remaining: Number(item.remainingAmount ?? 0),
 });
 
 const alertSeverity = (severity?: string): Alert["severity"] => {

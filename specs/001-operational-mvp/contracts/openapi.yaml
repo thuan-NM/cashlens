@@ -155,7 +155,7 @@ components:
         scenario: { enum: [FULL, INSTALLMENT], description: 'Retained; INSTALLMENT handling pending product decision (no inferred interest rate may be applied, GOAL-007)' }
         months: { type: integer, minimum: 0, description: 'Remaining periods used as divisor: user months from current through deadline month inclusive; 0 when past deadline (data-model GOAL rules)' }
         horizonSource: { enum: [QUERY, TARGET_DATE, GOAL_MONTHS, DEFAULT], description: 'Additive; which horizon determined the deadline month (DEFAULT = visible 6-month default)' }
-        pastDeadline: { type: boolean, description: 'Additive; true when months = 0 and remainingAmount > 0 (whole remaining amount due now)' }
+        pastDeadline: { type: boolean, description: 'Additive; true when months = 0 and remainingAmount > 0 (whole remaining amount due now, unrounded)' }
         targetAmount: { type: number }
         savedAmount: { type: number }
         remainingAmount: { type: number, minimum: 0 }
@@ -163,10 +163,10 @@ components:
         monthlyRequired: { type: number, minimum: 0, description: 'Required monthly saving (GOAL-002): ceil(remainingAmount / months) to the currency unit (whole VND); remainingAmount when pastDeadline; 0 when remainingAmount = 0' }
         feasibilityScore: { type: [integer, 'null'], minimum: 0, maximum: 100, description: 'floor(available * 100 / monthlyRequired) capped 0-100; 100 when monthlyRequired = 0; null when INSUFFICIENT_DATA' }
         status: { enum: [SAFE, ACCEPTABLE, RISKY, NOT_RECOMMENDED, INSUFFICIENT_DATA] }
-        availableMonthlyCashflow: { type: [number, 'null'], description: 'Additive; floor of mean completed-month net cashflow in the goal currency (GOAL-003)' }
+        availableMonthlyCashflow: { type: [number, 'null'], description: 'Additive; floor of mean completed-month net cashflow in the goal currency (GOAL-003); null when INSUFFICIENT_DATA' }
         observationMonths: { type: array, items: {type: string, pattern: '^\d{4}-\d{2}$'}, description: Additive }
-        monthsRequired: { type: integer, minimum: 0, description: Additive; additional completed months needed when INSUFFICIENT_DATA }
-        reason: { type: string, description: Additive; sanitized explanation }
+        monthsRequired: { type: integer, minimum: 0, description: 'Additive; additional completed months needed when INSUFFICIENT_DATA (2 minus the observed count); 0 otherwise' }
+        reason: { type: string, description: 'Additive; sanitized explanation as comma-separated codes, in this order: INSUFFICIENT_HISTORY, TARGET_REACHED, PAST_DEADLINE (COMPLETED_MONTHS_AVERAGE alone when none applies), then INSTALLMENT_WITHOUT_INTEREST for the INSTALLMENT scenario' }
 
     BudgetWrite:
       description: Threshold fields of budget create/update (other existing fields unchanged). All existing period values remain accepted; only MONTHLY budgets are evaluated for alerts (BUDGET-005).
@@ -296,9 +296,11 @@ components:
         baseCurrency: { type: string, pattern: '^[A-Z]{3}$', description: 'Upper-case ISO 4217 code; registration and the admin user bodies use the same rule' }
     TransactionWriteRules:
       description: >-
-        Rules for the existing transaction create/update bodies (SEC-004, TX-002). userId, classificationSource, and
-        classificationConfidence are not accepted (400); provenance is derived on the server (MANUAL when the owner
-        chooses a category). status accepts PENDING, POSTED, IGNORED, or NEEDS_REVIEW, never DELETED: deletion uses
+        Rules for the existing transaction create/update bodies (SEC-004, TX-002). userId, classificationSource,
+        classificationConfidence, classificationRuleId, and classifiedAt are not accepted (400); provenance is derived
+        on the server. A categoryId on create, or on PATCH (a category or null), is a MANUAL decision locked against
+        automatic classification and recorded as a category event (T054); without one, create applies the rules
+        (T055) and PATCH leaves the classification unchanged. status accepts PENDING, POSTED, IGNORED, or NEEDS_REVIEW, never DELETED: deletion uses
         DELETE /transactions/{id}, an audited soft delete. Related ids (financialAccountId, categoryId,
         duplicateOfTransactionId) must be non-empty and owned (or a system category), otherwise 400 or owner-safe 404;
         an archived account or category gets the same 404. isDuplicate true needs a duplicateOfTransactionId (sent or
@@ -313,6 +315,98 @@ components:
         transactionTime: { type: string, format: date-time, description: 'ISO 8601 date-time with a UTC offset or Z; a time without an offset gets 400. It decides the user month (data-model.md "Financial period policy")' }
         postedDate: { type: string, format: date-time, description: Same rule as transactionTime }
         feeAmount: { type: number, minimum: 0, multipleOf: 0.01 }
+
+    ClassificationProvenance:
+      description: >-
+        Additive transaction fields (T050): who decided the current category. classificationSource is MANUAL
+        (locked), USER_RULE, SYSTEM_RULE, FALLBACK (no rule matched; categoryId null, the item needs a category),
+        or UNKNOWN (automatic classification off, or a legacy row). The legacy enum values RULE, ML, LLM, and SYSTEM
+        are never written (CLASS-007).
+      type: object
+      properties:
+        classificationSource: { enum: [MANUAL, USER_RULE, SYSTEM_RULE, FALLBACK, UNKNOWN] }
+        classificationRuleId: { type: [string, 'null'], description: 'Winning rule; null for MANUAL, FALLBACK, UNKNOWN, or a deleted rule' }
+        classificationConfidence: { type: [number, 'null'], description: 1 when a category is set by the owner or a rule; null otherwise }
+        classifiedAt: { type: [string, 'null'], format: date-time }
+    DecisionExplanation:
+      description: >-
+        Why the winner won (CLASS-003): every matching eligible rule in rank order (user before system, then
+        priority descending, createdAt ascending, id ascending), the tie-break between the winner and the runner-up,
+        and whether the matches pointed to more than one category. Ids and codes only, never text (SEC-006).
+      type: object
+      required: [candidates, winnerRuleId, runnerUpRuleId, tieBreak, conflict]
+      properties:
+        candidates:
+          type: array
+          items:
+            type: object
+            required: [ruleId, scope, priority, createdAt, categoryId]
+            properties:
+              ruleId: { type: string }
+              scope: { enum: [USER, SYSTEM] }
+              priority: { type: integer }
+              createdAt: { type: string, format: date-time }
+              categoryId: { type: string }
+        winnerRuleId: { type: [string, 'null'] }
+        runnerUpRuleId: { type: [string, 'null'] }
+        tieBreak: { enum: [SCOPE, PRIORITY, CREATED_AT, ID, null] }
+        conflict: { type: boolean }
+    CategoryEvent:
+      description: One append-only category history event (CLASS-005), oldest first by sequence.
+      type: object
+      required: [id, sequence, createdAt, source, trigger, reason, actorType, actorUserId, merchantRuleId, previousCategory, newCategory, explanation]
+      properties:
+        id: { type: string }
+        sequence: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        source: { enum: [MANUAL, USER_RULE, SYSTEM_RULE, FALLBACK] }
+        trigger: { enum: [CREATE, IMPORT, MANUAL_CORRECTION, EXPLICIT_RECLASSIFY, AUTOMATIC_RERUN] }
+        reason: { enum: [MANUAL_SET, MANUAL_CLEARED, RULE_MATCHED, NO_RULE_MATCHED] }
+        actorType: { enum: [USER, SYSTEM] }
+        actorUserId: { type: [string, 'null'] }
+        merchantRuleId: { type: [string, 'null'], description: Kept after the rule is deleted }
+        previousCategory:
+          oneOf:
+            - { type: 'null' }
+            - { type: object, properties: { id: { type: string }, name: { type: [string, 'null'], description: 'Null when the owner can no longer read the category' } } }
+        newCategory: { $ref: '#/components/schemas/CategoryEvent/properties/previousCategory' }
+        explanation: { oneOf: [{ type: 'null' }, { $ref: '#/components/schemas/DecisionExplanation' }] }
+    ClassificationRule:
+      description: >-
+        A classification rule (CLASS-001). scope USER rules are the caller's own; scope SYSTEM rules are listed
+        read-only and have no owner in the response. Matching compares text without diacritics, case, or extra
+        spaces: merchantPattern and descriptionPattern are contains-matches (merchant falls back to the
+        counterparty), bankName is an equality match, direction an equality match when set; every set criterion
+        must hold.
+      type: object
+      properties:
+        id: { type: string }
+        scope: { enum: [USER, SYSTEM] }
+        categoryId: { type: [string, 'null'] }
+        merchantPattern: { type: [string, 'null'] }
+        descriptionPattern: { type: [string, 'null'] }
+        bankName: { type: [string, 'null'] }
+        direction: { enum: [INCOME, EXPENSE, TRANSFER_IN, TRANSFER_OUT, ADJUSTMENT, null] }
+        priority: { type: integer, minimum: 0, maximum: 1000000 }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ClassificationRuleWrite:
+      description: >-
+        Create (categoryId required) or partial update. At least one of merchantPattern, descriptionPattern, or
+        bankName must remain set (400). Patterns are literal text of 1-200 characters (never regexes) and may be
+        cleared with null on update; categoryId, priority, and isActive may be omitted but not null. The category
+        must be an ACTIVE system category or one of the caller's ACTIVE categories, otherwise 404. userId, scope,
+        and unknown fields get 400 (SEC-004). Changing a rule never reclassifies existing transactions.
+      type: object
+      properties:
+        categoryId: { type: string }
+        merchantPattern: { type: [string, 'null'], maxLength: 200 }
+        descriptionPattern: { type: [string, 'null'], maxLength: 200 }
+        bankName: { type: [string, 'null'], maxLength: 200 }
+        direction: { enum: [INCOME, EXPENSE, TRANSFER_IN, TRANSFER_OUT, ADJUSTMENT, null] }
+        priority: { type: integer, minimum: 0, maximum: 1000000, default: 100 }
+        isActive: { type: boolean, default: true }
 
     CurrencyTotals:
       description: Eligible totals of one currency (data-model.md "Financial period policy"); money is never summed across currencies.
@@ -754,23 +848,145 @@ paths:
       - { in: path, name: id, required: true, schema: { type: string } }
     patch:
       summary: Apply authoritative manual category correction
+      description: >-
+        TX-004, CLASS-005: the category (or null to clear it) becomes a MANUAL decision that automatic runs never
+        overwrite. The row is locked, updated, and given a MANUAL_CORRECTION event in one database transaction; the
+        audit TRANSACTION_CATEGORY_CORRECTED is written when the category changes. Repeating the current manual
+        choice writes nothing (decision.eventId null). categoryId is required (an empty body gets 400).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [categoryId]
+              properties:
+                categoryId: { type: [string, 'null'], minLength: 1 }
       responses:
-        '200': { description: Transaction and decision evidence, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '200':
+          description: The updated transaction with the decision (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/ClassificationProvenance'
+                          - type: object
+                            properties:
+                              decision:
+                                type: object
+                                required: [source, reason, eventId]
+                                properties:
+                                  source: { const: MANUAL }
+                                  reason: { enum: [MANUAL_SET, MANUAL_CLEARED] }
+                                  eventId: { type: [string, 'null'] }
+        '400': { $ref: '#/components/responses/ValidationError' }
         '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
   /transactions/{id}/reclassify:
     parameters:
       - { in: path, name: id, required: true, schema: { type: string } }
     post:
-      summary: Explicitly allow deterministic automatic reclassification
+      summary: Explicit deterministic reclassification, releasing a manual category
+      description: >-
+        CLASS-006: applies the current rules to the transaction's current facts and replaces a MANUAL category
+        (clients must warn first). Always appends an EXPLICIT_RECLASSIFY event and the audit TRANSACTION_RECLASSIFIED,
+        even when the outcome is unchanged. The body must be empty (any property gets 400). Answers 200.
+      requestBody:
+        content: { application/json: { schema: { type: object, additionalProperties: false } } }
       responses:
-        '200': { description: Transaction and winning-rule evidence, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '200':
+          description: The updated transaction with the decision (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/ClassificationProvenance'
+                          - type: object
+                            properties:
+                              decision:
+                                type: object
+                                required: [source, categoryId, ruleId, reason, explanation, eventId]
+                                properties:
+                                  source: { enum: [USER_RULE, SYSTEM_RULE, FALLBACK] }
+                                  categoryId: { type: [string, 'null'] }
+                                  ruleId: { type: [string, 'null'] }
+                                  reason: { enum: [RULE_MATCHED, NO_RULE_MATCHED] }
+                                  explanation: { $ref: '#/components/schemas/DecisionExplanation' }
+                                  eventId: { type: string }
+        '400': { $ref: '#/components/responses/ValidationError' }
         '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
   /transactions/{id}/category-history:
     parameters:
       - { in: path, name: id, required: true, schema: { type: string } }
     get:
+      summary: The owner's append-only category history, oldest first
+      description: >-
+        Rows created before DB-M3 have no events (no history is backfilled). A soft-deleted transaction gets 404; its
+        events are kept.
       responses:
-        '200': { description: Append-only owner-visible category events, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '200':
+          description: Enveloped array of CategoryEvent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { type: array, items: { $ref: '#/components/schemas/CategoryEvent' } } }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+  /classification-rules:
+    get:
+      summary: The caller's rules and the active system rules (read-only), by priority
+      responses:
+        '200':
+          description: Enveloped array
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { type: array, items: { $ref: '#/components/schemas/ClassificationRule' } } }
+    post:
+      summary: Create a user rule (system rules have no HTTP route)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ClassificationRuleWrite' } } } }
+      responses:
+        '201':
+          description: Enveloped rule
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/ClassificationRule' } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { description: 'Category absent, archived, or not usable by the caller: "Transaction category not found"', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /classification-rules/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    patch:
+      summary: Change one of the caller's rules (a system rule or another owner's rule is 404)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ClassificationRuleWrite' } } } }
+      responses:
+        '200':
+          description: Enveloped rule
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/ClassificationRule' } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+    delete:
+      summary: Delete one of the caller's rules; transactions it decided keep their category
+      responses:
+        '200': { description: 'Enveloped { id }' }
         '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
   /budgets:
     get:
