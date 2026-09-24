@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { BaseRepository } from '../../common/repositories/base.repository';
+import { nullIfNotFound } from '../../common/utils/prisma-errors';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -62,15 +63,27 @@ export class EmailConnectionsRepository extends BaseRepository {
     return this.prisma.emailConnection.update({ where: { id }, data });
   }
 
-  disconnect(id: string) {
-    return this.prisma.emailConnection.update({
-      where: { id },
-      data: {
-        status: 'REVOKED',
-        disconnectedAt: new Date(),
-        accessTokenEncrypted: '',
-        refreshTokenEncrypted: '',
-      },
+  /** Owner-scoped (SEC-001); null when the caller owns no such connection. */
+  disconnect(userId: string, id: string) {
+    return nullIfNotFound(
+      this.prisma.emailConnection.update({
+        where: { id, userId, disconnectedAt: null },
+        data: {
+          status: 'REVOKED',
+          disconnectedAt: new Date(),
+          accessTokenEncrypted: '',
+          refreshTokenEncrypted: '',
+        },
+      }),
+    );
+  }
+
+  /** The OAuth callback bypasses JwtStrategy, so it checks the account itself. */
+  async isActiveUser(userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, status: 'ACTIVE', deletedAt: null },
+      select: { id: true },
     });
+    return Boolean(user);
   }
 }

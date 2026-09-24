@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { BaseRepository } from '../../common/repositories/base.repository';
+import { nullIfNotFound } from '../../common/utils/prisma-errors';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ListTransactionCategoriesDto } from './dto/list-transaction-categories.dto';
 import { buildTransactionCategoryWhere } from './query/transaction-categories.query';
@@ -43,17 +44,27 @@ export class TransactionCategoriesRepository extends BaseRepository {
     return this.prisma.transactionCategory.create({ data });
   }
 
-  updateById(id: string, data: Prisma.TransactionCategoryUncheckedUpdateInput) {
-    return this.prisma.transactionCategory.update({
-      where: { id },
-      data,
-    });
+  // Writes carry the owner predicate themselves (SEC-001): system categories
+  // (userId null) and other users' categories resolve to null (not found).
+  updateById(
+    userId: string,
+    id: string,
+    data: Prisma.TransactionCategoryUncheckedUpdateInput,
+  ) {
+    return nullIfNotFound(
+      this.prisma.transactionCategory.update({
+        where: { id, userId },
+        data,
+      }),
+    );
   }
 
-  archiveById(id: string) {
-    return this.prisma.transactionCategory.update({
-      where: { id },
-      data: { status: 'ARCHIVED' },
-    });
+  archiveById(userId: string, id: string) {
+    return nullIfNotFound(
+      this.prisma.transactionCategory.update({
+        where: { id, userId },
+        data: { status: 'ARCHIVED' },
+      }),
+    );
   }
 }

@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { AuditActorType } from '@prisma/client';
 import type { RequestUser } from '../../common/types/request-user.type';
 import { CreateTransactionCategoryDto } from './dto/create-transaction-category.dto';
 import { ListTransactionCategoriesDto } from './dto/list-transaction-categories.dto';
@@ -13,12 +14,14 @@ import {
   toTransactionCategoryResponse,
   toUpdateTransactionCategoryInput,
 } from './transaction-categories.mapper';
+import { UsersRepository } from '../users/users.repository';
 import { TransactionCategoriesRepository } from './transaction-categories.repository';
 
 @Injectable()
 export class TransactionCategoriesService {
   constructor(
     private readonly transactionCategoriesRepository: TransactionCategoriesRepository,
+    private readonly users: UsersRepository,
   ) {}
 
   async list(user: RequestUser, query: ListTransactionCategoriesDto) {
@@ -32,7 +35,10 @@ export class TransactionCategoriesService {
 
   async findById(user: RequestUser, id: string) {
     const category =
-      await this.transactionCategoriesRepository.findAccessibleById(user.id, id);
+      await this.transactionCategoriesRepository.findAccessibleById(
+        user.id,
+        id,
+      );
 
     if (!category) {
       throw new NotFoundException('Transaction category not found');
@@ -60,7 +66,11 @@ export class TransactionCategoriesService {
     return toTransactionCategoryResponse(category);
   }
 
-  async update(user: RequestUser, id: string, dto: UpdateTransactionCategoryDto) {
+  async update(
+    user: RequestUser,
+    id: string,
+    dto: UpdateTransactionCategoryDto,
+  ) {
     const category = await this.findOwnedById(user, id);
     await this.ensureParentAllowed(user, dto.parentId);
 
@@ -78,10 +88,15 @@ export class TransactionCategoriesService {
       }
     }
 
-    const updatedCategory = await this.transactionCategoriesRepository.updateById(
-      id,
-      toUpdateTransactionCategoryInput(dto),
-    );
+    const updatedCategory =
+      await this.transactionCategoriesRepository.updateById(
+        user.id,
+        id,
+        toUpdateTransactionCategoryInput(dto),
+      );
+    if (!updatedCategory) {
+      throw new NotFoundException('Editable transaction category not found');
+    }
 
     return toTransactionCategoryResponse(updatedCategory);
   }
@@ -89,7 +104,21 @@ export class TransactionCategoriesService {
   async archive(user: RequestUser, id: string) {
     await this.findOwnedById(user, id);
 
-    await this.transactionCategoriesRepository.archiveById(id);
+    const archived = await this.transactionCategoriesRepository.archiveById(
+      user.id,
+      id,
+    );
+    if (!archived) {
+      throw new NotFoundException('Editable transaction category not found');
+    }
+    // Destructive financial action (SEC-006).
+    await this.users.recordAudit({
+      actorType: AuditActorType.USER,
+      actorId: user.id,
+      action: 'TRANSACTION_CATEGORY_ARCHIVED',
+      resourceType: 'transaction_category',
+      resourceId: id,
+    });
 
     return { id };
   }
@@ -114,5 +143,4 @@ export class TransactionCategoriesService {
 
     await this.findById(user, parentId);
   }
-
 }

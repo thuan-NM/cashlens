@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import type { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import type { RequestUser } from '../../../common/types/request-user.type';
+import { UsersRepository } from '../../users/users.repository';
 
 export type JwtPayload = {
   sub: string;
@@ -12,7 +14,10 @@ export type JwtPayload = {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-  constructor(configService: ConfigService) {
+  constructor(
+    configService: ConfigService,
+    private readonly usersRepository: UsersRepository,
+  ) {
     const secret = configService.get<string>('JWT_SECRET');
 
     if (!secret) {
@@ -29,15 +34,27 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  validate(payload: JwtPayload) {
-    return {
-      id: payload.sub,
-      email: payload.email,
-      role: payload.role,
-    };
+  /**
+   * A valid signature is not enough: the account must still exist and be
+   * ACTIVE, and its role comes from the database. A disabled or deleted
+   * account's unexpired token gets the same 401 as a missing session.
+   */
+  async validate(payload: JwtPayload): Promise<RequestUser> {
+    const user = payload.sub
+      ? await this.usersRepository.findActiveForAuth(payload.sub)
+      : null;
+
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    return { id: user.id, email: user.email, role: user.role };
   }
 
-  private static extractTokenFromCookie(request: Request): string | null {
-    return request.cookies?.accessToken ?? null;
-  }
+  private static readonly extractTokenFromCookie = (
+    request: Request,
+  ): string | null => {
+    const token: unknown = request.cookies?.accessToken;
+    return typeof token === 'string' ? token : null;
+  };
 }

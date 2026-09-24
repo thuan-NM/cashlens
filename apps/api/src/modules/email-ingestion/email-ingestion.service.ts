@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { AuditActorType, EmailSyncStatus } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { RequestUser } from '../../common/types/request-user.type';
 import { EmailConnectionsService } from '../email-connections/email-connections.service';
 import { ParserService } from '../parser/parser.service';
+import { UsersRepository } from '../users/users.repository';
 import { ListEmailMessagesDto } from './dto/list-email-messages.dto';
 import {
   toEmailMessageResponse,
@@ -18,14 +20,19 @@ export class EmailIngestionService {
     private readonly connections: EmailConnectionsService,
     private readonly gmail: GmailApiService,
     private readonly parser: ParserService,
+    private readonly users: UsersRepository,
   ) {}
 
   async sync(user: RequestUser, connectionId: string) {
-    const { connection, accessToken } =
-      await this.connections.validAccessToken(user.id, connectionId);
+    const { connection, accessToken } = await this.connections.validAccessToken(
+      user.id,
+      connectionId,
+    );
     const rules = await this.repository.enabledRules(user.id, connectionId);
     if (!rules.length) {
-      throw new BadRequestException('At least one enabled listen rule is required');
+      throw new BadRequestException(
+        'At least one enabled listen rule is required',
+      );
     }
 
     const run = await this.repository.createRun(connectionId);
@@ -89,17 +96,23 @@ export class EmailIngestionService {
       }
 
       await this.repository.markConnectionSynced(connectionId);
-      return toEmailSyncRunResponse(
-        await this.repository.finishRun(run.id, {
-          status: failed ? 'PARTIAL_FAILED' : 'SUCCESS',
-          finishedAt: new Date(),
-          emailsFound: ids.length,
-          emailsMatched: matched,
-          emailsParsed: parsed,
-          transactionsCreated,
-          errorMessage: failed ? `${failed} message(s) failed` : null,
-        }),
-      );
+      const finished = await this.repository.finishRun(run.id, {
+        status: failed ? 'PARTIAL_FAILED' : 'SUCCESS',
+        finishedAt: new Date(),
+        emailsFound: ids.length,
+        emailsMatched: matched,
+        emailsParsed: parsed,
+        transactionsCreated,
+        errorMessage: failed ? `${failed} message(s) failed` : null,
+      });
+      await this.auditSync(user, connectionId, run.id, finished.status, {
+        emailsFound: ids.length,
+        emailsMatched: matched,
+        emailsParsed: parsed,
+        emailsFailed: failed,
+        transactionsCreated,
+      });
+      return toEmailSyncRunResponse(finished);
     } catch (error) {
       await this.repository.finishRun(run.id, {
         status: 'FAILED',
@@ -109,6 +122,13 @@ export class EmailIngestionService {
         emailsParsed: parsed,
         transactionsCreated,
         errorMessage: error instanceof Error ? error.message : 'Sync failed',
+      });
+      await this.auditSync(user, connectionId, run.id, 'FAILED', {
+        emailsFound: ids.length,
+        emailsMatched: matched,
+        emailsParsed: parsed,
+        emailsFailed: failed,
+        transactionsCreated,
       });
       throw error;
     }
@@ -132,12 +152,33 @@ export class EmailIngestionService {
     };
   }
 
-  private gmailQuery(rules: Awaited<ReturnType<EmailIngestionRepository['enabledRules']>>) {
+  /** Sanitized evidence of a sync (SEC-006): run id, status, and counts only. */
+  private auditSync(
+    user: RequestUser,
+    connectionId: string,
+    syncRunId: string,
+    status: EmailSyncStatus | 'FAILED',
+    counts: Record<string, number>,
+  ) {
+    return this.users.recordAudit({
+      actorType: AuditActorType.USER,
+      actorId: user.id,
+      action: 'EMAIL_SYNC',
+      resourceType: 'email_connection',
+      resourceId: connectionId,
+      metadata: { syncRunId, status, ...counts },
+    });
+  }
+
+  private gmailQuery(
+    rules: Awaited<ReturnType<EmailIngestionRepository['enabledRules']>>,
+  ) {
     const clauses = rules.flatMap((rule) => {
       const values: string[] = [];
       if (rule.senderEmail) values.push(`from:${rule.senderEmail}`);
       if (rule.senderDomain) values.push(`from:@${rule.senderDomain}`);
-      if (rule.subjectContains) values.push(`subject:"${rule.subjectContains}"`);
+      if (rule.subjectContains)
+        values.push(`subject:"${rule.subjectContains}"`);
       return values;
     });
     const earliest = rules

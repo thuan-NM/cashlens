@@ -5,7 +5,15 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from 'node:crypto';
+
+/** Lifetime of one connect flow: the signed state and its nonce cookie. */
+export const GMAIL_OAUTH_FLOW_TTL_MS = 10 * 60 * 1000;
 
 type GmailTokenResponse = {
   access_token: string;
@@ -24,12 +32,16 @@ type GmailProfile = {
 
 @Injectable()
 export class GmailOAuthService {
-  private readonly scope =
-    'https://www.googleapis.com/auth/gmail.readonly';
+  private readonly scope = 'https://www.googleapis.com/auth/gmail.readonly';
 
   constructor(private readonly configService: ConfigService) {}
 
-  authorizationUrl(userId: string) {
+  /** A per-flow secret for the initiating browser (kept in an HttpOnly cookie). */
+  createNonce(): string {
+    return randomBytes(32).toString('base64url');
+  }
+
+  authorizationUrl(userId: string, nonce: string) {
     const params = new URLSearchParams({
       client_id: this.required('GMAIL_CLIENT_ID'),
       redirect_uri: this.required('GMAIL_REDIRECT_URI'),
@@ -38,32 +50,48 @@ export class GmailOAuthService {
       access_type: 'offline',
       prompt: 'consent',
       include_granted_scopes: 'true',
-      state: this.signState(userId),
+      state: this.signState(userId, nonce),
     });
 
     return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
   }
 
-  verifyState(state: string): string {
+  /**
+   * Returns the user who started the flow. The signed state binds the flow to
+   * the browser that started it through the nonce hash, so a state completed
+   * in any other browser is refused (SEC-001).
+   */
+  verifyState(state: unknown, nonce: unknown): string {
+    const invalid = () => new UnauthorizedException('Invalid OAuth state');
+    if (typeof state !== 'string' || typeof nonce !== 'string' || !nonce) {
+      throw invalid();
+    }
     const [payload, signature] = state.split('.');
-    if (!payload || !signature) throw new UnauthorizedException('Invalid OAuth state');
+    if (!payload || !signature) throw invalid();
 
-    const expected = this.signature(payload);
-    const actualBuffer = Buffer.from(signature, 'base64url');
-    const expectedBuffer = Buffer.from(expected, 'base64url');
-    if (
-      actualBuffer.length !== expectedBuffer.length ||
-      !timingSafeEqual(actualBuffer, expectedBuffer)
-    ) {
-      throw new UnauthorizedException('Invalid OAuth state');
+    if (!this.sameValue(signature, this.signature(payload))) {
+      throw invalid();
     }
 
-    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString()) as {
-      sub: string;
-      exp: number;
-    };
-    if (!parsed.sub || parsed.exp < Date.now()) {
+    let parsed: { sub?: unknown; exp?: unknown; nonce?: unknown };
+    try {
+      parsed = JSON.parse(Buffer.from(payload, 'base64url').toString()) as {
+        sub?: unknown;
+        exp?: unknown;
+        nonce?: unknown;
+      };
+    } catch {
+      throw invalid();
+    }
+    if (typeof parsed.sub !== 'string' || !parsed.sub) throw invalid();
+    if (typeof parsed.exp !== 'number' || parsed.exp < Date.now()) {
       throw new UnauthorizedException('OAuth state expired');
+    }
+    if (
+      typeof parsed.nonce !== 'string' ||
+      !this.sameValue(parsed.nonce, this.nonceHash(nonce))
+    ) {
+      throw invalid();
     }
 
     return parsed.sub;
@@ -115,11 +143,28 @@ export class GmailOAuthService {
     return response.json() as Promise<GmailTokenResponse>;
   }
 
-  private signState(userId: string) {
+  private signState(userId: string, nonce: string) {
     const payload = Buffer.from(
-      JSON.stringify({ sub: userId, exp: Date.now() + 10 * 60 * 1000 }),
+      JSON.stringify({
+        sub: userId,
+        exp: Date.now() + GMAIL_OAUTH_FLOW_TTL_MS,
+        nonce: this.nonceHash(nonce),
+      }),
     ).toString('base64url');
     return `${payload}.${this.signature(payload)}`;
+  }
+
+  private nonceHash(nonce: string) {
+    return createHash('sha256').update(nonce).digest('base64url');
+  }
+
+  private sameValue(actual: string, expected: string) {
+    const actualBuffer = Buffer.from(actual, 'base64url');
+    const expectedBuffer = Buffer.from(expected, 'base64url');
+    return (
+      actualBuffer.length === expectedBuffer.length &&
+      timingSafeEqual(actualBuffer, expectedBuffer)
+    );
   }
 
   private signature(payload: string) {

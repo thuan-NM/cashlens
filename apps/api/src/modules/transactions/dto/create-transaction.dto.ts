@@ -1,5 +1,4 @@
 import {
-  ClassificationSource,
   Prisma,
   TransactionDirection,
   TransactionStatus,
@@ -9,12 +8,24 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsIn,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
   MaxLength,
 } from 'class-validator';
 
+// Soft deletion goes through DELETE /transactions/:id only (audited, SEC-006).
+const WRITABLE_STATUSES = Object.values(TransactionStatus).filter(
+  (status) => status !== TransactionStatus.DELETED,
+);
+
+/**
+ * Owner-writable transaction fields. Ownership (userId) and classification
+ * provenance (classificationSource, classificationConfidence) are derived on
+ * the server, so the global ValidationPipe rejects them (SEC-004, TX-002).
+ */
 export class CreateTransactionDto {
   @Type(() => Number)
   @IsNumber()
@@ -37,10 +48,12 @@ export class CreateTransactionDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   financialAccountId?: string;
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   categoryId?: string;
 
   @IsOptional()
@@ -68,7 +81,7 @@ export class CreateTransactionDto {
   feeAmount?: number;
 
   @IsOptional()
-  @IsEnum(TransactionStatus)
+  @IsIn(WRITABLE_STATUSES)
   status?: TransactionStatus;
 
   @IsOptional()
@@ -77,16 +90,8 @@ export class CreateTransactionDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   duplicateOfTransactionId?: string;
-
-  @IsOptional()
-  @IsEnum(ClassificationSource)
-  classificationSource?: ClassificationSource;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  classificationConfidence?: number;
 
   @IsOptional()
   @IsString()

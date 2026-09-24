@@ -8,8 +8,10 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import { ConfigService } from '@nestjs/config';
+import type { CookieOptions, Request, Response } from 'express';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { HttpsRequiredGuard } from '../../common/guards/https-required.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import type { RequestUser } from '../../common/types/request-user.type';
 import { AuthService } from './auth.service';
@@ -20,10 +22,17 @@ import { RegisterDto } from './dto/register.dto';
 import { AuthSession } from './types/auth-session.type';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 
+const REFRESH_COOKIE_PATH = '/api/auth';
+
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly config: ConfigService,
+  ) {}
 
+  // Session-issuing routes require HTTPS in production (OPS-009).
+  @UseGuards(HttpsRequiredGuard)
   @Post('register')
   async register(
     @Body() dto: RegisterDto,
@@ -32,6 +41,7 @@ export class AuthController {
     return this.authService.register(dto, this.getRequestMeta(request));
   }
 
+  @UseGuards(HttpsRequiredGuard)
   @HttpCode(200)
   @Post('login')
   async login(
@@ -47,6 +57,7 @@ export class AuthController {
     return toAuthResponse(session);
   }
 
+  @UseGuards(HttpsRequiredGuard)
   @HttpCode(200)
   @Post('refresh')
   async refresh(
@@ -67,13 +78,17 @@ export class AuthController {
     return this.authService.me(user);
   }
 
+  @UseGuards(HttpsRequiredGuard)
   @HttpCode(200)
   @Post('logout')
   async logout(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.authService.logout(request.cookies?.refreshToken);
+    const result = await this.authService.logout(
+      request.cookies?.refreshToken,
+      this.getRequestMeta(request),
+    );
     this.clearAuthCookies(response);
     return result;
   }
@@ -83,39 +98,56 @@ export class AuthController {
   @Post('logout-all')
   async logoutAll(
     @CurrentUser() user: RequestUser,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.authService.logoutAll(user);
+    const result = await this.authService.logoutAll(
+      user,
+      this.getRequestMeta(request),
+    );
     this.clearAuthCookies(response);
     return result;
   }
 
-  private setAuthCookies(response: Response, session: AuthSession) {
-    response.cookie('accessToken', session.accessToken, {
+  // Cookie flags come from validated configuration (AUTH-003): Secure and
+  // SameSite follow COOKIE_SECURE and COOKIE_SAME_SITE; both are HttpOnly.
+  private cookieOptions(path: string): CookieOptions {
+    return {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-    });
+      secure: this.config.get<string>('COOKIE_SECURE') === 'true',
+      sameSite:
+        this.config.get<string>('COOKIE_SAME_SITE') === 'strict'
+          ? 'strict'
+          : 'lax',
+      path,
+    };
+  }
+
+  private setAuthCookies(response: Response, session: AuthSession) {
+    response.cookie(
+      'accessToken',
+      session.accessToken,
+      this.cookieOptions('/'),
+    );
 
     response.cookie('refreshToken', session.refreshToken, {
-      httpOnly: true,
+      ...this.cookieOptions(REFRESH_COOKIE_PATH),
       maxAge: session.refreshTokenMaxAgeMs,
-      path: '/api/auth',
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
     });
   }
 
   private clearAuthCookies(response: Response) {
-    response.clearCookie('accessToken');
-    response.clearCookie('refreshToken', {
-      path: '/api/auth',
-    });
+    response.clearCookie('accessToken', this.cookieOptions('/'));
+    response.clearCookie(
+      'refreshToken',
+      this.cookieOptions(REFRESH_COOKIE_PATH),
+    );
   }
 
   private getRequestMeta(request: Request) {
     return {
       userAgent: request.get('user-agent'),
+      // Trust-proxy aware: the client address as seen through TRUST_PROXY hops.
       ipAddress: request.ip,
     };
   }

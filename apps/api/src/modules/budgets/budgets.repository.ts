@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, TransactionDirection } from '@prisma/client';
 import { BaseRepository } from '../../common/repositories/base.repository';
+import { nullIfNotFound } from '../../common/utils/prisma-errors';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ListBudgetsDto } from './dto/list-budgets.dto';
 import { buildBudgetWhere } from './query/budgets.query';
@@ -34,19 +35,28 @@ export class BudgetsRepository extends BaseRepository {
     return this.prisma.budget.create({ data, include: budgetInclude });
   }
 
-  updateById(id: string, data: Prisma.BudgetUncheckedUpdateInput) {
-    return this.prisma.budget.update({
-      where: { id },
-      data,
-      include: budgetInclude,
-    });
+  // Writes carry the owner predicate themselves (SEC-001); null means not found.
+  updateById(
+    userId: string,
+    id: string,
+    data: Prisma.BudgetUncheckedUpdateInput,
+  ) {
+    return nullIfNotFound(
+      this.prisma.budget.update({
+        where: { id, userId, deletedAt: null },
+        data,
+        include: budgetInclude,
+      }),
+    );
   }
 
-  archiveById(id: string) {
-    return this.prisma.budget.update({
-      where: { id },
-      data: { deletedAt: new Date(), isActive: false },
-    });
+  archiveById(userId: string, id: string) {
+    return nullIfNotFound(
+      this.prisma.budget.update({
+        where: { id, userId, deletedAt: null },
+        data: { deletedAt: new Date(), isActive: false },
+      }),
+    );
   }
 
   categoryExistsForUser(userId: string, categoryId: string) {

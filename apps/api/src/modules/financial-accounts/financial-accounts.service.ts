@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { AuditActorType } from '@prisma/client';
 import type { RequestUser } from '../../common/types/request-user.type';
 import { CreateFinancialAccountDto } from './dto/create-financial-account.dto';
 import { ListFinancialAccountsDto } from './dto/list-financial-accounts.dto';
@@ -8,12 +9,14 @@ import {
   toFinancialAccountResponse,
   toUpdateFinancialAccountInput,
 } from './financial-accounts.mapper';
+import { UsersRepository } from '../users/users.repository';
 import { FinancialAccountsRepository } from './financial-accounts.repository';
 
 @Injectable()
 export class FinancialAccountsService {
   constructor(
     private readonly financialAccountsRepository: FinancialAccountsRepository,
+    private readonly users: UsersRepository,
   ) {}
 
   async list(user: RequestUser, query: ListFinancialAccountsDto) {
@@ -42,10 +45,11 @@ export class FinancialAccountsService {
     const data = toCreateFinancialAccountInput(user.id, dto);
 
     if (dto.isDefault) {
-      const account = await this.financialAccountsRepository.createWithDefaultReset(
-        user.id,
-        data,
-      );
+      const account =
+        await this.financialAccountsRepository.createWithDefaultReset(
+          user.id,
+          data,
+        );
       return toFinancialAccountResponse(account);
     }
 
@@ -58,24 +62,42 @@ export class FinancialAccountsService {
     const data = toUpdateFinancialAccountInput(dto);
 
     if (dto.isDefault) {
-      const account = await this.financialAccountsRepository.updateWithDefaultReset(
-        user.id,
-        id,
-        data,
+      const account = this.found(
+        await this.financialAccountsRepository.updateWithDefaultReset(
+          user.id,
+          id,
+          data,
+        ),
       );
       return toFinancialAccountResponse(account);
     }
 
-    const account = await this.financialAccountsRepository.updateById(id, data);
+    const account = this.found(
+      await this.financialAccountsRepository.updateById(user.id, id, data),
+    );
     return toFinancialAccountResponse(account);
   }
 
   async archive(user: RequestUser, id: string) {
     await this.findById(user, id);
 
-    await this.financialAccountsRepository.archiveById(id);
+    this.found(await this.financialAccountsRepository.archiveById(user.id, id));
+    // Destructive financial action (SEC-006).
+    await this.users.recordAudit({
+      actorType: AuditActorType.USER,
+      actorId: user.id,
+      action: 'FINANCIAL_ACCOUNT_ARCHIVED',
+      resourceType: 'financial_account',
+      resourceId: id,
+    });
 
     return { id };
   }
 
+  private found<T>(account: T | null): T {
+    if (!account) {
+      throw new NotFoundException('Financial account not found');
+    }
+    return account;
+  }
 }

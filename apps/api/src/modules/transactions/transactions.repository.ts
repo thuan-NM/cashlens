@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ClassificationSource, Prisma, TransactionStatus } from '@prisma/client';
+import {
+  ClassificationSource,
+  Prisma,
+  TransactionStatus,
+} from '@prisma/client';
 import { BaseRepository } from '../../common/repositories/base.repository';
+import { nullIfNotFound } from '../../common/utils/prisma-errors';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ListTransactionsDto } from './dto/list-transactions.dto';
 import { buildTransactionWhere } from './query/transactions.query';
@@ -15,7 +20,13 @@ export class TransactionsRepository extends BaseRepository {
   async listByUser(userId: string, query: ListTransactionsDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 25;
-    const where = buildTransactionWhere(userId, query);
+    // Soft-deleted rows never appear in list views, whatever the filter (DATA-004).
+    const where: Prisma.TransactionWhereInput = {
+      AND: [
+        buildTransactionWhere(userId, query),
+        { status: { not: 'DELETED' } },
+      ],
+    };
 
     const [data, total] = await this.prisma.$transaction([
       this.prisma.transaction.findMany({
@@ -45,43 +56,51 @@ export class TransactionsRepository extends BaseRepository {
     });
   }
 
-  updateById(id: string, data: Prisma.TransactionUncheckedUpdateInput) {
-    return this.prisma.transaction.update({
-      where: { id },
-      data,
-      include: transactionInclude,
+  // Every write carries the owner predicate itself (SEC-001), so a row that
+  // is not the caller's, or is soft-deleted, resolves to null (owner-safe 404).
+  updateById(
+    userId: string,
+    id: string,
+    data: Prisma.TransactionUncheckedUpdateInput,
+  ) {
+    return this.updateOwned(userId, id, data);
+  }
+
+  updateCategory(userId: string, id: string, categoryId?: string | null) {
+    return this.updateOwned(userId, id, {
+      categoryId: categoryId ?? null,
+      classificationSource: ClassificationSource.MANUAL,
+      classificationConfidence: categoryId ? 1 : null,
     });
   }
 
-  updateCategory(id: string, categoryId?: string | null) {
-    return this.prisma.transaction.update({
-      where: { id },
-      data: {
-        categoryId: categoryId ?? null,
-        classificationSource: ClassificationSource.MANUAL,
-        classificationConfidence: categoryId ? 1 : null,
-      },
-      include: transactionInclude,
+  markDuplicate(
+    userId: string,
+    id: string,
+    duplicateOfTransactionId?: string | null,
+  ) {
+    return this.updateOwned(userId, id, {
+      isDuplicate: Boolean(duplicateOfTransactionId),
+      duplicateOfTransactionId: duplicateOfTransactionId ?? null,
     });
   }
 
-  markDuplicate(id: string, duplicateOfTransactionId?: string | null) {
-    return this.prisma.transaction.update({
-      where: { id },
-      data: {
-        isDuplicate: Boolean(duplicateOfTransactionId),
-        duplicateOfTransactionId: duplicateOfTransactionId ?? null,
-      },
-      include: transactionInclude,
-    });
+  updateStatus(userId: string, id: string, status: TransactionStatus) {
+    return this.updateOwned(userId, id, { status });
   }
 
-  updateStatus(id: string, status: TransactionStatus) {
-    return this.prisma.transaction.update({
-      where: { id },
-      data: { status },
-      include: transactionInclude,
-    });
+  private updateOwned(
+    userId: string,
+    id: string,
+    data: Prisma.TransactionUncheckedUpdateInput,
+  ) {
+    return nullIfNotFound(
+      this.prisma.transaction.update({
+        where: { id, userId, status: { not: 'DELETED' } },
+        data,
+        include: transactionInclude,
+      }),
+    );
   }
 
   async financialAccountExists(userId: string, id: string) {

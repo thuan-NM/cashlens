@@ -1,0 +1,55 @@
+# CashLens release secret scan (CFG-006, SC-003, TEST-008).
+# Run through scripts/scan-secrets.ps1, which pins gitleaks v8.30.1 by digest.
+#
+# Paths are matched as `/scan/<repo path>` in the working-tree scan and as
+# `<repo path>` in the history scan, so path rules use `(^|/)` anchors.
+
+title = "CashLens secret scan"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "cashlens-google-oauth-client-secret"
+description = "Google OAuth client secret"
+regex = '''GOCSPX-[A-Za-z0-9_-]{20,}'''
+keywords = ["gocspx-"]
+
+[[rules]]
+id = "cashlens-google-refresh-token"
+description = "Google OAuth refresh token"
+regex = '''1//0[A-Za-z0-9_-]{20,}'''
+keywords = ["1//0"]
+
+[[rules]]
+id = "cashlens-non-synthetic-fixture-email"
+description = "Fixture or test email outside the reserved synthetic domains (TEST-008)"
+regex = '''[A-Za-z0-9._%+-]+@((?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})'''
+secretGroup = 1
+path = '''(^|/)(apps/[^/]+/test/|([^/]+/)*fixtures/)'''
+
+  [[rules.allowlists]]
+  description = "Reserved synthetic domains: example.com, example.org, example.test, cashlens.test"
+  regexTarget = "secret"
+  regexes = ['''(?i)^(?:[a-z0-9-]+\.)*(?:example\.(?:com|org|test)|cashlens\.test)$''']
+
+# The only allowlist: the documented placeholders that production startup
+# rejects (CFG-001). scan-secrets.ps1 fails if this block differs from
+# PLACEHOLDER_SECRETS in apps/api/src/config/placeholder-secrets.ts.
+[[allowlists]]
+description = "Documented placeholders rejected in production (placeholder-secrets.ts)"
+regexTarget = "secret"
+regexes = [
+  # BEGIN placeholder allowlist
+  '''(?i)^change-me$''',
+  '''(?i)^changeme$''',
+  '''(?i)^cashlens_password$''',
+  '''(?i)^replace-with-a-random-jwt-secret$''',
+  '''(?i)^replace-with-at-least-32-random-characters$''',
+  '''(?i)^replace-with-a-random-oauth-state-secret$''',
+  '''(?i)^replace-with-google-oauth-client-id$''',
+  '''(?i)^replace-with-google-oauth-client-secret$''',
+  '''(?i)^replace-with-smtp-password$''',
+  '''(?i)^replace-with-a-strong-database-password$''',
+  # END placeholder allowlist
+]

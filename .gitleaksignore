@@ -1,0 +1,20 @@
+# Reviewed exceptions for the CashLens release secret scan (CFG-006, T009).
+#
+# Only exact, commit-scoped git-history fingerprints are allowed:
+#   <full 40-hex commit>:<repository path>:<rule id>:<line>
+# scripts/scan-secrets.ps1 refuses any other form (no commit-less "global"
+# fingerprints, no wildcards, no undocumented entries), so a finding in any
+# other commit, file, line, or rule - including the working tree - is still
+# reported.
+#
+# Commit 219f8e9 is pushed, so its history cannot be rewritten. It added two
+# synthetic production-validation fixtures to
+# apps/api/src/config/configuration.spec.ts. Both were built from literal runs
+# ("synthetic-<name>-0123456789-abcdef..."), appear in no other commit, file,
+# or deployment environment, and were never a real credential. The working
+# tree now builds these fixtures at runtime instead. Reviewed 2026-09-23.
+#
+# Synthetic JWT_SECRET value of the T001 production-environment fixture.
+219f8e9dc865741ccfccfe10d92cba23e2509684:apps/api/src/config/configuration.spec.ts:generic-api-key:18
+# Synthetic EMAIL_TOKEN_ENCRYPTION_KEY value of the same fixture.
+219f8e9dc865741ccfccfe10d92cba23e2509684:apps/api/src/config/configuration.spec.ts:generic-api-key:19

@@ -77,8 +77,16 @@ export const authProvider: AuthProvider = {
   },
 
   onError: async (error) => {
-    if ((error as { status?: number }).status === 401) {
-      return { logout: true, redirectTo: "/" };
+    const { status, sessionRenewed } = error as { status?: number; sessionRenewed?: boolean };
+
+    // The client already tried one session renewal (api/client.ts). If it worked, the
+    // user stays signed in and retries the action; otherwise they return to sign-in.
+    if (status === 401 && !sessionRenewed) {
+      return {
+        logout: true,
+        redirectTo: "/",
+        error: { name: "Session expired", message: "Please sign in again." },
+      };
     }
 
     return { error };

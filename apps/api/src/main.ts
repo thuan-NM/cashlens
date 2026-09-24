@@ -1,8 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import cookieParser from 'cookie-parser';
-import { ValidationPipe } from '@nestjs/common';
 import { Logger } from 'nestjs-pino';
+import { configureApp } from './app.setup';
 import { setupSwagger } from './swagger';
 
 async function bootstrap() {
@@ -12,22 +11,12 @@ async function bootstrap() {
   // Prisma disconnects before the process exits (OPS-005).
   app.enableShutdownHooks();
 
-  app.use(cookieParser());
-
-  app.setGlobalPrefix('api');
+  configureApp(app);
 
   app.enableCors({
     origin: process.env.CORS_ORIGIN?.split(',') ?? 'http://localhost:5173',
     credentials: true,
   });
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
 
   setupSwagger(app);
 

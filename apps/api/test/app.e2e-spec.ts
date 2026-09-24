@@ -394,7 +394,7 @@ describe('CashLens current modules smoke test (e2e)', () => {
           emailConnectionId,
           bankProviderId,
           providerMessageId: `gmail-success-${testRunId}`,
-          senderEmail: 'notify@vcb.example',
+          senderEmail: 'notify@vcb.example.test',
           subject: 'VCB transaction notification',
           snippet:
             'Amount: 1,250,000 VND; Direction: EXPENSE; Time: 20/06/2026 15:30:00; Description: Grocery payment; Balance: 8,750,000 VND; Code: TXN123',
@@ -409,7 +409,7 @@ describe('CashLens current modules smoke test (e2e)', () => {
           emailConnectionId,
           bankProviderId,
           providerMessageId: `gmail-failed-${testRunId}`,
-          senderEmail: 'notify@vcb.example',
+          senderEmail: 'notify@vcb.example.test',
           subject: 'VCB transaction notification',
           snippet: 'Direction: EXPENSE; Time: 20/06/2026 15:30:00',
           receivedAt: new Date('2026-06-20T08:30:00.000Z'),

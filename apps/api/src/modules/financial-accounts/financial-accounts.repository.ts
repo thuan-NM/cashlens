@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { BaseRepository } from '../../common/repositories/base.repository';
+import { nullIfNotFound } from '../../common/utils/prisma-errors';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ListFinancialAccountsDto } from './dto/list-financial-accounts.dto';
 import { buildFinancialAccountWhere } from './query/financial-accounts.query';
@@ -28,8 +29,18 @@ export class FinancialAccountsRepository extends BaseRepository {
     return this.prisma.financialAccount.create({ data });
   }
 
-  updateById(id: string, data: Prisma.FinancialAccountUncheckedUpdateInput) {
-    return this.prisma.financialAccount.update({ where: { id }, data });
+  // Writes carry the owner predicate themselves (SEC-001); null means not found.
+  updateById(
+    userId: string,
+    id: string,
+    data: Prisma.FinancialAccountUncheckedUpdateInput,
+  ) {
+    return nullIfNotFound(
+      this.prisma.financialAccount.update({
+        where: { id, userId, deletedAt: null },
+        data,
+      }),
+    );
   }
 
   async createWithDefaultReset(
@@ -51,20 +62,27 @@ export class FinancialAccountsRepository extends BaseRepository {
     id: string,
     data: Prisma.FinancialAccountUncheckedUpdateInput,
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.financialAccount.updateMany({
-        where: { userId, deletedAt: null, id: { not: id } },
-        data: { isDefault: false },
-      });
+    return nullIfNotFound(
+      this.prisma.$transaction(async (tx) => {
+        await tx.financialAccount.updateMany({
+          where: { userId, deletedAt: null, id: { not: id } },
+          data: { isDefault: false },
+        });
 
-      return tx.financialAccount.update({ where: { id }, data });
-    });
+        return tx.financialAccount.update({
+          where: { id, userId, deletedAt: null },
+          data,
+        });
+      }),
+    );
   }
 
-  archiveById(id: string) {
-    return this.prisma.financialAccount.update({
-      where: { id },
-      data: { deletedAt: new Date(), status: 'ARCHIVED', isDefault: false },
-    });
+  archiveById(userId: string, id: string) {
+    return nullIfNotFound(
+      this.prisma.financialAccount.update({
+        where: { id, userId, deletedAt: null },
+        data: { deletedAt: new Date(), status: 'ARCHIVED', isDefault: false },
+      }),
+    );
   }
 }

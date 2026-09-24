@@ -42,23 +42,35 @@ export class GoalsService {
 
   async update(user: RequestUser, id: string, dto: UpdateGoalDto) {
     await this.findById(user, id);
-    const goal = await this.goalsRepository.updateById(
-      id,
-      toUpdateGoalInput(dto),
+    const goal = this.found(
+      await this.goalsRepository.updateById(
+        user.id,
+        id,
+        toUpdateGoalInput(dto),
+      ),
     );
     return toGoalResponse(goal);
   }
 
   async archive(user: RequestUser, id: string) {
     await this.findById(user, id);
-    await this.goalsRepository.archiveById(id);
+    this.found(await this.goalsRepository.archiveById(user.id, id));
     return { id };
   }
 
   async contribute(user: RequestUser, id: string, dto: GoalContributionDto) {
     await this.findById(user, id);
-    const goal = await this.goalsRepository.contribute(id, dto.amount);
+    const goal = this.found(
+      await this.goalsRepository.contribute(user.id, id, dto.amount),
+    );
     return toGoalResponse(goal);
+  }
+
+  private found<T>(goal: T | null): T {
+    if (!goal) {
+      throw new NotFoundException('Goal not found');
+    }
+    return goal;
   }
 
   async simulate(user: RequestUser, id: string, query: GoalSimulationQueryDto) {

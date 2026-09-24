@@ -72,7 +72,7 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
   - an **unmodified-history** check, which fails if any pre-existing folder under `apps/api/prisma/migrations/` differs from `origin/main`.
 
   Verify each path exits nonzero on incompatibility and zero when valid.
-- [ ] T009 [P] [CFG-002, CFG-006, SC-003, TEST-008] Add the deterministic secret scan exactly as specified in research.md "Secret scanning"; depends on T002 and T003.
+- [X] T009 [P] [CFG-002, CFG-006, SC-003, TEST-008] Add the deterministic secret scan exactly as specified in research.md "Secret scanning"; depends on T002 and T003.
   - **Files:** `scripts/scan-secrets.ps1`, `.gitleaks.toml`.
   - **Scanner image:** `ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f`, recorded once in the script.
   - **Base ref:** `git merge-base origin/main HEAD`. If it is missing, exit 2; never skip the history scan.
@@ -106,7 +106,7 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
 
 ### Tests for User Story 1
 
-- [ ] T010 [P] [US1] [SEC-007, TEST-003, TEST-008] Add the e2e test-database harness and the shared synthetic fixture helper; depends on T002. Apply the strategy in research.md "E2E test database strategy".
+- [X] T010 [P] [US1] [SEC-007, TEST-003, TEST-008] Add the e2e test-database harness and the shared synthetic fixture helper; depends on T002. Apply the strategy in research.md "E2E test database strategy".
   - **Files:** `apps/api/test/helpers/test-database.ts`, `apps/api/test/jest-e2e.global-setup.ts`, `apps/api/test/jest-e2e.json` (globalSetup), `apps/api/package.json` (`test:e2e` uses `--runInBand`), `apps/api/test/helpers/auth-fixtures.ts`.
   - **Database guard:** use `E2E_DATABASE_URL`, and refuse to run unless the database name contains `test`.
   - **Global setup:** migrate the shared test schema once, and drop leftover `e2e_*` schemas older than 24 hours.
@@ -117,11 +117,11 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
   - a non-test database name aborts;
   - two consecutive runs leave no residual rows or schemas;
   - no real data is used.
-- [ ] T011 [P] [US1] [SEC-002, SEC-003, SEC-004, SEC-005, SEC-007, SC-015] Add failing role and privileged-field tests in `apps/api/test/admin-authorization.e2e-spec.ts`; depends on T010. Cover:
+- [X] T011 [P] [US1] [SEC-002, SEC-003, SEC-004, SEC-005, SEC-007, SC-015] Add failing role and privileged-field tests in `apps/api/test/admin-authorization.e2e-spec.ts`; depends on T010. Cover:
   - today's self-promotion via `PATCH /users/:id` and `POST /users` with `role`;
   - registration with `role` or `status` (expect 400);
   - bank-provider writes and parser-template writes (expect 403 for ordinary users).
-- [ ] T012 [P] [US1] [AUTH-001, AUTH-002, AUTH-003, AUTH-004, AUTH-005, OPS-009, TEST-004] Add failing session tests in `apps/api/test/auth-session.e2e-spec.ts`; depends on T010. Cover:
+- [X] T012 [P] [US1] [AUTH-001, AUTH-002, AUTH-003, AUTH-004, AUTH-005, OPS-009, TEST-004] Add failing session tests in `apps/api/test/auth-session.e2e-spec.ts`; depends on T010. Cover:
   - registration, generic login failure, access expiry, refresh rotation/reuse, logout, and logout-all;
   - **production mode**:
     - login with `X-Forwarded-Proto: https` from the trusted hop sets cookies with `Secure; HttpOnly; SameSite=Lax`;
@@ -129,7 +129,7 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
     - `/health/ready` over HTTP returns 200.
 
   Verify no token or account-existence leakage.
-- [ ] T013 [P] [US1] [SEC-009, SC-015, AUTH-005] Add failing admin-bootstrap tests in `apps/api/test/admin-bootstrap.e2e-spec.ts`; depends on T010.
+- [X] T013 [P] [US1] [SEC-009, SC-015, AUTH-005] Add failing admin-bootstrap tests in `apps/api/test/admin-bootstrap.e2e-spec.ts`; depends on T010.
   - **Isolation:** each case runs in its **own isolated database** (T010 `createIsolatedDatabase`), so the zero-admin precondition holds regardless of other suites.
   - **Invocation:** the script is spawned as a child process with that database's `DATABASE_URL`. The concurrency case spawns two processes at once. Each case asserts that the promotion and audit row appear in the isolated database, and that the shared test database's admin rows are unchanged.
   - **Cleanup:** the database is dropped in `afterAll`.
@@ -143,30 +143,30 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
   - `--list-admins` prints no credentials;
   - `--revoke --email` on a pre-existing self-promoted admin writes one `ADMIN_ROLE_REVOKED` audit row, after which bootstrap succeeds;
   - output contains no password, token, or `DATABASE_URL`.
-- [ ] T014 [P] [US1] [SEC-001, SEC-005, SEC-008, TEST-003] Add a failing two-user/admin ownership matrix for **finance core** (financial accounts, transactions, transaction categories) in `apps/api/test/ownership-finance-core.e2e-spec.ts`; depends on T010. Verify owner-safe 404 versus role-based 403.
-- [ ] T015 [P] [US1] [SEC-001, SEC-005, SEC-008, TEST-003] Add a failing ownership matrix for **planning and alerts** (budgets, goals, alerts, alert settings) in `apps/api/test/ownership-planning-alerts.e2e-spec.ts`; depends on T010. Verify admin gets no private access.
-- [ ] T016 [P] [US1] [SEC-001, SEC-005, SEC-008, TEST-003] Add a failing ownership matrix for the **email pipeline** (email connections, listen rules, email messages, parser runs, sync runs) in `apps/api/test/ownership-email-pipeline.e2e-spec.ts`; depends on T010. Verify no provider token or payload disclosure.
-- [ ] T017 [P] [US1] [SEC-001, SEC-002, SEC-005, TEST-003] Add a failing ownership matrix for **users and settings** (list, read, update, delete other users; `me`; `me/settings`) in `apps/api/test/ownership-users-settings.e2e-spec.ts`; depends on T010.
+- [X] T014 [P] [US1] [SEC-001, SEC-005, SEC-008, TEST-003] Add a failing two-user/admin ownership matrix for **finance core** (financial accounts, transactions, transaction categories) in `apps/api/test/ownership-finance-core.e2e-spec.ts`; depends on T010. Verify owner-safe 404 versus role-based 403.
+- [X] T015 [P] [US1] [SEC-001, SEC-005, SEC-008, TEST-003] Add a failing ownership matrix for **planning and alerts** (budgets, goals, alerts, alert settings) in `apps/api/test/ownership-planning-alerts.e2e-spec.ts`; depends on T010. Verify admin gets no private access.
+- [X] T016 [P] [US1] [SEC-001, SEC-005, SEC-008, TEST-003] Add a failing ownership matrix for the **email pipeline** (email connections, listen rules, email messages, parser runs, sync runs) in `apps/api/test/ownership-email-pipeline.e2e-spec.ts`; depends on T010. Verify no provider token or payload disclosure.
+- [X] T017 [P] [US1] [SEC-001, SEC-002, SEC-005, TEST-003] Add a failing ownership matrix for **users and settings** (list, read, update, delete other users; `me`; `me/settings`) in `apps/api/test/ownership-users-settings.e2e-spec.ts`; depends on T010.
 
 ### Implementation for User Story 1
 
-- [ ] T018 [US1] [SEC-002, SEC-003, SEC-005] Add `@Roles()` metadata and an administrator guard that reads the **persisted** role and status, with unit tests. Files: `apps/api/src/common/decorators/roles.decorator.ts`, `apps/api/src/common/guards/roles.guard.ts`, `apps/api/src/common/guards/roles.guard.spec.ts`. Depends on T011. Verify USER, ADMIN, disabled ADMIN, absent role, and absent authentication.
-- [ ] T019 [US1] [SEC-002, SEC-003, SEC-008] Apply administrator authorization only to account identity/status, bank-provider/sender writes, and parser-template writes. Files: `apps/api/src/modules/users/users.controller.ts`, `apps/api/src/modules/bank-providers/bank-providers.controller.ts`, `apps/api/src/modules/parser/parser.controller.ts`. Depends on T018. Verify the T011 role expectations and that private modules have no admin bypass.
-- [ ] T020 [US1] [SEC-003, SEC-004, TX-002] Split self-service and admin DTO mappings so non-admin input cannot bind `role`, `status`, `userId`, metadata ownership, or classification provenance. Files: `apps/api/src/modules/users/dto/*`, `apps/api/src/modules/users/users.mapper.ts`, `apps/api/src/modules/users/users.controller.ts`, `apps/api/src/modules/auth/dto/register.dto.ts`, `apps/api/src/modules/transactions/dto/*`, `apps/api/src/modules/transactions/transactions.mapper.ts`. Depends on T019. Verify forbid-non-whitelisted field errors and that stored privileged fields are unchanged; T011 passes.
-- [ ] T021 [US1] [SEC-001, SEC-005, DATA-004] Repair owner predicates for **finance core** in `apps/api/src/modules/financial-accounts/*`, `apps/api/src/modules/transactions/transactions.repository.ts`, `apps/api/src/modules/transactions/transactions.service.ts`, and `apps/api/src/modules/transaction-categories/*`; depends on T014 and T020. Verify T014 passes without duplicate repositories.
-- [ ] T022 [P] [US1] [SEC-001, SEC-005, SEC-008] Repair owner predicates for **planning and alerts** in `apps/api/src/modules/budgets/*`, `apps/api/src/modules/goals/*`, and `apps/api/src/modules/alerts/*`; depends on T015. Verify T015 passes.
-- [ ] T023 [P] [US1] [SEC-001, SEC-005, SEC-008] Repair owner predicates for the **email pipeline** in `apps/api/src/modules/email-connections/*`, `apps/api/src/modules/email-listen-rules/*`, `apps/api/src/modules/email-ingestion/*`, `apps/api/src/modules/parser/parser.service.ts`, and `apps/api/src/modules/parser/parser.repository.ts`; depends on T016. Verify T016 passes.
-- [ ] T024 [US1] [SEC-001, SEC-002, SEC-005] Repair self-service scoping for **users and settings** in `apps/api/src/modules/users/users.service.ts` and `apps/api/src/modules/users/users.repository.ts`; depends on T017 and T020. Verify T017 passes.
-- [ ] T025 [US1] [AUTH-002, SEC-005, SEC-007] Reject disabled or soft-deleted accounts during JWT validation and refresh, and load role from the database, in `apps/api/src/modules/auth/strategies/jwt.strategy.ts`, `apps/api/src/modules/auth/auth.service.ts`, and `apps/api/src/modules/users/users.repository.ts`; depends on T012 and T024. Verify old access and refresh credentials become unauthorized and promotion takes effect on the next request.
-- [ ] T026 [US1] [AUTH-001, AUTH-003, AUTH-005, OPS-009] Implement the application side of the TLS boundary; depends on T002, T005, T012, and T025. Scope:
+- [X] T018 [US1] [SEC-002, SEC-003, SEC-005] Add `@Roles()` metadata and an administrator guard that reads the **persisted** role and status, with unit tests. Files: `apps/api/src/common/decorators/roles.decorator.ts`, `apps/api/src/common/guards/roles.guard.ts`, `apps/api/src/common/guards/roles.guard.spec.ts`. Depends on T011. Verify USER, ADMIN, disabled ADMIN, absent role, and absent authentication.
+- [X] T019 [US1] [SEC-002, SEC-003, SEC-008] Apply administrator authorization only to account identity/status, bank-provider/sender writes, and parser-template writes. Files: `apps/api/src/modules/users/users.controller.ts`, `apps/api/src/modules/bank-providers/bank-providers.controller.ts`, `apps/api/src/modules/parser/parser.controller.ts`. Depends on T018. Verify the T011 role expectations and that private modules have no admin bypass.
+- [X] T020 [US1] [SEC-003, SEC-004, TX-002] Split self-service and admin DTO mappings so non-admin input cannot bind `role`, `status`, `userId`, metadata ownership, or classification provenance. Files: `apps/api/src/modules/users/dto/*`, `apps/api/src/modules/users/users.mapper.ts`, `apps/api/src/modules/users/users.controller.ts`, `apps/api/src/modules/auth/dto/register.dto.ts`, `apps/api/src/modules/transactions/dto/*`, `apps/api/src/modules/transactions/transactions.mapper.ts`. Depends on T019. Verify forbid-non-whitelisted field errors and that stored privileged fields are unchanged; T011 passes.
+- [X] T021 [US1] [SEC-001, SEC-005, DATA-004] Repair owner predicates for **finance core** in `apps/api/src/modules/financial-accounts/*`, `apps/api/src/modules/transactions/transactions.repository.ts`, `apps/api/src/modules/transactions/transactions.service.ts`, and `apps/api/src/modules/transaction-categories/*`; depends on T014 and T020. Verify T014 passes without duplicate repositories.
+- [X] T022 [P] [US1] [SEC-001, SEC-005, SEC-008] Repair owner predicates for **planning and alerts** in `apps/api/src/modules/budgets/*`, `apps/api/src/modules/goals/*`, and `apps/api/src/modules/alerts/*`; depends on T015. Verify T015 passes.
+- [X] T023 [P] [US1] [SEC-001, SEC-005, SEC-008] Repair owner predicates for the **email pipeline** in `apps/api/src/modules/email-connections/*`, `apps/api/src/modules/email-listen-rules/*`, `apps/api/src/modules/email-ingestion/*`, `apps/api/src/modules/parser/parser.service.ts`, and `apps/api/src/modules/parser/parser.repository.ts`; depends on T016. Verify T016 passes.
+- [X] T024 [US1] [SEC-001, SEC-002, SEC-005] Repair self-service scoping for **users and settings** in `apps/api/src/modules/users/users.service.ts` and `apps/api/src/modules/users/users.repository.ts`; depends on T017 and T020. Verify T017 passes.
+- [X] T025 [US1] [AUTH-002, SEC-005, SEC-007] Reject disabled or soft-deleted accounts during JWT validation and refresh, and load role from the database, in `apps/api/src/modules/auth/strategies/jwt.strategy.ts`, `apps/api/src/modules/auth/auth.service.ts`, and `apps/api/src/modules/users/users.repository.ts`; depends on T012 and T024. Verify old access and refresh credentials become unauthorized and promotion takes effect on the next request.
+- [X] T026 [US1] [AUTH-001, AUTH-003, AUTH-005, OPS-009] Implement the application side of the TLS boundary; depends on T002, T005, T012, and T025. Scope:
   - make cookie flags and scopes configuration-driven (`Secure; HttpOnly; SameSite=Lax` in production);
   - set Express `trust proxy` from `TRUST_PROXY`;
   - add a production-only `HTTPS_REQUIRED` guard on register, login, refresh, logout, and the OAuth callback, with health exempt;
   - preserve refresh rotation and sanitize auth audit records.
 
   Files: `apps/api/src/modules/auth/auth.controller.ts`, `apps/api/src/modules/auth/auth.service.ts`, `apps/api/src/common/guards/https-required.guard.ts`, `apps/api/src/main.ts`. Verify all T012 cases pass.
-- [ ] T027 [US1] [AUTH-002, ERR-002, TEST-006] Implement a single-flight refresh attempt for safe/idempotent requests, with sign-out fallback and no automatic mutation replay, in `apps/web/src/api/client.ts` and `apps/web/src/providers/authProvider.ts`; depends on T026. Verify concurrent 401 handling and no duplicate POST/PATCH/DELETE request.
-- [ ] T028 [P] [US1] [SEC-003, SEC-009, AUTH-005, SC-015] Implement the operator bootstrap; depends on T002, T013, and T020.
+- [X] T027 [US1] [AUTH-002, ERR-002, TEST-006] Implement a single-flight refresh attempt for safe/idempotent requests, with sign-out fallback and no automatic mutation replay, in `apps/web/src/api/client.ts` and `apps/web/src/providers/authProvider.ts`; depends on T026. Verify concurrent 401 handling and no duplicate POST/PATCH/DELETE request.
+- [X] T028 [P] [US1] [SEC-003, SEC-009, AUTH-005, SC-015] Implement the operator bootstrap; depends on T002, T013, and T020.
   - **Files:** `apps/api/src/scripts/bootstrap-admin.ts`, `apps/api/src/scripts/bootstrap-admin.module.ts`, `apps/api/src/modules/users/admin-bootstrap.service.ts`, `apps/api/package.json` (script `admin:bootstrap`).
   - **Package script:** `admin:bootstrap` runs `ts-node -r tsconfig-paths/register src/scripts/bootstrap-admin.ts`, never `nest build`, because `deleteOutDir` would clear `dist/` under the dev watcher. Production runs `node dist/src/scripts/bootstrap-admin.js`.
   - **Runtime:** `NestFactory.createApplicationContext` with validated config and Prisma only. Do not reuse the `generate-openapi.ts` `JWT_SECRET` fallback or its Prisma override.
@@ -174,8 +174,8 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
   - **Upgrade-review modes:** `--list-admins` (read-only) and `--revoke --email` (audited).
 
   Verify T013 passes and `docker compose -f docker-compose.prod.yml run --rm api node dist/src/scripts/bootstrap-admin.js --email …` works from the release image.
-- [ ] T029 [US1] [SEC-006, AUTH-005] Add sanitized audit writes using the existing `AuditLog` writer for privileged account changes, settings changes, email connect/disconnect/sync, category corrections, and destructive financial actions. Files: `apps/api/src/modules/users/users.repository.ts`, `apps/api/src/modules/users/users.service.ts`, `apps/api/src/modules/email-connections/email-connections.service.ts`, `apps/api/src/modules/email-ingestion/email-ingestion.service.ts`, `apps/api/src/modules/transactions/transactions.service.ts`. Depends on T021, T023, T025, and T026. Verify actor/resource/action evidence without secrets or raw email data.
-- [ ] T030 [US1] [SEC-001–SEC-009, AUTH-001–AUTH-005, SC-002, SC-015] Run and stabilize all US1 suites (T011–T017), serially under the T010 harness, in `apps/api/test/*.e2e-spec.ts`; depends on T018–T029. Verify the independent test passes end to end.
+- [X] T029 [US1] [SEC-006, AUTH-005] Add sanitized audit writes using the existing `AuditLog` writer for privileged account changes, settings changes, email connect/disconnect/sync, category corrections, and destructive financial actions. Files: `apps/api/src/modules/users/users.repository.ts`, `apps/api/src/modules/users/users.service.ts`, `apps/api/src/modules/email-connections/email-connections.service.ts`, `apps/api/src/modules/email-ingestion/email-ingestion.service.ts`, `apps/api/src/modules/transactions/transactions.service.ts`. Depends on T021, T023, T025, and T026. Verify actor/resource/action evidence without secrets or raw email data.
+- [X] T030 [US1] [SEC-001–SEC-009, AUTH-001–AUTH-005, SC-002, SC-015] Run and stabilize all US1 suites (T011–T017), serially under the T010 harness, in `apps/api/test/*.e2e-spec.ts`; depends on T018–T029. Verify the independent test passes end to end.
 
 **Checkpoint**: US1 is independently secure, the first administrator is provisionable only via SEC-009, and P0 security gates are satisfied.
 

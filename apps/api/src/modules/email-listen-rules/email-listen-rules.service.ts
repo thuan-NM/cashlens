@@ -26,21 +26,22 @@ export class EmailListenRulesService {
     );
   }
 
-  async update(
-    user: RequestUser,
-    id: string,
-    dto: UpdateEmailListenRuleDto,
-  ) {
+  async update(user: RequestUser, id: string, dto: UpdateEmailListenRuleDto) {
     await this.findOwned(user.id, id);
     await this.assertRelations(user.id, dto);
-    return toEmailListenRuleResponse(
-      await this.repository.update(id, toUpdateEmailListenRuleInput(dto)),
+    const rule = await this.repository.update(
+      user.id,
+      id,
+      toUpdateEmailListenRuleInput(dto),
     );
+    if (!rule) throw new NotFoundException('Email listen rule not found');
+    return toEmailListenRuleResponse(rule);
   }
 
   async remove(user: RequestUser, id: string) {
-    await this.findOwned(user.id, id);
-    await this.repository.delete(id);
+    if (!(await this.repository.delete(user.id, id))) {
+      throw new NotFoundException('Email listen rule not found');
+    }
     return { id };
   }
 

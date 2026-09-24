@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { AuditActorType } from '@prisma/client';
+import { AuditActorType, Prisma, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'crypto';
 import { RequestUser } from '../../common/types/request-user.type';
@@ -47,9 +47,18 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
-    const user = await this.usersRepository.create(
-      toRegisterUserInput(dto, passwordHash),
-    );
+    const user = await this.usersRepository
+      .create(toRegisterUserInput(dto, passwordHash))
+      .catch((error: unknown) => {
+        // A concurrent or soft-deleted duplicate gets the same answer as above.
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === 'P2002'
+        ) {
+          throw new ConflictException('Email already exists');
+        }
+        throw error;
+      });
 
     await this.writeAuditLog(user.id, 'REGISTER', 'users', user.id, meta);
 
@@ -63,12 +72,19 @@ export class AuthService {
     const user = await this.usersRepository.findByEmailForAuth(dto.email);
 
     if (!user?.passwordHash) {
+      // Same bcrypt cost as a real check, so timing does not reveal whether
+      // the account exists (AUTH-004).
+      await bcrypt.compare(dto.password, await this.dummyPasswordHash());
       throw new UnauthorizedException('Invalid email or password');
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
 
-    if (!isPasswordValid) {
+    // A disabled or pending-deletion account gets the same generic failure,
+    // checked after the password so its status is never disclosed (AUTH-002).
+    if (!isPasswordValid || user.status !== UserStatus.ACTIVE) {
+      // Audited without the submitted email or password (AUTH-005).
+      await this.writeAuditLog(user.id, 'LOGIN_FAILED', 'users', user.id, meta);
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -96,11 +112,20 @@ export class AuthService {
     const storedToken =
       await this.usersRepository.findActiveRefreshToken(tokenHash);
 
-    if (!storedToken || storedToken.user.deletedAt) {
+    if (
+      !storedToken ||
+      storedToken.user.deletedAt ||
+      storedToken.user.status !== UserStatus.ACTIVE
+    ) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    await this.usersRepository.revokeRefreshToken(tokenHash);
+    // Rotation is atomic: of two requests replaying one token, only the one
+    // that actually revokes it gets a new session.
+    const { count } = await this.usersRepository.revokeRefreshToken(tokenHash);
+    if (count !== 1) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
     await this.writeAuditLog(
       storedToken.user.id,
       'REFRESH_TOKEN',
@@ -117,19 +142,37 @@ export class AuthService {
     );
   }
 
-  async logout(refreshToken?: string) {
+  async logout(refreshToken?: string, meta: AuthRequestMeta = {}) {
     if (refreshToken) {
-      await this.usersRepository.revokeRefreshToken(
-        this.hashRefreshToken(refreshToken),
-      );
+      const tokenHash = this.hashRefreshToken(refreshToken);
+      const storedToken =
+        await this.usersRepository.findActiveRefreshToken(tokenHash);
+      const { count } =
+        await this.usersRepository.revokeRefreshToken(tokenHash);
+
+      if (storedToken && count === 1) {
+        await this.writeAuditLog(
+          storedToken.user.id,
+          'LOGOUT',
+          'refresh_tokens',
+          storedToken.id,
+          meta,
+        );
+      }
     }
 
     return { loggedOut: true };
   }
 
-  async logoutAll(user: RequestUser) {
+  async logoutAll(user: RequestUser, meta: AuthRequestMeta = {}) {
     await this.usersRepository.revokeAllRefreshTokens(user.id);
-    await this.writeAuditLog(user.id, 'LOGOUT_ALL', 'refresh_tokens', null, {});
+    await this.writeAuditLog(
+      user.id,
+      'LOGOUT_ALL',
+      'refresh_tokens',
+      null,
+      meta,
+    );
 
     return { loggedOut: true };
   }
@@ -184,6 +227,13 @@ export class AuthService {
     });
   }
 
+  private dummyHash?: Promise<string>;
+
+  private dummyPasswordHash(): Promise<string> {
+    this.dummyHash ??= bcrypt.hash(randomBytes(16).toString('hex'), 12);
+    return this.dummyHash;
+  }
+
   private generateRefreshToken(): string {
     return randomBytes(64).toString('base64url');
   }
@@ -209,8 +259,9 @@ export class AuthService {
       action,
       resourceType,
       resourceId,
-      ipAddress: meta.ipAddress,
-      userAgent: meta.userAgent,
+      // Sanitized: request metadata only, bounded; never a credential (AUTH-005).
+      ipAddress: meta.ipAddress?.slice(0, 64),
+      userAgent: meta.userAgent?.slice(0, 255),
     });
   }
 }

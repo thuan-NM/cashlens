@@ -1,10 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { AuditActorType, Prisma, UserStatus } from '@prisma/client';
 import type { User } from '@prisma/client';
 import { BaseRepository } from '../../common/repositories/base.repository';
 import type { ListQuery } from '../../common/types/list-query-config.type';
 import { PrismaService } from '../../prisma/prisma.service';
 import { usersListConfig } from './query/users.list-config';
+
+export type AuditEntry = {
+  actorType: AuditActorType;
+  actorId: string;
+  action: string;
+  resourceType: string;
+  resourceId: string | null;
+  metadata?: Record<string, string | number | boolean | null | string[]>;
+};
 
 type UserWithPasswordHash = User & {
   passwordHash: string | null;
@@ -46,6 +55,18 @@ export class UsersRepository extends BaseRepository {
     });
   }
 
+  /**
+   * The persisted identity behind every authenticated request: disabled,
+   * pending-deletion, and soft-deleted accounts resolve to null, and the role
+   * is read from the database, never from a token claim (SEC-009f, AUTH-002).
+   */
+  findActiveForAuth(id: string) {
+    return this.prisma.user.findFirst({
+      where: { id, deletedAt: null, status: UserStatus.ACTIVE },
+      select: { id: true, email: true, role: true },
+    });
+  }
+
   findByEmail(email: string) {
     return this.prisma.user.findFirst({
       where: {
@@ -63,7 +84,7 @@ export class UsersRepository extends BaseRepository {
         deletedAt: null,
       },
       include: userProfileInclude,
-    }) as Promise<UserWithPasswordHash | null>;
+    });
   }
 
   create(data: Prisma.UserCreateInput & { passwordHash?: string | null }) {
@@ -104,6 +125,22 @@ export class UsersRepository extends BaseRepository {
 
   createAuditLog(data: Prisma.AuditLogCreateInput) {
     return this.prisma.auditLog.create({ data });
+  }
+
+  /**
+   * Sanitized audit evidence for sensitive actions (SEC-006): who did what to
+   * which resource. Metadata holds only ids, counts, statuses, and field
+   * names, never credentials, tokens, cookies, or email content.
+   */
+  recordAudit(entry: AuditEntry) {
+    return this.createAuditLog({
+      user: { connect: { id: entry.actorId } },
+      actorType: entry.actorType,
+      action: entry.action,
+      resourceType: entry.resourceType,
+      resourceId: entry.resourceId,
+      metadata: entry.metadata,
+    });
   }
 
   createRefreshToken(data: Prisma.RefreshTokenCreateInput) {

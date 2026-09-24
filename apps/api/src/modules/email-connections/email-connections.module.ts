@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
+import { UsersModule } from '../users/users.module';
 import { EmailConnectionsController } from './email-connections.controller';
 import { EmailConnectionsRepository } from './email-connections.repository';
 import { EmailConnectionsService } from './email-connections.service';
 import { GmailOAuthService } from './gmail-oauth.service';
 
 @Module({
+  imports: [UsersModule],
   controllers: [EmailConnectionsController],
   providers: [
     EmailConnectionsRepository,
