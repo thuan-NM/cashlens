@@ -59,18 +59,18 @@ Expected: all commands pass. Generated Swagger preserves existing APIs and imple
 ./scripts/scan-secrets.ps1
 ```
 
-Run `git fetch origin main` first. The script uses `ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f` and runs two scans:
+The history baseline must be present (a full clone; a shallow clone needs `git fetch --unshallow`). The script uses `ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f` and runs two scans:
 
 1. **Files.** It selects files with `git ls-files --cached --others --exclude-standard`, which means tracked files plus untracked files that are not ignored. It stages them in a temporary directory and scans that directory in `dir` mode. Ignored files (`.env*`, `node_modules`, `dist`, `.turbo`, `coverage`, `.yarn`) are never scanned.
-2. **Commits.** It scans `$(git merge-base origin/main HEAD)..HEAD` in `git` mode.
+2. **Commits.** It scans `<BaseRef>..HEAD` in `git` mode. The default `-BaseRef` is `80f3e0d`, the last commit of this branch that was merged into `dev`; the range also covers the implementation baseline `b273f14` and every feature commit.
 
 | Exit code | Meaning |
 |---|---|
 | 0 | Clean |
 | 1 | Findings |
-| 2 | Prerequisite error, such as a missing `origin/main` or no Docker |
+| 2 | Prerequisite or configuration error, such as a missing or unrelated base ref, no Docker, an allowlist that differs from the placeholder list, or an invalid `.gitleaksignore` |
 
-Expected: exit 0. Only the shared production placeholder list is allowlisted. Record the scanner digest, the scanned file count, the commit range, and the result in release evidence, together with the synthetic-fixture attestation (TEST-008).
+Expected: exit 0, printing `Reviewed history exceptions (.gitleaksignore): 2`. Only the shared production placeholder list is allowlisted; the two reviewed exceptions are exact fingerprints of synthetic fixtures in pushed commit `219f8e9` (research.md "Secret scanning"). Record the scanner digest, the scanned file count, the commit range, and the result in release evidence, together with the synthetic-fixture attestation (TEST-008).
 
 ## 3. Database migration checks
 
@@ -157,14 +157,15 @@ Expected outcomes:
 - Exit 0, and one `ADMIN_BOOTSTRAP_GRANTED` audit row with actor `SYSTEM`.
 - Rerunning for C: exit 0, with no new audit row.
 - Running for A: exit 3 (`ADMIN_EXISTS`), and A's role is unchanged.
-- Running for an unknown email: exit 2.
+- Running for an unknown email, or for an account without its own password (for example one created by an administrator): exit 2.
 - No output contains a password, token, or connection string.
 - `PATCH /users/{A}` with `{"role":"ADMIN"}` as A returns 403. Registration with a `role` field returns 400.
 
 - Missing/expired credentials return 401.
-- Ordinary access to admin user/provider/parser operations returns 403.
+- Ordinary access to administrator user and parser-template operations returns 403, whatever fields a well-formed JSON body contains (malformed JSON is 400 for every caller). Bank-provider writes do not exist in this release and return 404.
 - Cross-user private IDs return the documented owner-safe absence and never data.
-- Admin C can manage identity/status and system configuration but cannot read A/B transactions, goals, budgets, alerts, connections, messages, or runs.
+- Admin C can manage identity/status and system configuration but cannot read A/B transactions, goals, budgets, alerts, connections, messages, or runs; C's view of an account carries no `settings`.
+- A changes their own profile through `PATCH /users/me`; `role`, `status`, or `email` there returns 400.
 - Attempts to submit `userId`, `role`, `status`, classification provenance, or similar privileged fields through ordinary endpoints fail and leave values unchanged.
 - `PATCH /users/me/settings` with `storeRawEmailBody: true` returns 400 `RAW_EMAIL_BODY_UNAVAILABLE`. The Settings page shows the raw-body control disabled and labeled "Unavailable in this release".
 - Captured logs contain correlation IDs but no password, cookie/token, encryption key, raw body, or sensitive notification content.

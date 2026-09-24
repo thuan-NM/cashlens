@@ -31,8 +31,10 @@ allowlist in .gitleaks.toml stops the scan.
 
 .PARAMETER BaseRef
 Historical baseline of the feature history scan. The default, 80f3e0d, is the
-last commit of the pre-feature codebase. The ref must exist and be an ancestor
-of HEAD; otherwise the scan exits 2 and never skips the history scan.
+last commit of this branch that was merged into dev (PR #7); the range still
+covers the implementation baseline b273f14 and every feature commit. The ref
+must exist and be an ancestor of HEAD; otherwise the scan exits 2 and never
+skips the history scan.
 
 .PARAMETER RepoRoot
 Repository to scan. Defaults to the repository containing this script.

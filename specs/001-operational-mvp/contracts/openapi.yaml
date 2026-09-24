@@ -17,6 +17,14 @@ info:
 
     Deployment rule (OPS-009): in production the web app and this API share one public origin;
     the proxy routes /api/ to the API and / to the web app, and the web app calls this API by the relative path /api.
+
+    Authorization rule (SEC-005, US1 closure): 401 for a missing, invalid, or inactive-account session; on
+    administrator-only operations authorization precedes body validation, so a non-administrator gets 403 whatever
+    fields a well-formed JSON body contains; owner-scoped operations answer absent, not-owned, and malformed ids with
+    the same 404. Operations that do not exist (for example bank-provider writes) are unsupported routes (404).
+    Three request-level refusals happen before authentication and apply to every caller, signed in or not: a URL
+    containing an encoded NUL (%00) gets 404; a path parameter with undecodable percent-encoding (for example %FF)
+    gets 400; a body that is not valid JSON gets 400. None of them discloses whether a resource exists.
 servers:
   - url: /api
 components:
@@ -175,17 +183,66 @@ components:
         rawEmailBodyAvailable: { type: boolean, const: false, description: 'Additive; raw body retention is unavailable in this release' }
 
     AdminUserWrite:
-      description: Admin-only account identity/status fields. Non-admin bodies containing role/status are rejected with 400.
+      description: >-
+        Admin-only account fields (existing CreateUserDto/UpdateUserDto). Create requires email; create and update
+        accept fullName, role, status, timezone, locale, baseCurrency, and metadata. metadata is write-only: it is never
+        returned in AdminUserView. Authorization precedes body validation: a non-administrator gets 403 whatever fields
+        a well-formed JSON body contains; field-level 400 applies only to an authorized administrator. Setting a status
+        other than ACTIVE, or deleting the account, revokes its refresh tokens. Every change is audited with field names
+        only (SEC-006).
       type: object
       properties:
+        email: { type: string, format: email, description: Create only (required there) }
         fullName: { type: string }
         role: { enum: [USER, ADMIN] }
         status: { enum: [ACTIVE, DISABLED, PENDING_DELETE] }
+        timezone: { type: string }
+        locale: { type: string }
+        baseCurrency: { type: string }
+        metadata: { type: object, writeOnly: true }
+    AdminUserView:
+      description: >-
+        What an administrator sees of an account (SEC-008): identity and status only. The user's settings, metadata,
+        credentials, and financial or email data are never included; the settings key is absent.
+      type: object
+      required: [id, email, role, status]
+      properties:
+        id: { type: string }
+        email: { type: string }
+        fullName: { type: [string, 'null'] }
+        role: { enum: [USER, ADMIN] }
+        status: { enum: [ACTIVE, DISABLED, PENDING_DELETE] }
+        timezone: { type: string }
+        locale: { type: string }
+        baseCurrency: { type: string }
+        lastLoginAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    UserProfileWrite:
+      description: >-
+        Self-service profile update (PATCH /users/me), added when /users/{id} became administrator-only. Only these
+        fields are accepted; role, status, email, id, userId, deletedAt, or metadata get 400 (SEC-004).
+      type: object
+      properties:
+        fullName: { type: string, maxLength: 120 }
+        timezone: { type: string, maxLength: 64 }
+        locale: { type: string, maxLength: 16 }
+        baseCurrency: { type: string, maxLength: 3 }
+    TransactionWriteRules:
+      description: >-
+        Rules for the existing transaction create/update bodies (SEC-004, TX-002). userId, classificationSource, and
+        classificationConfidence are not accepted (400); provenance is derived on the server (MANUAL when the owner
+        chooses a category). status accepts PENDING, POSTED, IGNORED, or NEEDS_REVIEW, never DELETED: deletion uses
+        DELETE /transactions/{id}, an audited soft delete. Related ids (financialAccountId, categoryId,
+        duplicateOfTransactionId) must be non-empty and owned (or a system category), otherwise 400 or owner-safe 404.
+      type: object
+      properties:
+        status: { enum: [PENDING, POSTED, IGNORED, NEEDS_REVIEW] }
 
   responses:
     Unauthorized: { description: 'Missing, expired, or invalid session', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Forbidden: { description: Authenticated but insufficient role, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-    OwnerSafeNotFound: { description: Absent or not owned (non-disclosing), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    OwnerSafeNotFound: { description: 'Absent, not owned, or malformed id (non-disclosing; administrators get the same outcome for private resources). A URL containing an encoded NUL (%00) gets this 404 before authentication; an id with undecodable percent-encoding (for example %FF) gets 400 before authentication instead', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     ValidationError: { description: Field-level validation failure, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     HttpsRequired: { description: 'Production only (OPS-009): request not received over HTTPS via the trusted proxy; code HTTPS_REQUIRED', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     EmptyOk:
@@ -241,6 +298,9 @@ paths:
   /auth/refresh:
     post:
       security: []
+      summary: >-
+        Existing; single-use rotation: of concurrent requests replaying one refresh token exactly one succeeds.
+        Disabled, pending-deletion, and soft-deleted accounts get 401.
       responses:
         '200': { description: Rotated authenticated session, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -252,12 +312,27 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/EmptyOk' }
         '403': { $ref: '#/components/responses/HttpsRequired' }
+  /email-connections/gmail/connect:
+    post:
+      summary: >-
+        Existing; returns the Google authorization URL. It also sets the HttpOnly, SameSite=Lax cookie gmailOAuthNonce
+        (path /api/email-connections/gmail/callback, 10 minutes), whose hash the signed state carries (SEC-001).
+      responses:
+        '201': { description: 'Enveloped { authorizationUrl }' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /email-connections/gmail/callback:
     get:
       security: []
-      summary: Existing OAuth redirect target (<origin>/api/email-connections/gmail/callback); production refuses non-HTTPS
+      summary: >-
+        Existing OAuth redirect target (<origin>/api/email-connections/gmail/callback); production refuses non-HTTPS.
+        The state must be valid, unexpired, and bound to the browser that started the flow (gmailOAuthNonce cookie),
+        and the account must be active; this is checked before Google is called. The nonce cookie is cleared on every
+        callback that reaches the handler; a callback refused earlier (HTTPS_REQUIRED) leaves it to expire after
+        10 minutes.
       responses:
-        '302': { description: Redirect back to the web app with a sanitized connection outcome }
+        '200': { description: 'Current (as built in US1): the enveloped connection record of the calling user (id, provider, mailbox address, scopes, status, timestamps; no tokens)' }
+        '302': { description: 'Target, not yet implemented: redirect back to the web app with a sanitized connection outcome' }
+        '401': { description: 'Missing, invalid, expired, or unbound state, or an inactive account; nothing is linked', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '403': { $ref: '#/components/responses/HttpsRequired' }
   /users/me/settings:
     patch:
@@ -273,12 +348,34 @@ paths:
                   - $ref: '#/components/schemas/Envelope'
                   - properties: { data: { $ref: '#/components/schemas/UserSettingsView' } }
         '400': { $ref: '#/components/responses/ValidationError' }
+  /users/me:
+    patch:
+      summary: Self-service profile update of the caller's own account (audited field names only)
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/UserProfileWrite' } } } }
+      responses:
+        '200': { description: The caller's own profile including settings (enveloped), content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /users/list:
+    post:
+      summary: Administrator lists accounts (existing list query body); items are AdminUserView
+      responses:
+        '201': { description: 'Enveloped { data: AdminUserView[], total } (existing POST status code)', content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /users:
     post:
       summary: Administrator creates a managed account (no network path grants ADMIN to a non-admin caller)
       requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/AdminUserWrite' } } } }
       responses:
-        '201': { $ref: '#/components/responses/EmptyOk' }
+        '201':
+          description: Created account (enveloped AdminUserView)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/AdminUserView' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /users/{id}:
@@ -287,15 +384,72 @@ paths:
     get:
       summary: Administrator reads account identity/status only
       responses:
-        '200': { description: Non-financial account fields, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '200':
+          description: Account identity and status (enveloped AdminUserView; no settings)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/AdminUserView' } }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Absent, soft-deleted, or malformed id (administrators only; non-administrators get 403 for any id) }
     patch:
       summary: Administrator updates identity/role/status (audited)
       requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/AdminUserWrite' } } } }
       responses:
-        '200': { $ref: '#/components/responses/EmptyOk' }
+        '200':
+          description: Updated account (enveloped AdminUserView)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/AdminUserView' } }
         '400': { $ref: '#/components/responses/ValidationError' }
         '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      summary: Administrator soft-deletes an account (audited); its sessions stop working
+      responses:
+        '200': { description: 'Enveloped { id }' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /bank-providers:
+    get:
+      summary: >-
+        Existing read of the seeded supported providers (any authenticated user). No write operation exists in this
+        release; POST/PATCH/DELETE are unsupported routes (404) until an administrator-only write is introduced (SEC-003).
+      responses:
+        '200': { description: Enveloped provider list }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /parser-templates:
+    post:
+      summary: Administrator creates a global parser template (SEC-003); reads (GET) stay available to authenticated users
+      responses:
+        '201': { description: Created template (enveloped) }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /parser-templates/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    patch:
+      summary: Administrator updates a global parser template (SEC-003)
+      responses:
+        '200': { description: Updated template (enveloped) }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /transactions/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    patch:
+      summary: Existing owner update; body rules in TransactionWriteRules (no DELETED status, no provenance fields)
+      responses:
+        '200': { description: Updated transaction (enveloped) }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+    delete:
+      summary: Existing owner soft delete, the only way to set DELETED (audited TRANSACTION_DELETED)
+      responses:
+        '200': { description: 'Enveloped { id }' }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
   /email-connections/{id}/sync:
     parameters:
       - { in: path, name: id, required: true, schema: { type: string } }

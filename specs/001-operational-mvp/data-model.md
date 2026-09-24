@@ -24,7 +24,7 @@ Uses existing `User.role` (`USER|ADMIN`), `User.status`, `User.deletedAt`, and `
 
 Provisioning transaction (one database transaction, serialized with `pg_advisory_xact_lock` on a fixed key so concurrent runs cannot both promote):
 
-1. Load the target by normalized email; refuse if it is missing, `status != ACTIVE`, or `deletedAt` is set.
+1. Load the target by normalized email; refuse if it is missing, `status != ACTIVE`, `deletedAt` is set, or it has no `passwordHash` (not self-registered, for example an account created by an administrator). All four refusals share exit code 2.
 2. If the target's `role = ADMIN`, return `ALREADY_ADMIN` and write no audit row.
 3. Count users with `role = ADMIN`, `status = ACTIVE`, and `deletedAt IS NULL`; if the count is above 0, refuse with `ADMIN_EXISTS`.
 4. Set `role = ADMIN` and insert an `AuditLog` row with `actorType = SYSTEM`, `action = ADMIN_BOOTSTRAP_GRANTED`, `resourceType = user`, and `resourceId = <userId>`. The `metadata` is `{ "source": "cli" }` only: no email, password, host secrets, or environment values.
@@ -37,6 +37,30 @@ No password, hash, token, or default account is created, and no row is seeded by
 - `--revoke --email <email>` runs in the same advisory-locked transaction. It sets `role = USER` and writes an `AuditLog` row with `actorType = SYSTEM`, `action = ADMIN_ROLE_REVOKED`, and `metadata = { "source": "cli" }`.
 
 Revoking the last active administrator returns the deployment to the zero-admin state, where bootstrap is allowed again. **Pending decision:** operator review is the default. The alternative is an automatic one-time demote-all at upgrade, written as audited rows by an explicit script and never silently inside a migration.
+
+## Account status and audit evidence (US1) — no schema change
+
+**Account status.** Only `status = ACTIVE` with `deletedAt IS NULL` can sign in, renew a session, or use an existing session. `DISABLED` and `PENDING_DELETE` are both treated as inactive. Setting a non-`ACTIVE` status or soft-deleting an account through the administrator API also revokes its refresh tokens.
+
+**Audit events.** All rows use the existing `AuditLog` table. `userId` is the actor (null for `SYSTEM`), and `metadata` holds only identifiers, counts, statuses, roles, the email provider name, the change source (`cli`), and changed field names; never a password, token, cookie, mailbox address, or email content (SEC-006, AUTH-005). Request metadata is bounded: `ipAddress` at most 64 and `userAgent` at most 255 characters.
+
+| Action | actorType | resourceType | metadata |
+|---|---|---|---|
+| `REGISTER`, `LOGIN` | USER | `users` | none |
+| `LOGIN_FAILED` (existing accounts with a password only, including inactive ones; `userId` is the account whose sign-in failed; an unknown email writes no row) | USER | `users` | none |
+| `REFRESH_TOKEN`, `LOGOUT`, `LOGOUT_ALL` | USER | `refresh_tokens` | none |
+| `ADMIN_USER_CREATED` | ADMIN | `user` | `role`, `status` |
+| `ADMIN_USER_UPDATED` | ADMIN | `user` | `fields` (names), new `role`/`status` when set |
+| `ADMIN_USER_DELETED` | ADMIN | `user` | none |
+| `USER_PROFILE_UPDATED`, `USER_SETTINGS_UPDATED` | USER | `user` | `fields` (names only) |
+| `ADMIN_BOOTSTRAP_GRANTED`, `ADMIN_ROLE_REVOKED` | SYSTEM | `user` | `{ "source": "cli" }` |
+| `EMAIL_CONNECTED` | USER | `email_connection` | `provider` |
+| `EMAIL_DISCONNECTED` | USER | `email_connection` | none |
+| `EMAIL_SYNC` | USER | `email_connection` | `syncRunId`, `status`, counts |
+| `TRANSACTION_CATEGORY_CORRECTED` | USER | `transaction` | `fromCategoryId`, `toCategoryId` |
+| `TRANSACTION_DELETED` | USER | `transaction` | none |
+| `FINANCIAL_ACCOUNT_ARCHIVED` | USER | `financial_account` | none |
+| `TRANSACTION_CATEGORY_ARCHIVED` | USER | `transaction_category` | none |
 
 ## Proposed schema deltas
 
