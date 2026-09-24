@@ -32,7 +32,7 @@ Remediation of the unresolved HIGH findings from the latest cross-artifact analy
 - Q: How are alert condition lifecycle and read state separated? → A: The lifecycle is `ACTIVE`, `DISMISSED`, or `RESOLVED`. Read state (read flag and read time) is independent presentation state. Reading never changes the lifecycle. A dismissed occurrence still blocks duplicates until the system resolves it.
 - Q: Which email delivery behavior does the MVP use without a queue or worker? → A: One standard mail-transport adapter, a disabled mode, and a redacted non-production log mode, plus an in-memory fake for tests. Delivery runs in-process after the alert is committed, with at most three attempts inside a bounded time budget. An interrupted delivery becomes an observable failure and is never resent automatically.
 - Q: Is representative-user usability acceptance (SC-012) a release gate for this MVP? → A: *(default — pending product-owner confirmation)* No. It moves to post-MVP because the release has no recruited representative participants or moderated sessions. Journey completability is verified by the automated end-to-end smoke suite.
-- Q: How is the absence of committed secrets verified for release? → A: One version-pinned secret scan runs over every tracked file, every untracked file not excluded by ignore rules (scope refined in the second pass below), and every commit on the feature branch since it diverged from the default branch. The allowlist is limited to the documented placeholder values that production startup rejects. Any other finding blocks release.
+- Q: How is the absence of committed secrets verified for release? → A: One version-pinned secret scan runs over every tracked file, every untracked file not excluded by ignore rules (scope refined in the second pass below), and every commit on the feature branch since it diverged from the default branch. The allowlist is limited to the documented placeholder values that production startup rejects. Any other finding blocks release. *(Commit range and reviewed exceptions superseded by Session 2026-09-24 below.)*
 - Q: How must API contracts represent success responses that the current contract exposes directly? → A: Every success response, including synchronization results and goal feasibility, uses the application's existing standard response envelope. Existing response field and status names are retained, and new fields are additive only. The exact shape is recorded in the contract artifact.
 
 Second remediation pass (same day), resolving the follow-up analysis findings:
@@ -40,7 +40,7 @@ Second remediation pass (same day), resolving the follow-up analysis findings:
 - Q: Which files does the release secret scan cover, so that correctly ignored local environment files do not fail it? → A: The scan covers:
   - every tracked file;
   - every untracked file not excluded by the repository's ignore rules, selected by Git;
-  - every commit on the feature branch since it diverged from the default branch.
+  - every commit on the feature branch since it diverged from the default branch *(commit range superseded by Session 2026-09-24 below)*.
 
   Ignored files (local environment files, dependency folders, build output) are never scanned. A tracked or committed environment file is always scanned.
 - Q: What exact benchmark verifies the one-second dashboard target? → A:
@@ -64,6 +64,23 @@ Second remediation pass (same day), resolving the follow-up analysis findings:
 - Q: Must at least one parser be declared for release? → A: Yes. Zero declared parsers fails release validation. Each declared parser must independently reach the 85% threshold.
 - Q: Do user-created alerts get an email-delivery record? → A: No. Only evaluator-created alerts have an email-delivery record; user-created alerts are in-app only.
 - Q: How do the production web interface and API relate at the proxy? → A: They share one public origin. The proxy sends the API path prefix to the application and everything else to the web service, and the web interface calls the API by relative path, so cookie authentication stays same-origin.
+
+### Session 2026-09-24 (US1 closure)
+
+Reconciliation of the specification with the verified US1 implementation (T009–T030). No product scope was added.
+
+- Q: How do users update their own profile once account operations become administrator-only? → A: Through a self-service profile operation (`PATCH /users/me`) that accepts only full name, timezone, locale, and base currency. Role, status, email, ownership, and metadata are rejected as invalid input.
+- Q: What does an ordinary user get when sending privileged fields to an administrator-only operation? → A: Forbidden (403). Authorization is evaluated before request-body validation, so a non-administrator is refused whatever fields a well-formed JSON body contains (a body that is not valid JSON is rejected earlier, with 400, for every caller). Field-level validation errors (400) apply once the caller is authorized, and on self-service and registration operations.
+- Q: How are supported bank providers and senders managed in this release? → A: They are system reference data seeded by migrations. No network-reachable write operation exists; write requests are answered as unsupported routes (404) until an administrator-only write operation is explicitly introduced. Reading the supported list requires authentication only.
+- Q: What does an administrator see when managing an account? → A: Identity and status only (id, email, full name, role, status, timezone, locale, base currency, last sign-in, creation and update times). The user's settings, metadata, credentials, and financial or email data are never included.
+- Q: How is a transaction deleted? → A: Only through the delete operation, which soft-deletes and is audited. Creating or updating a transaction cannot set the deleted status.
+- Q: Which accounts are eligible for first-administrator provisioning? → A: An existing, active, non-deleted account that was self-registered, meaning it has its own sign-in password. Accounts without a password, such as ones created by an administrator, are refused like missing accounts.
+- Q: How is an account pending deletion treated? → A: Like a disabled account: it cannot sign in, renew a session, or use an existing session.
+- Q: Which commit range and exceptions does the release secret scan use on this branch? → A: The commit range starts at the historical baseline `80f3e0d`, the last commit of this branch that was merged into `dev` (PR #7), because the default branch holds only the initial scaffold and predates the existing codebase. The range therefore also rescans the implementation baseline `b273f14` and every feature commit. The only exceptions besides the placeholder allowlist are reviewed, exact, commit-scoped fingerprints of two synthetic test fixtures in pushed commit `219f8e9`; each is documented in `.gitleaksignore`, and no broader exception is accepted.
+
+### Session 2026-09-24 (US2 closure)
+
+- Q: Do transactions in a category marked "exclude from analytics" appear in category breakdowns? → A: No. They are left out of every category breakdown (dashboard and analytics). Exclusion from analytics does not change financial eligibility: the same transactions still count in total income, total expense, net income, savings rate, the cashflow trend, transaction list totals, and budgets. A category breakdown therefore totals less than the expense total whenever such a category has spending, and the dashboard says so instead of presenting the breakdown as the whole expense.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -245,7 +262,7 @@ The following baseline was established from the PRD/SRS, the implementation at c
 | FR-01 | Register, login, retrieve profile | IMPLEMENTED | Preserve and harden under AUTH/SEC requirements. |
 | FR-02 | Gmail OAuth with read-only scope | PARTIALLY_IMPLEMENTED | Complete configuration, consent verification, reconnect, and release testing. |
 | FR-03 | View connection state, last sync, disconnect/reconnect | PARTIALLY_IMPLEMENTED | Complete explicit state/error/reconnect behavior. |
-| FR-04 | Supported bank providers and senders | PARTIALLY_IMPLEMENTED | Preserve provider data and protect system-managed changes with admin authorization. |
+| FR-04 | Supported bank providers and senders | PARTIALLY_IMPLEMENTED | Preserve the seeded provider data; it is readable by authenticated users. No write operation exists in this release (write requests are unsupported, 404); any future write operation must be administrator-only (SEC-003). |
 | FR-05 | User-owned sender/subject/body/bank listen rules | IMPLEMENTED | Verify ownership, disabled-rule behavior, and configured sync range. |
 | FR-06 | Manually trigger bounded sync | IMPLEMENTED | Harden lifecycle, concurrency, retry, and observability. |
 | FR-07 | Persist email metadata and body hash | IMPLEMENTED | Preserve privacy-by-default and retention behavior. |
@@ -290,20 +307,20 @@ The following baseline was established from the PRD/SRS, the implementation at c
 - **AUTH-002**: An expired or invalid session MUST produce a consistent unauthorized outcome; the client MUST either renew once safely or return the user to sign-in without repeating a non-idempotent operation.
 - **AUTH-003**: Authentication cookies or equivalent session credentials MUST use production-appropriate confidentiality, transport, scope, and cross-origin protections.
 - **AUTH-004**: Authentication failure messages MUST not reveal whether an email address, token, or account exists beyond what is necessary for the user action.
-- **AUTH-005**: Security-relevant authentication events MUST be auditable without recording passwords, raw tokens, or secrets.
+- **AUTH-005**: Security-relevant authentication events MUST be auditable without recording passwords, raw tokens, or secrets. Disabled, pending-deletion, and soft-deleted accounts cannot sign in, renew a session, or use an existing session, and receive the same generic outcome as invalid credentials.
 - **SEC-001**: Every user-owned financial, email, planning, alert, and settings operation MUST derive ownership from the authenticated identity and MUST prevent cross-user read or mutation.
 - **SEC-002**: Ordinary users MUST NOT list arbitrary users, create privileged users, or read/update/delete another user account.
-- **SEC-003**: Only an explicitly authorized administrator MAY manage user account identity, role/status, supported bank providers/senders, and parser templates. No network-reachable operation MAY grant the administrator role to a caller who is not already an active administrator, and the first administrator MUST be provisioned only through SEC-009.
-- **SEC-004**: Ordinary user input MUST NOT modify role, account status, ownership identifiers, system classification provenance, or other privileged fields.
-- **SEC-005**: Missing authentication MUST return an unauthorized outcome; valid authentication without sufficient permission MUST return a forbidden outcome; owner-scoped lookups MUST follow one documented non-disclosure policy.
-- **SEC-006**: Sensitive actions including email connect/disconnect/sync, privileged changes, category corrections, and destructive financial-data actions MUST produce sanitized audit evidence.
+- **SEC-003**: Only an explicitly authorized administrator MAY manage user account identity, role/status, supported bank providers/senders, and parser templates. No network-reachable operation MAY grant the administrator role to a caller who is not already an active administrator, and the first administrator MUST be provisioned only through SEC-009. In this release, bank providers and senders are seeded reference data with no write operation; write requests are unsupported routes (404) until an administrator-only write operation is explicitly introduced.
+- **SEC-004**: Ordinary user input MUST NOT modify role, account status, ownership identifiers, system classification provenance, or other privileged fields. Users change their own profile only through the self-service profile operation (full name, timezone, locale, base currency). Creating or updating a transaction MUST NOT set the deleted status; deletion uses the audited delete operation.
+- **SEC-005**: Missing authentication MUST return an unauthorized outcome; valid authentication without sufficient permission MUST return a forbidden outcome; owner-scoped lookups MUST follow one documented non-disclosure policy. On administrator-only operations, authorization is evaluated before request-body validation, so a non-administrator receives the forbidden outcome whatever fields a well-formed JSON body contains. The non-disclosure policy: an absent, not-owned, or malformed identifier returns the same not-found outcome, and administrators receive the same outcome for private resources as ordinary users. Three malformed requests are refused before authentication, for every caller and without disclosing whether a resource exists: a URL containing an encoded NUL character gets the not-found outcome; a path parameter with undecodable percent-encoding, and a body that is not valid JSON, get a validation error (400).
+- **SEC-006**: Sensitive actions including email connect/disconnect/sync, privileged changes, category corrections, and destructive financial-data actions MUST produce sanitized audit evidence. Destructive financial-data actions include transaction deletion and archiving a financial account or a transaction category. Audit metadata is limited to identifiers, counts, statuses, roles, the email provider name, the change source (for example the operator command line), and changed field names.
 - **SEC-007**: Automated authorization tests MUST cover horizontal access, vertical privilege escalation, mass assignment, deleted/disabled users, and malformed identifiers.
-- **SEC-008**: Administrator status MUST NOT grant access to user-owned transactions, financial accounts, categories, budgets, goals, alert contents, email connections, provider tokens, email messages, listen rules, parser-run payloads, or sync-run details.
+- **SEC-008**: Administrator status MUST NOT grant access to user-owned transactions, financial accounts, categories, budgets, goals, alert contents, email connections, provider tokens, email messages, listen rules, parser-run payloads, or sync-run details. Administrator account views expose identity and status only, never the user's settings or metadata.
 - **SEC-009**: The first administrator MUST be provisioned only by an operator-run, non-network provisioning step that requires host and database access to the deployment. The step:
-  - (a) accepts only an identifier of an existing, active, non-deleted, self-registered account, and never creates, accepts, prints, or stores a password or other credential;
+  - (a) accepts only an identifier of an existing, active, non-deleted, self-registered account (one with its own sign-in password), and never creates, accepts, prints, or stores a password or other credential;
   - (b) is atomic, succeeds only while no active administrator exists, and is safe under concurrent runs;
   - (c) is a successful no-op with no new audit record when the target is already an administrator;
-  - (d) refuses, without changes and with a distinct non-secret outcome, any other target when an active administrator exists, and any missing, disabled, or deleted target;
+  - (d) refuses, without changes and with a distinct non-secret outcome, any other target when an active administrator exists, and any missing, disabled, pending-deletion, deleted, or passwordless (not self-registered) target;
   - (e) records a sanitized system-actor audit event for every promotion;
   - (f) takes effect on the promoted account's next authorized request, because role checks use the persisted account state.
 
@@ -326,9 +343,9 @@ The following baseline was established from the PRD/SRS, the implementation at c
 - **CFG-006**: Release verification MUST run one deterministic, version-pinned secret scan that covers:
   - (a) every file tracked by the repository, in its current working-tree content, including tracked files that ignore rules would otherwise match;
   - (b) every untracked file that the repository's ignore rules do not exclude;
-  - (c) every commit on the feature branch since it diverged from the default branch, including secrets that were added and later removed.
+  - (c) every commit on the feature branch since the historical baseline, including secrets that were added and later removed. On this branch the baseline is commit `80f3e0d`, the last commit of this branch that was merged into `dev` (PR #7), because the default branch holds only the initial scaffold and predates the existing codebase; the range therefore also covers the implementation baseline `b273f14` and every feature commit.
 
-  The file set MUST be selected by the version-control system, not by walking the directory. Files excluded by ignore rules (local environment files, dependency folders, build output, caches) MUST NOT be scanned, so that a developer's correctly ignored local configuration never fails release verification. A missing default-branch reference MUST fail the scan with a distinct prerequisite error rather than skip the commit-range scan. The scan's allowlist MUST be limited to the documented placeholder values that CFG-001 rejects in production. Any other finding MUST block release. Synthetic-data rules MUST flag fixture email addresses outside the documented reserved test domains. Because private financial data cannot be reliably detected by pattern, release evidence MUST also record an explicit attestation that all fixtures are synthetic (TEST-008).
+  The file set MUST be selected by the version-control system, not by walking the directory. Files excluded by ignore rules (local environment files, dependency folders, build output, caches) MUST NOT be scanned, so that a developer's correctly ignored local configuration never fails release verification. A missing or unrelated baseline reference MUST fail the scan with a distinct prerequisite error rather than skip the commit-range scan. The scan's allowlist MUST be limited to the documented placeholder values that CFG-001 rejects in production. The only other permitted exceptions are reviewed, documented, exact commit-scoped fingerprints (commit, path, rule, line) of synthetic fixtures in history that can no longer be rewritten; they never apply to the working tree or to any other commit, file, line, or rule. Any other finding MUST block release. Synthetic-data rules MUST flag fixture email addresses outside the documented reserved test domains. Because private financial data cannot be reliably detected by pattern, release evidence MUST also record an explicit attestation that all fixtures are synthetic (TEST-008).
 - **CFG-007**: A deployment MAY run with email delivery disabled. When email delivery is enabled, every transport setting it requires MUST be validated at startup under CFG-001. A non-production diagnostic mode that records only redacted delivery metadata MUST be rejected in production. When email delivery is disabled, email deliveries MUST be recorded as skipped, and the user interface MUST state that email notification is unavailable.
 
 #### Transactions, dashboard, and data correctness
@@ -338,7 +355,7 @@ The following baseline was established from the PRD/SRS, the implementation at c
 - **TX-003**: Income, expense, transfer, duplicate, ignored, pending, and deleted states MUST have one documented treatment used consistently by transaction lists, dashboard totals, budgets, classification, and goals.
 - **TX-004**: A manual category correction MUST be retained as the authoritative category until the user explicitly requests another correction or reclassification.
 - **TX-005**: Mutating a transaction MUST trigger or make available deterministic recalculation of every affected current summary and budget period.
-- **DASH-001**: Monthly dashboard results MUST derive from the authenticated user's persisted eligible records and include total income, total expense, net income, savings rate, category breakdown, cashflow trend, and recent transactions.
+- **DASH-001**: Monthly dashboard results MUST derive from the authenticated user's persisted eligible records and include total income, total expense, net income, savings rate, category breakdown, cashflow trend, and recent transactions. The category breakdown MUST leave out categories marked "exclude from analytics"; those transactions still count in every total.
 - **DASH-002**: Dashboard period boundaries MUST honor the user's timezone and configured month-start rule.
 - **DASH-003**: Identical eligible source records and period settings MUST always produce identical dashboard totals independent of any AI-generated content.
 - **DASH-004**: On the reference benchmark, at least 95% of dashboard loads MUST return complete monthly results within one second. The reference benchmark is defined as follows:
@@ -621,7 +638,7 @@ The following baseline was established from the PRD/SRS, the implementation at c
   - first promotion with an audit record;
   - idempotent rerun without a new audit record;
   - refusal once an administrator exists;
-  - refusal for missing, disabled, or deleted accounts;
+  - refusal for missing, disabled, pending-deletion, deleted, or passwordless (not self-registered) accounts;
   - exactly one administrator after concurrent runs;
   - an audited operator removal of an unapproved existing administrator, after which provisioning succeeds.
 

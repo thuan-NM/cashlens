@@ -1,99 +1,89 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, TransactionDirection } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import {
+  normalizeCurrency,
+  savingRatePercent,
+  toDecimal,
+  userMonthsEndingAt,
+} from '../../common/finance/financial-period-policy';
+import {
+  compareCategoryRows,
+  emptyCashflowPoint,
+} from '../../common/finance/financial-summary.query';
 import type { RequestUser } from '../../common/types/request-user.type';
 import { toTransactionResponse } from '../transactions/transactions.mapper';
 import {
   DashboardCashflowQueryDto,
   DashboardMonthQueryDto,
 } from './dto/dashboard-query.dto';
-import {
-  dashboardMonthRange,
-  dashboardMonthsRange,
-  monthKey,
-} from './dashboard.mapper';
+import { dashboardMonth, formatAmount } from './dashboard.mapper';
 import { DashboardRepository } from './dashboard.repository';
 
-const decimalToNumber = (value: Prisma.Decimal | null | undefined) =>
-  value ? Number(value.toString()) : 0;
-
+/**
+ * Monthly dashboard over the user's persisted eligible records (DASH-001).
+ * Periods are user months (DASH-002). Money figures are in the account's base
+ * currency; other currencies are reported separately, never summed in.
+ */
 @Injectable()
 export class DashboardService {
   constructor(private readonly dashboardRepository: DashboardRepository) {}
 
   async overview(user: RequestUser, query: DashboardMonthQueryDto) {
-    const range = dashboardMonthRange(query.month);
-    const [income, expense, transactionCount, unreadAlerts] = await Promise.all(
-      [
-        this.dashboardRepository.sumAmount(user.id, range, [
-          TransactionDirection.INCOME,
-        ]),
-        this.dashboardRepository.sumAmount(user.id, range, [
-          TransactionDirection.EXPENSE,
-        ]),
-        this.dashboardRepository.countTransactions(user.id, range),
-        this.dashboardRepository.unreadCriticalAlerts(user.id),
-      ],
-    );
-
-    const incomeAmount = decimalToNumber(income._sum.amount);
-    const expenseAmount = decimalToNumber(expense._sum.amount);
-    const netCashflow = incomeAmount - expenseAmount;
-    const savingRate =
-      incomeAmount === 0 ? 0 : Math.round((netCashflow / incomeAmount) * 100);
+    const context = await this.dashboardRepository.financialContext(user.id);
+    const month = dashboardMonth(context.settings, query.month);
+    const [totals, unreadAlerts] = await Promise.all([
+      this.dashboardRepository.totals(user.id, context.baseCurrency, month),
+      this.dashboardRepository.unreadCriticalAlerts(user.id),
+    ]);
 
     return {
-      month: monthKey(range.from),
-      income: incomeAmount,
-      expense: expenseAmount,
-      netCashflow,
-      savingRate,
-      transactionCount,
+      month: month.key,
+      currency: totals.currency,
+      income: totals.income,
+      expense: totals.expense,
+      netCashflow: totals.netCashflow,
+      savingRate: savingRatePercent(totals.income, totals.netCashflow),
+      transactionCount: totals.transactionCount,
       unreadAlerts,
+      currencies: totals.currencies,
+      periodStart: month.from.toISOString(),
+      periodEnd: month.to.toISOString(),
+      timeZone: context.settings.timeZone,
     };
   }
 
+  /** One entry per user month, oldest first, including months with no data. */
   async cashflow(user: RequestUser, query: DashboardCashflowQueryDto) {
-    const range = dashboardMonthsRange(query.months ?? 6);
-    const transactions = await this.dashboardRepository.cashflowTransactions(
-      user.id,
-      range,
+    const context = await this.dashboardRepository.financialContext(user.id);
+    const last = dashboardMonth(context.settings, query.month);
+    const months = userMonthsEndingAt(
+      last.key,
+      query.months ?? 6,
+      context.settings,
     );
-    const months = new Map<
-      string,
-      { month: string; income: number; expense: number; netCashflow: number }
-    >();
+    const buckets = await this.dashboardRepository.cashflowByMonth(
+      user.id,
+      months,
+      context.baseCurrency,
+    );
 
-    for (const transaction of transactions) {
-      const month = monthKey(transaction.transactionTime);
-      const current = months.get(month) ?? {
-        month,
-        income: 0,
-        expense: 0,
-        netCashflow: 0,
-      };
-      const amount = decimalToNumber(transaction.amount);
-
-      if (transaction.direction === TransactionDirection.INCOME) {
-        current.income += amount;
-      }
-
-      if (transaction.direction === TransactionDirection.EXPENSE) {
-        current.expense += amount;
-      }
-
-      current.netCashflow = current.income - current.expense;
-      months.set(month, current);
-    }
-
-    return Array.from(months.values());
+    return months.map((month) => ({
+      month: month.key,
+      ...(buckets.get(month.key) ?? emptyCashflowPoint(context.baseCurrency)),
+    }));
   }
 
+  /**
+   * Eligible expense per category and currency, uncategorized included.
+   * Categories flagged `excludeFromAnalytics` never appear, so the rows add up
+   * to the overview expense minus those categories' spending.
+   */
   async categoryBreakdown(user: RequestUser, query: DashboardMonthQueryDto) {
-    const range = dashboardMonthRange(query.month);
-    const rows = await this.dashboardRepository.categoryBreakdown(
-      user.id,
-      range,
-    );
+    const context = await this.dashboardRepository.financialContext(user.id);
+    const month = dashboardMonth(context.settings, query.month);
+    const rows = (
+      await this.dashboardRepository.expenseByCategory(user.id, month)
+    ).sort(compareCategoryRows(context.baseCurrency));
     const categoryIds = rows
       .map((row) => row.categoryId)
       .filter((id): id is string => Boolean(id));
@@ -107,26 +97,30 @@ export class DashboardService {
       category: row.categoryId
         ? (categoryMap.get(row.categoryId) ?? null)
         : null,
-      amount: decimalToNumber(row._sum.amount),
-      count: row._count._all,
+      currency: row.currency,
+      amount: row.amount,
+      count: row.count,
     }));
   }
 
   async recentTransactions(user: RequestUser, query: DashboardMonthQueryDto) {
-    const range = dashboardMonthRange(query.month);
+    const context = await this.dashboardRepository.financialContext(user.id);
+    const month = dashboardMonth(context.settings, query.month);
     const transactions = await this.dashboardRepository.recentTransactions(
       user.id,
-      range,
+      month,
       5,
     );
     return transactions.map(toTransactionResponse);
   }
 
+  /** Budgets over their warning threshold, spent in the budget's currency. */
   async hotBudgets(user: RequestUser, query: DashboardMonthQueryDto) {
-    const range = dashboardMonthRange(query.month);
+    const context = await this.dashboardRepository.financialContext(user.id);
+    const month = dashboardMonth(context.settings, query.month);
     const budgets = await this.dashboardRepository.activeBudgets(
       user.id,
-      range,
+      month,
     );
     const categoryIds = Array.from(
       new Set(
@@ -135,48 +129,66 @@ export class DashboardService {
           .filter((id): id is string => Boolean(id)),
       ),
     );
-    const spendingRows = await this.dashboardRepository.budgetSpending(
-      user.id,
-      categoryIds,
-      range,
-    );
-    const spentMap = new Map(
-      spendingRows.map((row) => [
-        row.categoryId ?? '',
-        decimalToNumber(row._sum.amount),
-      ]),
-    );
+    const spendingRows = categoryIds.length
+      ? await this.dashboardRepository.budgetSpending(
+          user.id,
+          categoryIds,
+          month,
+        )
+      : [];
+    // Currency codes that differ only in case are one currency.
+    const spentMap = new Map<string, Prisma.Decimal>();
+    for (const row of spendingRows) {
+      const key = `${row.categoryId ?? ''}|${normalizeCurrency(row.currency)}`;
+      spentMap.set(
+        key,
+        (spentMap.get(key) ?? toDecimal(0)).plus(toDecimal(row._sum.amount)),
+      );
+    }
 
     return budgets
       .map((budget) => {
-        const amount = decimalToNumber(budget.amount);
+        const amount = toDecimal(budget.amount);
         const spent = budget.categoryId
-          ? (spentMap.get(budget.categoryId) ?? 0)
-          : 0;
-        const percentUsed =
-          amount === 0 ? 0 : Math.round((spent / amount) * 100);
+          ? (spentMap.get(
+              `${budget.categoryId}|${normalizeCurrency(budget.currency)}`,
+            ) ?? toDecimal(0))
+          : toDecimal(0);
+        const percentUsed = amount.isZero()
+          ? 0
+          : Math.round(spent.div(amount).times(100).toNumber());
+        const remaining = amount.minus(spent);
 
         return {
           id: budget.id,
           categoryId: budget.categoryId,
           name: budget.name,
-          amount,
-          spent,
-          remaining: Math.max(0, amount - spent),
+          currency: normalizeCurrency(budget.currency),
+          amount: amount.toNumber(),
+          spent: spent.toNumber(),
+          remaining: remaining.isNegative() ? 0 : remaining.toNumber(),
           percentUsed,
           thresholdPercent: budget.thresholdPercent,
           category: budget.category,
         };
       })
       .filter((budget) => budget.percentUsed >= budget.thresholdPercent)
-      .sort((a, b) => b.percentUsed - a.percentUsed)
+      .sort(
+        (a, b) =>
+          b.percentUsed - a.percentUsed ||
+          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      )
       .slice(0, 5);
   }
 
   async insights(user: RequestUser, query: DashboardMonthQueryDto) {
+    // Resolve the month once, so both parts describe the same user month
+    // even when the request crosses a month boundary (DASH-003).
+    const context = await this.dashboardRepository.financialContext(user.id);
+    const month = { month: dashboardMonth(context.settings, query.month).key };
     const [overview, hotBudgets] = await Promise.all([
-      this.overview(user, query),
-      this.hotBudgets(user, query),
+      this.overview(user, month),
+      this.hotBudgets(user, month),
     ]);
 
     const insights: Array<{
@@ -191,14 +203,14 @@ export class DashboardService {
         type: 'POSITIVE_CASHFLOW',
         severity: 'INFO',
         title: 'Positive cashflow',
-        message: `Net cashflow is ${overview.netCashflow.toLocaleString('vi-VN')} VND.`,
+        message: `Net cashflow is ${formatAmount(overview.netCashflow, overview.currency)}.`,
       });
     } else {
       insights.push({
         type: 'NEGATIVE_CASHFLOW',
         severity: 'WARNING',
         title: 'Negative cashflow',
-        message: `Spending exceeds income by ${Math.abs(overview.netCashflow).toLocaleString('vi-VN')} VND.`,
+        message: `Spending exceeds income by ${formatAmount(Math.abs(overview.netCashflow), overview.currency)}.`,
       });
     }
 
@@ -207,7 +219,7 @@ export class DashboardService {
         type: 'HOT_BUDGET',
         severity: budget.percentUsed > 100 ? 'CRITICAL' : 'WARNING',
         title: `${budget.name} used ${budget.percentUsed}% of budget`,
-        message: `Spent ${budget.spent.toLocaleString('vi-VN')} / ${budget.amount.toLocaleString('vi-VN')} VND.`,
+        message: `Spent ${formatAmount(budget.spent, budget.currency)} / ${formatAmount(budget.amount, budget.currency)}.`,
       });
     }
 

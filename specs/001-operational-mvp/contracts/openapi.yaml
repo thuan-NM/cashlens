@@ -17,6 +17,14 @@ info:
 
     Deployment rule (OPS-009): in production the web app and this API share one public origin;
     the proxy routes /api/ to the API and / to the web app, and the web app calls this API by the relative path /api.
+
+    Authorization rule (SEC-005, US1 closure): 401 for a missing, invalid, or inactive-account session; on
+    administrator-only operations authorization precedes body validation, so a non-administrator gets 403 whatever
+    fields a well-formed JSON body contains; owner-scoped operations answer absent, not-owned, and malformed ids with
+    the same 404. Operations that do not exist (for example bank-provider writes) are unsupported routes (404).
+    Three request-level refusals happen before authentication and apply to every caller, signed in or not: a URL
+    containing an encoded NUL (%00) gets 404; a path parameter with undecodable percent-encoding (for example %FF)
+    gets 400; a body that is not valid JSON gets 400. None of them discloses whether a resource exists.
 servers:
   - url: /api
 components:
@@ -175,17 +183,131 @@ components:
         rawEmailBodyAvailable: { type: boolean, const: false, description: 'Additive; raw body retention is unavailable in this release' }
 
     AdminUserWrite:
-      description: Admin-only account identity/status fields. Non-admin bodies containing role/status are rejected with 400.
+      description: >-
+        Admin-only account fields (existing CreateUserDto/UpdateUserDto). Create requires email; create and update
+        accept fullName, role, status, timezone, locale, baseCurrency, and metadata. metadata is write-only: it is never
+        returned in AdminUserView. Authorization precedes body validation: a non-administrator gets 403 whatever fields
+        a well-formed JSON body contains; field-level 400 applies only to an authorized administrator. Setting a status
+        other than ACTIVE, or deleting the account, revokes its refresh tokens. Every change is audited with field names
+        only (SEC-006).
       type: object
       properties:
+        email: { type: string, format: email, description: Create only (required there) }
         fullName: { type: string }
         role: { enum: [USER, ADMIN] }
         status: { enum: [ACTIVE, DISABLED, PENDING_DELETE] }
+        timezone: { type: string }
+        locale: { type: string }
+        baseCurrency: { type: string }
+        metadata: { type: object, writeOnly: true }
+    AdminUserView:
+      description: >-
+        What an administrator sees of an account (SEC-008): identity and status only. The user's settings, metadata,
+        credentials, and financial or email data are never included; the settings key is absent.
+      type: object
+      required: [id, email, role, status]
+      properties:
+        id: { type: string }
+        email: { type: string }
+        fullName: { type: [string, 'null'] }
+        role: { enum: [USER, ADMIN] }
+        status: { enum: [ACTIVE, DISABLED, PENDING_DELETE] }
+        timezone: { type: string }
+        locale: { type: string }
+        baseCurrency: { type: string }
+        lastLoginAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    UserProfileWrite:
+      description: >-
+        Self-service profile update (PATCH /users/me), added when /users/{id} became administrator-only. Only these
+        fields are accepted; role, status, email, id, userId, deletedAt, or metadata get 400 (SEC-004).
+      type: object
+      properties:
+        fullName: { type: string, maxLength: 120 }
+        timezone: { type: string, maxLength: 64, description: 'IANA time zone (DASH-002); an unknown zone gets 400. Registration and the admin user bodies use the same rule' }
+        locale: { type: string, maxLength: 16 }
+        baseCurrency: { type: string, pattern: '^[A-Z]{3}$', description: 'Upper-case ISO 4217 code; registration and the admin user bodies use the same rule' }
+    TransactionWriteRules:
+      description: >-
+        Rules for the existing transaction create/update bodies (SEC-004, TX-002). userId, classificationSource, and
+        classificationConfidence are not accepted (400); provenance is derived on the server (MANUAL when the owner
+        chooses a category). status accepts PENDING, POSTED, IGNORED, or NEEDS_REVIEW, never DELETED: deletion uses
+        DELETE /transactions/{id}, an audited soft delete. Related ids (financialAccountId, categoryId,
+        duplicateOfTransactionId) must be non-empty and owned (or a system category), otherwise 400 or owner-safe 404;
+        an archived account or category gets the same 404. isDuplicate true needs a duplicateOfTransactionId (sent or
+        already stored); a reference alone marks the record as a duplicate; isDuplicate false clears the reference and
+        cannot be sent together with one; a transaction cannot reference itself. Every refusal is a 400 whose message
+        names the field (T034).
+      type: object
+      properties:
+        status: { enum: [PENDING, POSTED, IGNORED, NEEDS_REVIEW] }
+        amount: { type: number, exclusiveMinimum: 0, maximum: 9999999999999.99, multipleOf: 0.01, description: 'Always positive; the direction carries the sign' }
+        currency: { type: string, pattern: '^[A-Z]{3}$', description: 'Upper-case ISO 4217 code' }
+        transactionTime: { type: string, format: date-time, description: 'ISO 8601 date-time with a UTC offset or Z; a time without an offset gets 400. It decides the user month (data-model.md "Financial period policy")' }
+        postedDate: { type: string, format: date-time, description: Same rule as transactionTime }
+        feeAmount: { type: number, minimum: 0, multipleOf: 0.01 }
+
+    CurrencyTotals:
+      description: Eligible totals of one currency (data-model.md "Financial period policy"); money is never summed across currencies.
+      type: object
+      required: [currency, income, expense, netCashflow, transactionCount]
+      properties:
+        currency: { type: string }
+        income: { type: number }
+        expense: { type: number }
+        netCashflow: { type: number }
+        transactionCount: { type: integer, description: Eligible records of every direction, transfers and adjustments included }
+    TotalsSummary:
+      description: >-
+        Base-currency totals plus every currency group. income, expense, and netCashflow are the account base
+        currency (named by currency); transactionCount spans every currency; currencies lists each group, sorted by
+        code, and is empty when nothing is eligible.
+      allOf:
+        - $ref: '#/components/schemas/CurrencyTotals'
+        - type: object
+          required: [currencies]
+          properties:
+            currencies: { type: array, items: { $ref: '#/components/schemas/CurrencyTotals' } }
+    DashboardOverview:
+      description: >-
+        Existing overview fields plus additive currency, currencies, periodStart, periodEnd, and timeZone. month is a user month
+        (timezone and month-start day). savingRate is base-currency net / income x 100 rounded half up to a whole
+        percent, 0 without income.
+      allOf:
+        - $ref: '#/components/schemas/TotalsSummary'
+        - type: object
+          required: [month, savingRate, unreadAlerts, periodStart, periodEnd, timeZone]
+          properties:
+            month: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }
+            savingRate: { type: integer }
+            unreadAlerts: { type: integer }
+            periodStart: { type: string, format: date-time }
+            periodEnd: { type: string, format: date-time, description: Exclusive }
+            timeZone: { type: string, description: 'Additive; the account IANA zone the period uses, so clients format dates without another request' }
+    CashflowMonth:
+      type: object
+      required: [month, currency, income, expense, netCashflow]
+      properties:
+        month: { type: string }
+        currency: { type: string, description: Additive; the base currency }
+        income: { type: number }
+        expense: { type: number }
+        netCashflow: { type: number }
+    CategoryBreakdownRow:
+      type: object
+      required: [categoryId, category, currency, amount, count]
+      properties:
+        categoryId: { type: [string, 'null'], description: null groups uncategorized records }
+        category: { type: [object, 'null'], description: 'The category. Categories flagged excludeFromAnalytics never appear in a breakdown' }
+        currency: { type: string, description: Additive }
+        amount: { type: number }
+        count: { type: integer }
 
   responses:
     Unauthorized: { description: 'Missing, expired, or invalid session', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Forbidden: { description: Authenticated but insufficient role, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
-    OwnerSafeNotFound: { description: Absent or not owned (non-disclosing), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    OwnerSafeNotFound: { description: 'Absent, not owned, or malformed id (non-disclosing; administrators get the same outcome for private resources). A URL containing an encoded NUL (%00) gets this 404 before authentication; an id with undecodable percent-encoding (for example %FF) gets 400 before authentication instead', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     ValidationError: { description: Field-level validation failure, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     HttpsRequired: { description: 'Production only (OPS-009): request not received over HTTPS via the trusted proxy; code HTTPS_REQUIRED', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     EmptyOk:
@@ -241,6 +363,9 @@ paths:
   /auth/refresh:
     post:
       security: []
+      summary: >-
+        Existing; single-use rotation: of concurrent requests replaying one refresh token exactly one succeeds.
+        Disabled, pending-deletion, and soft-deleted accounts get 401.
       responses:
         '200': { description: Rotated authenticated session, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -252,12 +377,27 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/EmptyOk' }
         '403': { $ref: '#/components/responses/HttpsRequired' }
+  /email-connections/gmail/connect:
+    post:
+      summary: >-
+        Existing; returns the Google authorization URL. It also sets the HttpOnly, SameSite=Lax cookie gmailOAuthNonce
+        (path /api/email-connections/gmail/callback, 10 minutes), whose hash the signed state carries (SEC-001).
+      responses:
+        '201': { description: 'Enveloped { authorizationUrl }' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /email-connections/gmail/callback:
     get:
       security: []
-      summary: Existing OAuth redirect target (<origin>/api/email-connections/gmail/callback); production refuses non-HTTPS
+      summary: >-
+        Existing OAuth redirect target (<origin>/api/email-connections/gmail/callback); production refuses non-HTTPS.
+        The state must be valid, unexpired, and bound to the browser that started the flow (gmailOAuthNonce cookie),
+        and the account must be active; this is checked before Google is called. The nonce cookie is cleared on every
+        callback that reaches the handler; a callback refused earlier (HTTPS_REQUIRED) leaves it to expire after
+        10 minutes.
       responses:
-        '302': { description: Redirect back to the web app with a sanitized connection outcome }
+        '200': { description: 'Current (as built in US1): the enveloped connection record of the calling user (id, provider, mailbox address, scopes, status, timestamps; no tokens)' }
+        '302': { description: 'Target, not yet implemented: redirect back to the web app with a sanitized connection outcome' }
+        '401': { description: 'Missing, invalid, expired, or unbound state, or an inactive account; nothing is linked', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '403': { $ref: '#/components/responses/HttpsRequired' }
   /users/me/settings:
     patch:
@@ -273,12 +413,34 @@ paths:
                   - $ref: '#/components/schemas/Envelope'
                   - properties: { data: { $ref: '#/components/schemas/UserSettingsView' } }
         '400': { $ref: '#/components/responses/ValidationError' }
+  /users/me:
+    patch:
+      summary: Self-service profile update of the caller's own account (audited field names only)
+      requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/UserProfileWrite' } } } }
+      responses:
+        '200': { description: The caller's own profile including settings (enveloped), content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /users/list:
+    post:
+      summary: Administrator lists accounts (existing list query body); items are AdminUserView
+      responses:
+        '201': { description: 'Enveloped { data: AdminUserView[], total } (existing POST status code)', content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /users:
     post:
       summary: Administrator creates a managed account (no network path grants ADMIN to a non-admin caller)
       requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/AdminUserWrite' } } } }
       responses:
-        '201': { $ref: '#/components/responses/EmptyOk' }
+        '201':
+          description: Created account (enveloped AdminUserView)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/AdminUserView' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /users/{id}:
@@ -287,15 +449,157 @@ paths:
     get:
       summary: Administrator reads account identity/status only
       responses:
-        '200': { description: Non-financial account fields, content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '200':
+          description: Account identity and status (enveloped AdminUserView; no settings)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/AdminUserView' } }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Absent, soft-deleted, or malformed id (administrators only; non-administrators get 403 for any id) }
     patch:
       summary: Administrator updates identity/role/status (audited)
       requestBody: { content: { application/json: { schema: { $ref: '#/components/schemas/AdminUserWrite' } } } }
       responses:
-        '200': { $ref: '#/components/responses/EmptyOk' }
+        '200':
+          description: Updated account (enveloped AdminUserView)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/AdminUserView' } }
         '400': { $ref: '#/components/responses/ValidationError' }
         '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      summary: Administrator soft-deletes an account (audited); its sessions stop working
+      responses:
+        '200': { description: 'Enveloped { id }' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /bank-providers:
+    get:
+      summary: >-
+        Existing read of the seeded supported providers (any authenticated user). No write operation exists in this
+        release; POST/PATCH/DELETE are unsupported routes (404) until an administrator-only write is introduced (SEC-003).
+      responses:
+        '200': { description: Enveloped provider list }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /parser-templates:
+    post:
+      summary: Administrator creates a global parser template (SEC-003); reads (GET) stay available to authenticated users
+      responses:
+        '201': { description: Created template (enveloped) }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /parser-templates/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    patch:
+      summary: Administrator updates a global parser template (SEC-003)
+      responses:
+        '200': { description: Updated template (enveloped) }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /transactions:
+    get:
+      summary: >-
+        Existing owner list (never soft-deleted rows) plus additive totals: the eligible totals of every row matching the
+        same filters, not only the page. With the same month and no other filter they equal the dashboard overview.
+      parameters:
+        - { in: query, name: month, schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }, description: 'Additive; a user month. Cannot be combined with from/to (400)' }
+        - { in: query, name: from, schema: { type: string, format: date-time }, description: 'Inclusive; needs a UTC offset; must not be after to' }
+        - { in: query, name: to, schema: { type: string, format: date-time }, description: 'Inclusive; needs a UTC offset' }
+        - { in: query, name: search, schema: { type: string, maxLength: 200 } }
+      responses:
+        '200':
+          description: 'Enveloped { data, total, page, limit, totals }'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          data: { type: array, items: { type: object } }
+                          total: { type: integer }
+                          page: { type: integer }
+                          limit: { type: integer }
+                          totals: { $ref: '#/components/schemas/TotalsSummary' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+    post:
+      summary: Existing owner create; body rules in TransactionWriteRules
+      responses:
+        '201': { description: Created transaction (enveloped) }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+  /dashboard/overview:
+    get:
+      summary: Existing monthly overview over eligible persisted records (DASH-001, DASH-002)
+      parameters:
+        - { in: query, name: month, schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }, description: 'User month; default the one containing now; malformed gets 400' }
+      responses:
+        '200':
+          description: Overview (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/DashboardOverview' } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+  /dashboard/cashflow:
+    get:
+      summary: Existing trend, now one zero-filled entry per user month, oldest first, in the base currency
+      parameters:
+        - { in: query, name: months, schema: { type: integer, minimum: 1, maximum: 24, default: 6 } }
+        - { in: query, name: month, schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }, description: 'Additive; the last month of the trend; default the one containing now' }
+      responses:
+        '200':
+          description: Trend (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { type: array, items: { $ref: '#/components/schemas/CashflowMonth' } } }
+  /dashboard/category-breakdown:
+    get:
+      summary: >-
+        Existing breakdown of eligible expense per category and currency, uncategorized included and not truncated;
+        base-currency rows first, then by amount. Categories flagged excludeFromAnalytics never appear, although their
+        transactions still count in the overview expense, trends, and list totals; the rows of one currency therefore add
+        up to that expense minus the excluded categories (equal when none has spending). The
+        recent-transactions, hot-budgets (additive currency; spend in the budget currency), insights, and analytics
+        routes take the same month parameter and policy; analytics monthly-summary gains the TotalsSummary fields
+        and analytics daily cashflow groups base-currency amounts by local date with an additive currency.
+      parameters:
+        - { in: query, name: month, schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' } }
+      responses:
+        '200':
+          description: Breakdown (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { type: array, items: { $ref: '#/components/schemas/CategoryBreakdownRow' } } }
+  /transactions/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string } }
+    patch:
+      summary: Existing owner update; body rules in TransactionWriteRules (no DELETED status, no provenance fields)
+      responses:
+        '200': { description: Updated transaction (enveloped) }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+    delete:
+      summary: Existing owner soft delete, the only way to set DELETED (audited TRANSACTION_DELETED)
+      responses:
+        '200': { description: 'Enveloped { id }' }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
   /email-connections/{id}/sync:
     parameters:
       - { in: path, name: id, required: true, schema: { type: string } }

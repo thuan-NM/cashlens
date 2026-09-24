@@ -1,10 +1,16 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { Test, TestingModule } from '@nestjs/testing';
-import cookieParser from 'cookie-parser';
-import request, { Response, SuperAgentTest } from 'supertest';
+import { createTestApp } from './helpers/test-app'; // first: synthetic config before AppModule loads
+import { INestApplication } from '@nestjs/common';
+import request, { Response } from 'supertest';
 import { App } from 'supertest/types';
-import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import {
+  Agent,
+  TestUser,
+  cleanupUsers,
+  promoteToAdminForTest,
+  registerUser,
+  syntheticPassword,
+} from './helpers/auth-fixtures';
 
 type ApiResponse<T> = {
   success: boolean;
@@ -55,18 +61,27 @@ type TransactionResponse = {
 const bodyData = <T>(response: Response) =>
   (response.body as ApiResponse<T>).data;
 
+// The ordinary user drives every self-service and owned-resource flow. Account
+// administration and parser-template writes are administrator-only (SEC-002,
+// SEC-003), so a controlled ADMIN - promoted by the harness in the shared test
+// database, never through the API - performs them.
 describe('CashLens current modules smoke test (e2e)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
-  let agent: SuperAgentTest;
+  let agent: Agent;
+  let admin: TestUser;
 
   const testRunId = Date.now();
   const email = `smoke-${testRunId}@example.com`;
   const managedUserEmail = `smoke-managed-${testRunId}@example.com`;
-  const password = 'CashLens123!';
-  const transactionTime = new Date().toISOString();
-  const month = transactionTime.slice(0, 7);
-  const date = transactionTime.slice(0, 10);
+  const password = syntheticPassword();
+  // Deterministic period (T036): the manual transactions share the user month
+  // of the parsed fixture email (20/06/2026), so the monthly summary never
+  // depends on the current date. 05:00Z is local midday in Asia/Ho_Chi_Minh,
+  // so the UTC and local calendar dates agree.
+  const transactionTime = '2026-06-15T05:00:00.000Z';
+  const month = '2026-06';
+  const date = '2026-06-15';
 
   let userId: string;
   let accountId: string;
@@ -79,44 +94,34 @@ describe('CashLens current modules smoke test (e2e)', () => {
   let parsedEmailMessageId: string;
   let failedEmailMessageId: string;
   let parserTemplateId: string;
+  let managedUserId: string | undefined;
 
   beforeAll(async () => {
-    process.env.EMAIL_TOKEN_ENCRYPTION_KEY =
-      'smoke-test-email-token-encryption-key-32';
-    process.env.GMAIL_CLIENT_ID = 'smoke-google-client-id';
-    process.env.GMAIL_CLIENT_SECRET = 'smoke-google-client-secret';
-    process.env.GMAIL_REDIRECT_URI =
-      'http://localhost:3000/api/email-connections/gmail/callback';
-    process.env.GMAIL_OAUTH_STATE_SECRET = 'smoke-oauth-state-secret';
-
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    app.use(cookieParser());
-    app.setGlobalPrefix('api');
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-      }),
-    );
-
-    await app.init();
+    // Synthetic configuration and the production request pipeline (T010 harness).
+    app = await createTestApp();
     prisma = app.get(PrismaService);
     agent = request.agent(app.getHttpServer());
+
+    admin = await registerUser(app, 'smoke-admin');
+    await promoteToAdminForTest(prisma, admin.id);
   });
 
   afterAll(async () => {
-    await prisma.parserTemplate.deleteMany({
-      where: { name: { startsWith: 'VCB smoke parser ' } },
-    });
-    await prisma.user.deleteMany({
-      where: { email: { in: [email, managedUserEmail] } },
-    });
-    await app.close();
+    if (prisma) {
+      await prisma.parserTemplate.deleteMany({
+        where: { name: { startsWith: 'VCB smoke parser ' } },
+      });
+      const users = await prisma.user.findMany({
+        where: { email: { in: [email, managedUserEmail] } },
+        select: { id: true },
+      });
+      await cleanupUsers(prisma, [
+        ...users.map((user) => user.id),
+        managedUserId,
+        admin?.id,
+      ]);
+    }
+    await app?.close();
   });
 
   describe('Auth and users', () => {
@@ -187,14 +192,14 @@ describe('CashLens current modules smoke test (e2e)', () => {
       });
     });
 
-    it('lists and finds the registered user', async () => {
-      const listResponse = await agent
+    it('lists and finds the registered user as an administrator only', async () => {
+      const listQuery = { currentPage: 1, pageSize: 10, search: email };
+      await agent.post('/api/users/list').send(listQuery).expect(403);
+      await agent.get(`/api/users/${userId}`).expect(403);
+
+      const listResponse = await admin.agent
         .post('/api/users/list')
-        .send({
-          currentPage: 1,
-          pageSize: 10,
-          search: email,
-        })
+        .send(listQuery)
         .expect(201);
 
       const list = bodyData<{ data: UserResponse[]; total: number }>(
@@ -203,24 +208,42 @@ describe('CashLens current modules smoke test (e2e)', () => {
       expect(list.total).toBeGreaterThanOrEqual(1);
       expect(list.data.some((user) => user.id === userId)).toBe(true);
 
-      const findResponse = await agent.get(`/api/users/${userId}`).expect(200);
+      const findResponse = await admin.agent
+        .get(`/api/users/${userId}`)
+        .expect(200);
       expect(bodyData<UserResponse>(findResponse).email).toBe(email);
+      // Administrators see identity and status, never private settings.
+      expect(bodyData<UserResponse>(findResponse)).not.toHaveProperty(
+        'settings',
+      );
     });
 
-    it('creates, updates, and deletes a managed user', async () => {
-      const createResponse = await agent
+    it('creates, updates, and deletes a managed user as an administrator only', async () => {
+      const managedUserBody = {
+        email: managedUserEmail,
+        fullName: 'Managed Smoke User',
+        timezone: 'UTC',
+        locale: 'en-US',
+        baseCurrency: 'USD',
+      };
+      await agent.post('/api/users').send(managedUserBody).expect(403);
+      expect(
+        await prisma.user.count({ where: { email: managedUserEmail } }),
+      ).toBe(0);
+
+      const createResponse = await admin.agent
         .post('/api/users')
-        .send({
-          email: managedUserEmail,
-          fullName: 'Managed Smoke User',
-          timezone: 'UTC',
-          locale: 'en-US',
-          baseCurrency: 'USD',
-        })
+        .send(managedUserBody)
         .expect(201);
       const managedUser = bodyData<UserResponse>(createResponse);
+      managedUserId = managedUser.id;
 
-      const updateResponse = await agent
+      await agent
+        .patch(`/api/users/${managedUser.id}`)
+        .send({ status: 'DISABLED' })
+        .expect(403);
+
+      const updateResponse = await admin.agent
         .patch(`/api/users/${managedUser.id}`)
         .send({
           fullName: 'Managed Smoke User Updated',
@@ -232,11 +255,12 @@ describe('CashLens current modules smoke test (e2e)', () => {
         status: 'DISABLED',
       });
 
-      const deleteResponse = await agent
+      await agent.delete(`/api/users/${managedUser.id}`).expect(403);
+      const deleteResponse = await admin.agent
         .delete(`/api/users/${managedUser.id}`)
         .expect(200);
       expect(bodyData<{ id: string }>(deleteResponse).id).toBe(managedUser.id);
-      await agent.get(`/api/users/${managedUser.id}`).expect(404);
+      await admin.agent.get(`/api/users/${managedUser.id}`).expect(404);
     });
 
     it('rotates cookies through refresh', async () => {
@@ -367,7 +391,10 @@ describe('CashLens current modules smoke test (e2e)', () => {
       const url = new URL(authorizationUrl);
 
       expect(url.origin).toBe('https://accounts.google.com');
-      expect(url.searchParams.get('client_id')).toBe('smoke-google-client-id');
+      // The synthetic test configuration supplies the client id (T010 harness).
+      expect(url.searchParams.get('client_id')).toBe(
+        process.env.GMAIL_CLIENT_ID,
+      );
       expect(url.searchParams.get('scope')).toBe(
         'https://www.googleapis.com/auth/gmail.readonly',
       );
@@ -420,8 +447,19 @@ describe('CashLens current modules smoke test (e2e)', () => {
   });
 
   describe('Parser pipeline', () => {
-    it('creates a safe versioned parser template', async () => {
-      const response = await agent
+    it('creates a safe versioned parser template as an administrator only', async () => {
+      // Parser templates are global system configuration (SEC-003).
+      await agent
+        .post('/api/parser-templates')
+        .send({
+          bankProviderId,
+          name: `VCB smoke parser ${testRunId} (refused)`,
+          version: 1,
+          channel: 'EMAIL',
+        })
+        .expect(403);
+
+      const response = await admin.agent
         .post('/api/parser-templates')
         .send({
           bankProviderId,
@@ -561,8 +599,7 @@ describe('CashLens current modules smoke test (e2e)', () => {
         })
         .expect(201);
 
-      const category =
-        bodyData<TransactionCategoryResponse>(createResponse);
+      const category = bodyData<TransactionCategoryResponse>(createResponse);
       categoryId = category.id;
       expect(category.status).toBe('ACTIVE');
 
@@ -610,8 +647,7 @@ describe('CashLens current modules smoke test (e2e)', () => {
           description: 'Smoke salary',
         })
         .expect(201);
-      incomeTransactionId =
-        bodyData<TransactionResponse>(incomeResponse).id;
+      incomeTransactionId = bodyData<TransactionResponse>(incomeResponse).id;
 
       const expenseResponse = await agent
         .post('/api/transactions')
@@ -626,8 +662,7 @@ describe('CashLens current modules smoke test (e2e)', () => {
           description: 'Smoke dinner',
         })
         .expect(201);
-      expenseTransactionId =
-        bodyData<TransactionResponse>(expenseResponse).id;
+      expenseTransactionId = bodyData<TransactionResponse>(expenseResponse).id;
     });
 
     it('lists, reads, updates, and categorizes transactions', async () => {
@@ -670,7 +705,6 @@ describe('CashLens current modules smoke test (e2e)', () => {
       expect(bodyData<TransactionResponse>(categoryResponse).categoryId).toBe(
         categoryId,
       );
-
     });
 
     it('returns monthly summary, category breakdown, and daily cashflow', async () => {
@@ -695,9 +729,10 @@ describe('CashLens current modules smoke test (e2e)', () => {
         .get('/api/analytics/category-breakdown')
         .query({ month })
         .expect(200);
-      const breakdown = bodyData<
-        Array<{ categoryId: string | null; amount: number; count: number }>
-      >(breakdownResponse);
+      const breakdown =
+        bodyData<
+          Array<{ categoryId: string | null; amount: number; count: number }>
+        >(breakdownResponse);
       expect(
         breakdown.some(
           (item) => item.categoryId === categoryId && item.count >= 1,
@@ -711,6 +746,7 @@ describe('CashLens current modules smoke test (e2e)', () => {
       const cashflow = bodyData<
         Array<{
           date: string;
+          currency: string;
           income: number;
           expense: number;
           netCashflow: number;
@@ -718,6 +754,7 @@ describe('CashLens current modules smoke test (e2e)', () => {
       >(cashflowResponse);
       expect(cashflow).toContainEqual({
         date,
+        currency: 'VND',
         income: 5000000,
         expense: 250000,
         netCashflow: 4750000,
@@ -776,10 +813,7 @@ describe('CashLens current modules smoke test (e2e)', () => {
       await agent.post('/api/auth/logout').expect(200);
       await agent.get('/api/auth/me').expect(401);
 
-      await agent
-        .post('/api/auth/login')
-        .send({ email, password })
-        .expect(200);
+      await agent.post('/api/auth/login').send({ email, password }).expect(200);
       await agent.post('/api/auth/logout-all').expect(200);
       await agent.get('/api/auth/me').expect(401);
     });

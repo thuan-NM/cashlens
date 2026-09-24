@@ -1,5 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionDirection } from '@prisma/client';
+import {
+  EXPENSE_DIRECTIONS,
+  TimeRange,
+  UserMonth,
+  eligibleTransactionWhere,
+  isInRange,
+} from '../../common/finance/financial-period-policy';
+import {
+  eligibleAmountsByCategory,
+  eligibleCashflowBuckets,
+  eligibleTotals,
+  loadFinancialContext,
+} from '../../common/finance/financial-summary.query';
 import { BaseRepository } from '../../common/repositories/base.repository';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -9,80 +21,44 @@ export class DashboardRepository extends BaseRepository {
     super();
   }
 
-  sumAmount(
-    userId: string,
-    range: { from: Date; to: Date },
-    directions: TransactionDirection[],
-  ) {
-    return this.prisma.transaction.aggregate({
-      where: {
-        userId,
-        status: 'POSTED',
-        isDuplicate: false,
-        direction: { in: directions },
-        transactionTime: { gte: range.from, lt: range.to },
-      },
-      _sum: { amount: true },
-    });
+  financialContext(userId: string) {
+    return loadFinancialContext(this.prisma, userId);
   }
 
-  countTransactions(userId: string, range: { from: Date; to: Date }) {
-    return this.prisma.transaction.count({
-      where: {
-        userId,
-        status: 'POSTED',
-        isDuplicate: false,
-        transactionTime: { gte: range.from, lt: range.to },
-      },
-    });
+  totals(userId: string, baseCurrency: string, range: TimeRange) {
+    return eligibleTotals(this.prisma, userId, baseCurrency, { range });
   }
 
-  recentTransactions(
-    userId: string,
-    range: { from: Date; to: Date },
-    limit = 5,
-  ) {
+  expenseByCategory(userId: string, range: TimeRange) {
+    return eligibleAmountsByCategory(
+      this.prisma,
+      userId,
+      range,
+      EXPENSE_DIRECTIONS,
+    );
+  }
+
+  cashflowByMonth(userId: string, months: UserMonth[], currency: string) {
+    return eligibleCashflowBuckets(
+      this.prisma,
+      userId,
+      { from: months[0].from, to: months[months.length - 1].to },
+      currency,
+      (instant) =>
+        months.find((month) => isInRange(instant, month))?.key ?? null,
+    );
+  }
+
+  recentTransactions(userId: string, range: TimeRange, limit = 5) {
     return this.prisma.transaction.findMany({
-      where: {
-        userId,
-        status: 'POSTED',
-        isDuplicate: false,
-        transactionTime: { gte: range.from, lt: range.to },
-      },
+      where: eligibleTransactionWhere(userId, range),
       include: { account: true, category: true },
-      orderBy: [{ transactionTime: 'desc' }, { createdAt: 'desc' }],
+      orderBy: [
+        { transactionTime: 'desc' },
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ],
       take: limit,
-    });
-  }
-
-  cashflowTransactions(userId: string, range: { from: Date; to: Date }) {
-    return this.prisma.transaction.findMany({
-      where: {
-        userId,
-        status: 'POSTED',
-        isDuplicate: false,
-        transactionTime: { gte: range.from, lt: range.to },
-      },
-      select: { amount: true, direction: true, transactionTime: true },
-      orderBy: [{ transactionTime: 'asc' }],
-    });
-  }
-
-  categoryBreakdown(userId: string, range: { from: Date; to: Date }) {
-    return this.prisma.transaction.groupBy({
-      by: ['categoryId'],
-      where: {
-        userId,
-        status: 'POSTED',
-        isDuplicate: false,
-        direction: TransactionDirection.EXPENSE,
-        transactionTime: { gte: range.from, lt: range.to },
-        category: { excludeFromAnalytics: false },
-      },
-      _sum: { amount: true },
-      _count: { _all: true },
-      orderBy: { _sum: { amount: 'desc' } },
-      take: 10,
     });
   }
 
@@ -92,7 +68,7 @@ export class DashboardRepository extends BaseRepository {
     });
   }
 
-  activeBudgets(userId: string, range: { from: Date; to: Date }) {
+  activeBudgets(userId: string, range: TimeRange) {
     return this.prisma.budget.findMany({
       where: {
         userId,
@@ -105,20 +81,18 @@ export class DashboardRepository extends BaseRepository {
     });
   }
 
-  budgetSpending(
-    userId: string,
-    categoryIds: string[],
-    range: { from: Date; to: Date },
-  ) {
+  /** Eligible expense per category and currency (TX-003, BUDGET-002). */
+  budgetSpending(userId: string, categoryIds: string[], range: TimeRange) {
     return this.prisma.transaction.groupBy({
-      by: ['categoryId'],
+      by: ['categoryId', 'currency'],
       where: {
-        userId,
-        categoryId: { in: categoryIds },
-        direction: TransactionDirection.EXPENSE,
-        status: 'POSTED',
-        isDuplicate: false,
-        transactionTime: { gte: range.from, lt: range.to },
+        AND: [
+          eligibleTransactionWhere(userId, range),
+          {
+            categoryId: { in: categoryIds },
+            direction: { in: EXPENSE_DIRECTIONS },
+          },
+        ],
       },
       _sum: { amount: true },
     });

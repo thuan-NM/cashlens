@@ -5,7 +5,9 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsTimeZone,
 } from 'class-validator';
+import { IsCurrencyCode } from '../../../common/finance/finance-validation';
 
 export class CreateUserDto {
   @IsEmail()
@@ -21,6 +23,7 @@ export class CreateUserDto {
 
   @IsOptional()
   @IsString()
+  @IsTimeZone()
   timezone?: string;
 
   @IsOptional()
@@ -28,7 +31,7 @@ export class CreateUserDto {
   locale?: string;
 
   @IsOptional()
-  @IsString()
+  @IsCurrencyCode()
   baseCurrency?: string;
 
   @IsOptional()

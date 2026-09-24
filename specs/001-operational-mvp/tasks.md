@@ -75,9 +75,9 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
 - [X] T009 [P] [CFG-002, CFG-006, SC-003, TEST-008] Add the deterministic secret scan exactly as specified in research.md "Secret scanning"; depends on T002 and T003.
   - **Files:** `scripts/scan-secrets.ps1`, `.gitleaks.toml`.
   - **Scanner image:** `ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f`, recorded once in the script.
-  - **Base ref:** `git merge-base origin/main HEAD`. If it is missing, exit 2; never skip the history scan.
+  - **Base ref:** the historical baseline `-BaseRef` (default `80f3e0d`). If it is missing or is not an ancestor of `HEAD`, exit 2; never skip the history scan.
   - **Scan 1 (file set):** select `git ls-files -z --cached --others --exclude-standard`, which covers tracked files plus untracked files that are not ignored; skip deleted paths. Copy them into a temp staging directory outside the repository, then run gitleaks `dir` on the staging directory. Ignored files (`.env*`, `node_modules`, `dist`, `.turbo`, `coverage`, `.yarn`) are never read.
-  - **Scan 2 (history):** gitleaks `git` mode over `$base..HEAD` on the repository mounted read-only.
+  - **Scan 2 (history):** gitleaks `git` mode over `<BaseRef>..HEAD` on the repository mounted read-only.
   - **Output:** `--redact`, `--no-banner`, `--exit-code 1`. Exit 0 when clean, 1 on findings, 2 on a prerequisite error. Print the scanned file count and the commit range.
   - **Config:** `.gitleaks.toml` extends the default rules and adds rules for OAuth client secrets, Google refresh tokens, and non-synthetic fixture email domains. Path rules match repository-relative paths.
   - **Allowlist:** exactly the values in `apps/api/src/config/placeholder-secrets.ts`.
@@ -91,8 +91,10 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
   | Untracked, non-ignored file with a planted synthetic secret | 1 |
   | Tracked (force-added) env file with a secret | 1 |
   | Secret committed and then removed within the feature range | 1 |
-  | Missing `origin/main` | 2 |
+  | Missing or unrelated base ref (`-BaseRef`, default `80f3e0d`) | 2 |
   | Clean tree | 0 |
+
+  **As built (US1 closure, 2026-09-24):** the history range starts at the historical baseline `-BaseRef` (default `80f3e0d`), because the default branch predates the existing codebase; a missing or unrelated base ref exits 2. Besides the placeholder allowlist, the root `.gitleaksignore` holds exactly two reviewed, documented, commit-scoped fingerprints of synthetic fixtures in pushed commit `219f8e9`; the script refuses any broader or undocumented exception and ignores inline `gitleaks:allow`. Verified on 2026-09-23 by a 31-case synthetic harness and 5 real-repository clone cases, run from session scratch space (the harness is not committed to the repository); the real-repository scan is re-run at every gate.
 
 **Checkpoint**: Configuration, runtime prerequisites, migration-history protection, and secret scanning are deterministic and testable.
 
@@ -121,6 +123,8 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
   - today's self-promotion via `PATCH /users/:id` and `POST /users` with `role`;
   - registration with `role` or `status` (expect 400);
   - bank-provider writes and parser-template writes (expect 403 for ordinary users).
+
+  **As built:** parser-template writes return 403 for ordinary users; bank-provider writes have no route and are asserted as 404 for USER and ADMIN callers (the unauthenticated case is not asserted). Privileged fields sent by a non-administrator to an administrator-only route get 403 (authorization precedes body validation; only a body that is not valid JSON is rejected earlier, with 400, by the body parser); 400 applies on registration and self-service routes.
 - [X] T012 [P] [US1] [AUTH-001, AUTH-002, AUTH-003, AUTH-004, AUTH-005, OPS-009, TEST-004] Add failing session tests in `apps/api/test/auth-session.e2e-spec.ts`; depends on T010. Cover:
   - registration, generic login failure, access expiry, refresh rotation/reuse, logout, and logout-all;
   - **production mode**:
@@ -138,7 +142,7 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
   - first promotion writes one `SYSTEM` audit row (exit 0);
   - rerun for the same user is a no-op with no new audit row (exit 0);
   - a different target while an admin exists is refused (exit 3);
-  - missing, disabled, or deleted targets are refused (exit 2);
+  - missing, disabled, pending-deletion, deleted, or passwordless (not self-registered) targets are refused (exit 2);
   - two concurrent runs produce exactly one admin;
   - `--list-admins` prints no credentials;
   - `--revoke --email` on a pre-existing self-promoted admin writes one `ADMIN_ROLE_REVOKED` audit row, after which bootstrap succeeds;
@@ -152,7 +156,9 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
 
 - [X] T018 [US1] [SEC-002, SEC-003, SEC-005] Add `@Roles()` metadata and an administrator guard that reads the **persisted** role and status, with unit tests. Files: `apps/api/src/common/decorators/roles.decorator.ts`, `apps/api/src/common/guards/roles.guard.ts`, `apps/api/src/common/guards/roles.guard.spec.ts`. Depends on T011. Verify USER, ADMIN, disabled ADMIN, absent role, and absent authentication.
 - [X] T019 [US1] [SEC-002, SEC-003, SEC-008] Apply administrator authorization only to account identity/status, bank-provider/sender writes, and parser-template writes. Files: `apps/api/src/modules/users/users.controller.ts`, `apps/api/src/modules/bank-providers/bank-providers.controller.ts`, `apps/api/src/modules/parser/parser.controller.ts`. Depends on T018. Verify the T011 role expectations and that private modules have no admin bypass.
+  **As built:** no bank-provider or sender write route exists, so there is nothing to guard; writes are unsupported routes (404) for every caller (SEC-003, spec Session 2026-09-24). Parser-template writes and all `/users` administration routes are administrator-only.
 - [X] T020 [US1] [SEC-003, SEC-004, TX-002] Split self-service and admin DTO mappings so non-admin input cannot bind `role`, `status`, `userId`, metadata ownership, or classification provenance. Files: `apps/api/src/modules/users/dto/*`, `apps/api/src/modules/users/users.mapper.ts`, `apps/api/src/modules/users/users.controller.ts`, `apps/api/src/modules/auth/dto/register.dto.ts`, `apps/api/src/modules/transactions/dto/*`, `apps/api/src/modules/transactions/transactions.mapper.ts`. Depends on T019. Verify forbid-non-whitelisted field errors and that stored privileged fields are unchanged; T011 passes.
+  **As built:** added self-service `PATCH /users/me` (full name, timezone, locale, base currency) because `/users/{id}` became administrator-only; administrator responses use an identity/status view without `settings`; transaction create/update reject `status: DELETED` (deletion only through the audited `DELETE`); empty related ids return 400.
 - [X] T021 [US1] [SEC-001, SEC-005, DATA-004] Repair owner predicates for **finance core** in `apps/api/src/modules/financial-accounts/*`, `apps/api/src/modules/transactions/transactions.repository.ts`, `apps/api/src/modules/transactions/transactions.service.ts`, and `apps/api/src/modules/transaction-categories/*`; depends on T014 and T020. Verify T014 passes without duplicate repositories.
 - [X] T022 [P] [US1] [SEC-001, SEC-005, SEC-008] Repair owner predicates for **planning and alerts** in `apps/api/src/modules/budgets/*`, `apps/api/src/modules/goals/*`, and `apps/api/src/modules/alerts/*`; depends on T015. Verify T015 passes.
 - [X] T023 [P] [US1] [SEC-001, SEC-005, SEC-008] Repair owner predicates for the **email pipeline** in `apps/api/src/modules/email-connections/*`, `apps/api/src/modules/email-listen-rules/*`, `apps/api/src/modules/email-ingestion/*`, `apps/api/src/modules/parser/parser.service.ts`, and `apps/api/src/modules/parser/parser.repository.ts`; depends on T016. Verify T016 passes.
@@ -174,10 +180,47 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
   - **Upgrade-review modes:** `--list-admins` (read-only) and `--revoke --email` (audited).
 
   Verify T013 passes and `docker compose -f docker-compose.prod.yml run --rm api node dist/src/scripts/bootstrap-admin.js --email …` works from the release image.
+
+  **As built:** eligibility also requires the account's own password (self-registered, SEC-009(a)); passwordless accounts exit 2 like missing ones.
 - [X] T029 [US1] [SEC-006, AUTH-005] Add sanitized audit writes using the existing `AuditLog` writer for privileged account changes, settings changes, email connect/disconnect/sync, category corrections, and destructive financial actions. Files: `apps/api/src/modules/users/users.repository.ts`, `apps/api/src/modules/users/users.service.ts`, `apps/api/src/modules/email-connections/email-connections.service.ts`, `apps/api/src/modules/email-ingestion/email-ingestion.service.ts`, `apps/api/src/modules/transactions/transactions.service.ts`. Depends on T021, T023, T025, and T026. Verify actor/resource/action evidence without secrets or raw email data.
+  **As built:** coverage also includes archiving a financial account or a transaction category (destructive financial actions under SEC-006), admin create/update/delete, self-service profile and settings changes, and `LOGIN_FAILED`/`LOGOUT` writes. It required importing `UsersModule` into the email, transaction, account, and category modules and passing the acting administrator from `users.controller.ts`. The action catalogue is in data-model.md "Account status and audit evidence". Test evidence: `apps/api/test/audit-evidence.e2e-spec.ts` asserts the administrator, self-service, financial, and email actions and the absence of secrets; `auth-session.e2e-spec.ts` asserts that login, refresh, and logout-all add rows without secrets; `admin-bootstrap.e2e-spec.ts` asserts the `SYSTEM` bootstrap and revoke rows. `REGISTER`, `LOGIN_FAILED`, and `LOGOUT` rows are written but not asserted by any test (follow-up below).
 - [X] T030 [US1] [SEC-001–SEC-009, AUTH-001–AUTH-005, SC-002, SC-015] Run and stabilize all US1 suites (T011–T017), serially under the T010 harness, in `apps/api/test/*.e2e-spec.ts`; depends on T018–T029. Verify the independent test passes end to end.
 
 **Checkpoint**: US1 is independently secure, the first administrator is provisionable only via SEC-009, and P0 security gates are satisfied.
+
+### US1 closure follow-ups (deferred, not part of US1)
+
+Found while implementing US1 and deliberately left open. Each maps to the future task or requirement that owns it; none blocks US1.
+
+| Issue | Requirement | Owner |
+|---|---|---|
+| `POST /alerts` accepts any `resourceType`/`resourceId` without an ownership check | ALERT-011, SEC-001 | T066, T068 |
+| The Gmail callback URL (`code`, `state`) appears in request logs | OPS-008, EMAIL-002 | T094, T095 |
+| Parser-run payloads and raw sync/parser error text reach their owner unsanitized | EMAIL-011, ERR-003, SEC-008 | T045, T049 |
+| Registration returns 409 for an existing email; the contract lists 201/400/403 | AUTH-004 | T101 contract comparison (pending product decision) |
+| Swagger UI and JSON are published in production | CFG-004 | T093 (it owns `main.ts`, where Swagger is mounted); T105 documents the production behavior |
+| The access-token lifetime falls back to 7 days when `JWT_EXPIRES_IN` is unset (compose and `.env.example` set 15m) | AUTH-002, CFG-001 | T093 (startup in `main.ts`; require the setting or default to 15m) |
+| Admin `POST /users/list` sorting or filtering by last sign-in fails (config key `lastLogin` instead of `lastLoginAt`) | ERR-001 | T092 (failing case), T093 (fix) |
+| A NUL character inside a JSON request body (not an id) may still reach PostgreSQL and fail | ERR-004 | T093 |
+| ~~The legacy smoke suite (`app.e2e-spec.ts`) monthly-summary case depends on the calendar month (fixture email dated June 2026)~~ **Resolved in T036:** the manual transactions use a fixed June 2026 instant and every summary names `month=2026-06`; expected values unchanged | TEST-004 | T036 (done) |
+| `REGISTER`, `LOGIN_FAILED`, and `LOGOUT` audit rows are written but no test asserts them | AUTH-005, SEC-006 | T098 (requirement-to-test traceability; add the missing assertions) |
+| The Gmail callback answers 200 with the enveloped connection record; the contract target is a 302 redirect back to the web app | EMAIL-001 | T101 contract comparison (pending product decision) |
+
+### US2 follow-ups (deferred, not part of US2)
+
+Found while implementing and reviewing US2 (T031–T036) and deliberately left open. Each maps to the future task or decision that owns it; none blocks US2.
+
+| Issue | Requirement | Owner |
+|---|---|---|
+| The parser `vi_datetime` normalizer builds the instant in the server process timezone, so an email's user month depends on the host (UTC in the release image) | DASH-002, DASH-003, EMAIL-011 | T045 (strict parser-output gate), T046 fixtures |
+| The parser keeps a minus sign on amounts, so a negative POSTED expense lowers totals; parsed currency codes are not normalized (`VNĐ`, `đ` form their own groups) | TX-002, TX-003, EMAIL-011 | T045 |
+| Budget DTO `currency` is still `@IsString @MaxLength(3)`, and the web budget form never sends a currency (stored `VND`), so hot budgets of non-VND accounts count nothing | BUDGET-002, TX-002 | T069, T070 |
+| Hot budgets without a category report 0 spent, and spend is not clipped to `startsAt`/`endsAt` | BUDGET-002 | T070 (shared spend aggregate) |
+| ~~`excludeFromAnalytics` no longer removes breakdown rows server-side~~ **Decided at US2 closure (2026-09-24):** excluded categories never appear in category breakdowns, and their transactions still count in totals; implemented and tested (spec.md Session 2026-09-24, US2 closure) | DASH-001, SC-009 | Done (US2 closure) |
+| A transaction created without `currency` gets the schema default `VND`, not the account base currency | TX-002 | Product decision; T101 contract comparison |
+| Duplicate links may form cycles, or point at an original that is later ignored or deleted, so an event can drop out of every total | TX-003, EMAIL-008 | Product decision; T045 layered deduplication |
+| Transactions in an archived financial account still count (the documented eligibility rule is transaction-level only) | TX-003 | Product decision; T101 contract comparison |
+| The web ESLint config cannot load (`eslint-plugin-react-refresh` and `typescript-eslint` are not installed for `apps/web`); this existed before US2 | ERR-005, TEST-006 | T096 (web test and tooling setup) |
 
 ---
 
@@ -187,12 +230,17 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
 
 **Independent Test**: A known data set produces identical hand-calculated transaction, dashboard, budget-input, and goal-input totals across edits and exclusions.
 
-- [ ] T031 [P] [US2] [TX-001, TX-002, TX-003, TX-005, DASH-001–DASH-003, BUDGET-002, DATA-004, TEST-002] Add failing golden tests for status eligibility, transfers, duplicates, timezone/month-start boundaries, and mixed currencies in `apps/api/src/common/finance/financial-period-policy.spec.ts`; depends on T030. Verify every documented edge case has an explicit expected total.
-- [ ] T032 [US2] [TX-003, DASH-002, DASH-003, DATA-004] Implement shared Prisma predicates and UTC/user-period range helpers, including a completed-month range helper, in `apps/api/src/common/finance/financial-period-policy.ts`; depends on T031. Verify deterministic ranges across DST and non-first-day month starts.
-- [ ] T033 [US2] [TX-001–TX-003, DASH-001–DASH-003] Refactor existing transaction, analytics, and dashboard repository queries to consume the shared policy. Files: `apps/api/src/modules/transactions/transactions.repository.ts`, `apps/api/src/modules/analytics/*`, `apps/api/src/modules/dashboard/*`. Depends on T032. Verify ignored, deleted, and duplicate rows and transfers are treated consistently.
-- [ ] T034 [US2] [TX-002, ERR-001] Tighten transaction field and related-owner validation in `apps/api/src/modules/transactions/dto/*` and `apps/api/src/modules/transactions/transactions.service.ts`; depends on T033. Verify invalid amount, currency, direction, date, account, category, and duplicate reference each produce an actionable field error or safe error.
-- [ ] T035 [P] [US2] [TX-001, TX-005, ERR-005] Complete transaction list/filter/edit/category/ignore/duplicate/delete feedback and dashboard empty/loading/error states in `apps/web/src/features/transactions/components/TransactionsPage.tsx` and `apps/web/src/features/dashboard/components/DashboardPage.tsx`; depends on T027 and T033. Verify persisted responses replace any runtime mock fallback.
-- [ ] T036 [US2] [DASH-001–DASH-004, TEST-004, SC-009, SC-010] Add transaction-to-dashboard integration tests and the reference benchmark tooling; depends on T003 (release-test profile), T007 (the bench override extends `docker-compose.prod.yml`), and T034. Deliverables:
+- [X] T031 [P] [US2] [TX-001, TX-002, TX-003, TX-005, DASH-001–DASH-003, BUDGET-002, DATA-004, TEST-002] Add failing golden tests for status eligibility, transfers, duplicates, timezone/month-start boundaries, and mixed currencies in `apps/api/src/common/finance/financial-period-policy.spec.ts`; depends on T030. Verify every documented edge case has an explicit expected total.
+  **As built:** 53 golden cases. 43 were written first and seen failing individually against a throwing stub. 10 were added after T032 and never seen failing: 8 after an independent coverage review, with literals recomputed independently by Intl brute force, and 2 after the US2 review (month-key range, currency case). They cover every status × direction treatment, transfers, adjustments, duplicates, deleted rows, exact-decimal USD sums, per-currency groups, the savings rate, half-open month boundaries, month-start days 1/6/8/25/28, year rollover, DST (New York), skipped and doubled midnights (America/Havana, America/Santiago, Asia/Beirut), completed-month windows at the exact boundary, and settings fallbacks. Decisions the spec left open are recorded in data-model.md "Financial period policy (US2)".
+- [X] T032 [US2] [TX-003, DASH-002, DASH-003, DATA-004] Implement shared Prisma predicates and UTC/user-period range helpers, including a completed-month range helper, in `apps/api/src/common/finance/financial-period-policy.ts`; depends on T031. Verify deterministic ranges across DST and non-first-day month starts.
+  **As built:** pure `Intl`-based helpers (no dependency): `userMonthForKey`, `userMonthContaining`, `userMonthsEndingAt`, `recentUserMonths`, `completedUserMonths`, `completedMonthsRange`, `startOfLocalDay`, `localDateKey`, plus `eligibleTransactionWhere`/`visibleTransactionWhere`, exact-decimal `totalsByCurrency`, and `savingRatePercent`. A local day starts at its earliest instant; a month is labelled by the local month in which it starts. Results are identical with the process `TZ` set to UTC, America/Los_Angeles, or Pacific/Kiritimati. Prisma-backed aggregates shared by the consumers live in `apps/api/src/common/finance/financial-summary.query.ts`.
+- [X] T033 [US2] [TX-001–TX-003, DASH-001–DASH-003] Refactor existing transaction, analytics, and dashboard repository queries to consume the shared policy. Files: `apps/api/src/modules/transactions/transactions.repository.ts`, `apps/api/src/modules/analytics/*`, `apps/api/src/modules/dashboard/*`. Depends on T032. Verify ignored, deleted, and duplicate rows and transfers are treated consistently.
+  **As built:** dashboard, analytics, and the transaction list use only the shared policy and aggregates. Money fields are the base currency with additive `currency`/`currencies`; the breakdown includes uncategorized rows, leaves out categories flagged `excludeFromAnalytics` (their transactions still count in every total; US2 closure decision), and is no longer truncated; the trend is zero-filled; hot budgets spend in the budget currency; the list gains a user-month `month` filter and additive `totals` over all matching rows. `apps/api/test/transactions-dashboard.e2e-spec.ts` (T036) verifies it: 17 cases. The first 16 were run against the pre-US2 source, and 15 of them failed; the 17th (currency-case folding) was added after the review.
+- [X] T034 [US2] [TX-002, ERR-001] Tighten transaction field and related-owner validation in `apps/api/src/modules/transactions/dto/*` and `apps/api/src/modules/transactions/transactions.service.ts`; depends on T033. Verify invalid amount, currency, direction, date, account, category, and duplicate reference each produce an actionable field error or safe error.
+  **As built:** shared validators in `apps/api/src/common/finance/finance-validation.ts`. Amounts are positive, with at most 2 decimals, up to 9,999,999,999,999.99; currencies are upper-case ISO 4217; instants need an explicit UTC offset; `isDuplicate`/`duplicateOfTransactionId` must agree and a transaction cannot reference itself; list `month` excludes `from`/`to` and `from` cannot be after `to`; malformed dashboard and analytics months get 400; timezones on registration, profile, and admin DTOs must be IANA. Related ids keep the US1 owner-safe 404. After the review, `IsMoney` also counts decimals exactly for exponent-notation numbers; `null` is refused for fields every transaction carries; `page` is at most 1,000,000; month keys are limited to 1900-01..2099-12. `apps/api/test/transactions-validation.e2e-spec.ts`: 48 cases pass (44, plus 4 added after the review), and the US1 suites are unchanged.
+- [X] T035 [P] [US2] [TX-001, TX-005, ERR-005] Complete transaction list/filter/edit/category/ignore/duplicate/delete feedback and dashboard empty/loading/error states in `apps/web/src/features/transactions/components/TransactionsPage.tsx` and `apps/web/src/features/dashboard/components/DashboardPage.tsx`; depends on T027 and T033. Verify persisted responses replace any runtime mock fallback.
+  **As built:** both pages read React Query data rather than Refine's frozen `{}` placeholder, so pending and failed requests show skeletons or an error with retry, never a crash or a false empty state. The Transactions page lists the user month taken from the dashboard overview; its summary cards come from the server `totals` (base currency, other currencies listed separately), and its rows carry status, duplicate, and transfer badges. Drawer actions (category, note, ignore, mark or clear duplicate, delete) each give feedback, refetch, and are disabled while pending. The create form shows the API's field errors. The Dashboard sends exactly the six month-less requests concurrently (the DASH-004 load), formats money in the base currency and dates in `overview.timeZone`, shows other currencies separately, and no longer has runtime mock fallbacks (fake T1–T6 months, placeholder insight, invented counts). `AreaChart` gained an optional `currency` prop. Verified by the web type check and production build, an SSR harness over pending, failed, and loaded states, and a headless-browser run against a mock API (six concurrent requests, no `/auth/me`). A headless-browser run against the real development-mode API, seeded with the benchmark fixture and served same-origin, passed 18/18 checks: rendered totals equal the API, six concurrent month-less dashboard requests, list totals equal the dashboard, one real ignore updated both views, and no page errors. The web ESLint config cannot load, which predates US2 (follow-up T096).
+- [X] T036 [US2] [DASH-001–DASH-004, TEST-004, SC-009, SC-010] Add transaction-to-dashboard integration tests and the reference benchmark tooling; depends on T003 (release-test profile), T007 (the bench override extends `docker-compose.prod.yml`), and T034. Deliverables:
   - **Integration tests** in `apps/api/test/transactions-dashboard.e2e-spec.ts`: hand-calculated canonical-ledger totals.
   - **Deterministic fixture generator** in `apps/api/test/benchmark/dashboard-bench.fixture.ts`: seed `20260923`; 13 user months; 2,990 transactions (230 per month with the DASH-004 mix); 20 categories; 3 accounts; 10 MONTHLY budgets. It returns its own expected current-month totals.
   - **Runner** in `apps/api/test/benchmark/dashboard-benchmark.ts`:
@@ -209,6 +257,7 @@ description: "Dependency-ordered implementation tasks for the CashLens operation
   - a **non-gating** 20-load smoke run completes against the test API.
 
   The release gate is T101.
+  **As built:** `transactions-dashboard.e2e-spec.ts` (17 cases: canonical ledger, list-versus-dashboard agreement, breakdown reconciliation with the excluded-from-analytics category hidden from both breakdowns but counted in totals, zero-filled trend, hot budgets, analytics, TX-005 recalculation, America/New_York month-start day 25 across DST, currency-case folding); the fixture, seeder, and runner under `apps/api/test/benchmark/` with `dashboard-bench.e2e-spec.ts` (12 cases: determinism, the DASH-004 mix for 13 months, isolated-database seeding whose API overview equals the independently computed totals, runner exit codes); `docker-compose.bench.yml` (pinned project `cashlens-bench`); package scripts. The legacy smoke suite now uses a fixed June 2026 period and passes 22/22 with unchanged expected values. Non-gating 20-load smoke run on the finished code: p95 59.2 ms, 0 failed responses, totals matched (research.md "Dashboard benchmark", As built). The gating run is T101.
 
 **Checkpoint**: US2 is independently testable and supplies the shared calculation foundation for budgets, alerts, and goals.
 

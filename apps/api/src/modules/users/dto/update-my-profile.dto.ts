@@ -1,4 +1,5 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength, IsTimeZone } from 'class-validator';
+import { IsCurrencyCode } from '../../../common/finance/finance-validation';
 
 /**
  * Self-service profile update (PATCH /users/me). Role, status, email,
@@ -14,6 +15,7 @@ export class UpdateMyProfileDto {
   @IsOptional()
   @IsString()
   @MaxLength(64)
+  @IsTimeZone()
   timezone?: string;
 
   @IsOptional()
@@ -22,7 +24,6 @@ export class UpdateMyProfileDto {
   locale?: string;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(3)
+  @IsCurrencyCode()
   baseCurrency?: string;
 }

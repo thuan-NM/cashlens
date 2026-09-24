@@ -8,7 +8,7 @@
 
 ## Authorization
 
-**Decision**: Add a small role guard for admin-only account/system configuration; keep mandatory repository owner scoping, with no admin bypass.  
+**Decision**: Add a small role guard for admin-only account/system configuration; keep mandatory repository owner scoping, with no admin bypass. As built (US1): the guard reads the persisted role and status on every request and runs after authentication and before body validation; administrator account views expose identity and status only; self-service profile edits use `PATCH /users/me`.  
 **Rationale**: Current Users CRUD is JWT-only and accepts role/status, while only USER/ADMIN behavior is needed.  
 **Alternatives considered**: ACL/policy framework and super-admin data access—unnecessary and contrary to SEC-008.
 
@@ -63,7 +63,7 @@ Exit codes:
 | Code | Outcome |
 |---|---|
 | 0 | Promoted, or already admin |
-| 2 | Target missing, disabled, or deleted |
+| 2 | Target missing, disabled, pending deletion, deleted, or not self-registered (no password of its own) |
 | 3 | Another active admin exists |
 | 1 | Configuration or database error |
 
@@ -93,7 +93,7 @@ How the operator runs it:
 - A SQL snippet in the docs: rejected because it has no audit, idempotency, or tests.
 - A `--force` flag: rejected as unnecessary.
 
-**Current gap it depends on**: `CreateUserDto`/`UpdateUserDto` accept `role`/`status`, and `/users` is guarded only by JWT, so any user can self-promote today. P0.1 must close this before the bootstrap has meaning.
+**Gap it depended on (closed in US1, T018–T020)**: `CreateUserDto`/`UpdateUserDto` accepted `role`/`status`, and `/users` was guarded only by JWT, so any user could self-promote. P0.1 closed this before the bootstrap was built; `/users` is now administrator-only and self-service profile changes use `PATCH /users/me`.
 
 ## Budget thresholds (BUDGET-001)
 
@@ -224,18 +224,18 @@ Optional tuning, with defaults:
 
 **File selection comes from Git, not from walking the directory.** gitleaks `dir` mode has no `.gitignore` support; its only ignore file, `.gitleaksignore`, suppresses findings, not files. A plain `dir` scan of the checkout would therefore scan a developer's correctly ignored `apps/api/.env`.
 
-`scripts/scan-secrets.ps1` runs these steps and exits 0 (clean), 1 (findings), or 2 (prerequisite error):
+`scripts/scan-secrets.ps1` runs these steps and exits 0 (clean), 1 (findings), or 2 (prerequisite or configuration error):
 
-1. **Preconditions.** Require `git` and `docker`. Resolve `$base = git merge-base origin/main HEAD`. If `origin/main` is missing, or the merge base cannot be found, exit **2**; never skip the history scan silently. Release runs do `git fetch origin main` first.
+1. **Preconditions.** Require `git` and `docker`. Resolve the historical baseline `-BaseRef` (default `80f3e0d`, the last commit of this branch that was merged into `dev` in PR #7). The default branch holds only the initial scaffold commit `a023029`, so its merge base would rescan the whole pre-feature history. The range `80f3e0d..HEAD` still covers the implementation baseline `b273f14` and every feature commit. If the ref is missing (for example in a shallow clone) or is not an ancestor of HEAD, exit **2**; never skip the history scan silently. Also exit **2** if the placeholder allowlist differs from `placeholder-secrets.ts`, if `.gitleaks.toml` holds any path, commit, or stopword allowlist, or if `.gitleaksignore` holds anything but documented exact fingerprints (see below).
 2. **Select the working-tree files.** `git ls-files -z --cached --others --exclude-standard`, de-duplicated. This covers:
    - every tracked file, including a tracked file that an ignore rule would match (an accidentally committed `.env` is still scanned);
    - every untracked file that ignore rules do not exclude.
 
    Ignored paths never enter the set: `.env*` local files, `node_modules`, `dist`, `.turbo`, `coverage`, and `.yarn`. Tracked paths that are deleted on disk are skipped.
 3. **Stage.** Copy the selected files, preserving relative paths, into a fresh temporary directory outside the repository. Remove the directory in a `finally` block.
-4. **Scan 1, working tree.** Run `docker run --rm -v <staging>:/scan:ro -v <repo>/.gitleaks.toml:/cfg/.gitleaks.toml:ro <image> dir /scan --config /cfg/.gitleaks.toml --redact --no-banner --exit-code 1`. Path-scoped rules match paths relative to `/scan`, which are the same as repository-relative paths.
-5. **Scan 2, feature history.** Run `docker run --rm -v <repo>:/repo:ro <image> git /repo --log-opts="$base..HEAD" --config /repo/.gitleaks.toml --redact --no-banner --exit-code 1`. This covers every feature commit, including secrets that were added and later removed. Ignored files never appear in commits unless forced, in which case they are scanned. The script sets `safe.directory` for the mounted path when the container user differs from the repository owner.
-6. **Result.** Exit 1 if either scan exits 1. Print only redacted findings, the scanned file count, and the commit range.
+4. **Scan 1, working tree.** Run `docker run --rm -v <staging>:/scan:ro -v <staged config>:/cfg:ro <image> dir /scan --config /cfg/.gitleaks.toml --ignore-gitleaks-allow --redact --no-banner --exit-code 1`, with the JSON report on standard output. Path-scoped rules match paths relative to `/scan`, which are the same as repository-relative paths.
+5. **Scan 2, feature history.** Run `docker run --rm -v <repo>:/repo:ro -v <staged config>:/cfg:ro <image> git /repo --log-opts="<BaseRef commit>..HEAD" --config /cfg/.gitleaks.toml --ignore-gitleaks-allow --redact --no-banner --exit-code 1`, with the JSON report on standard output. The validated root `.gitleaksignore` applies its exact commit-scoped fingerprints. This covers every feature commit, including secrets that were added and later removed. Ignored files never appear in commits unless forced, in which case they are scanned. The script sets `safe.directory` for the mounted path when the container user differs from the repository owner.
+6. **Result.** Exit 1 if either scan reports findings, and 2 if gitleaks produced no parsable report. Print only redacted findings, the reviewed-exception count, the scanned file count, and the commit range.
 
 Scan options:
 
@@ -243,6 +243,7 @@ Scan options:
 - `.gitleaks.toml` sets `[extend] useDefault = true`.
 - Custom rules cover the Google OAuth client secret (`GOCSPX-`), Google refresh tokens (`1//0`), and **non-synthetic email addresses under `apps/*/test/**` and `**/fixtures/**`**. Allowed fixture domains are `example.com`, `example.org`, `example.test`, and `cashlens.test`.
 - The allowlist contains exactly the placeholder values in `apps/api/src/config/placeholder-secrets.ts`, the same list that production startup rejects (CFG-001), for example `change-me`, `cashlens_password`, and `replace-with-…`. No path-wide allowlists are used.
+- **Reviewed history exceptions** (US1 closure): the root `.gitleaksignore` may hold only exact, commit-scoped fingerprints `<40-hex commit>:<path>:<rule>:<line>` of commits in HEAD's history, each directly after a comment explaining it. gitleaks would apply a commit-less fingerprint to every commit and to the working tree, so the script refuses those, wildcards, abbreviated commits, undocumented entries, and nested `.gitleaksignore` files. Inline `gitleaks:allow` comments are ignored (`--ignore-gitleaks-allow`). The file currently holds two entries: the synthetic `JWT_SECRET` and `EMAIL_TOKEN_ENCRYPTION_KEY` fixture values committed in pushed commit `219f8e9` (`apps/api/src/config/configuration.spec.ts` lines 18 and 19), which the working tree now builds at runtime. A changed fixture, or any other secret in the same file, folder, or commit, is still reported.
 
 **Rationale**:
 
@@ -332,6 +333,15 @@ All six use the current month, the web default. A load's duration runs from the 
 - Timing a single endpoint: it misses the page's real cost.
 - Concurrent load testing: this is not a throughput feature.
 - k6 or autocannon: an extra tool with no benefit at this scale.
+
+**As built (T036):**
+- **Anchor.** The generator is pure, and the seeder and runner share one anchor date (`--anchor YYYY-MM-DD`, default today in Asia/Ho_Chi_Minh). Every month draws the same number of random values, so the current-month amounts depend on the seed alone; any anchor in the same month verifies. The "elapsed part of the month" runs through the end of the anchor day, so some rows may carry later-today timestamps. They stay inside the current month and change neither totals nor timing.
+- **Sign-in password.** The bench user's password comes from `BENCH_USER_PASSWORD` (12–72 characters), which both the seeder and the runner read and never print. Generate a throwaway value in the session, as quickstart.md §7b does.
+- **Seeder guards.** The seeder refuses (exit 2) when the target database holds any account other than `bench@cashlens.test`. With `BENCH_DATABASE_URL`, it also refuses a database name without "bench" or "test".
+- **Runner output.** Its median is nearest-rank (the 100th of 200). Exit codes: 0 pass, 1 p95 over 1,000 ms, 2 usage error, 3 totals mismatch, 4 failed response (including warm-up, readiness, and sign-in).
+- **Compose override.** `docker-compose.bench.yml` pins the project name `cashlens-bench`, so leaving out `-p` never touches the `cashlens-prod` stack.
+- **Load shape.** A load is the six concurrent month-less requests of `DashboardPage.tsx`; the page issues exactly those, with no request gated on another (T035).
+- **Non-gating smoke run (T036), development mode over HTTP.** It ran on a dedicated test database: 20 loads after 2 warm-ups; final re-run on the finished code: min 44.1 ms, median 47.2 ms, p95 59.2 ms, max 62.3 ms, 0 failed responses, totals matched (an earlier run gave p95 78.0 ms). Host: AMD Ryzen 5 4600H, 12 logical CPUs, 15.4 GiB, Windows, Node 22. This is not SC-010 evidence, which T101 records on the reference release host.
 
 ## Goal rounding and periods (GOAL-002 to GOAL-004)
 
