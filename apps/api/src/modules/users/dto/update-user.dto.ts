@@ -1,5 +1,12 @@
 import { UserRole, UserStatus } from '@prisma/client';
-import { IsEnum, IsObject, IsOptional, IsString } from 'class-validator';
+import {
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsTimeZone,
+} from 'class-validator';
+import { IsCurrencyCode } from '../../../common/finance/finance-validation';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -12,6 +19,7 @@ export class UpdateUserDto {
 
   @IsOptional()
   @IsString()
+  @IsTimeZone()
   timezone?: string;
 
   @IsOptional()
@@ -19,7 +27,7 @@ export class UpdateUserDto {
   locale?: string;
 
   @IsOptional()
-  @IsString()
+  @IsCurrencyCode()
   baseCurrency?: string;
 
   @IsOptional()

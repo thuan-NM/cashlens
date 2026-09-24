@@ -265,6 +265,21 @@ Rules:
   - `POST /email-connections/gmail/connect` also sets the `gmailOAuthNonce` cookie, and the callback refuses (401) a state that is not bound to that browser or whose account is inactive.
   - Disabled, pending-deletion, and soft-deleted accounts lose sign-in, refresh, and existing sessions (401); refresh rotation is single-use under concurrency.
   - An id containing a NUL character is answered with 404 instead of a database error.
+  - Financial totals (US2, data-model.md "Financial period policy"):
+    - Dashboard and analytics `month` values, and the new `month` filter on `GET /transactions`, are user months in the account timezone with its month-start day, not UTC calendar months.
+    - `income`, `expense`, and `netCashflow` now cover the base currency only. The additive `currency` and `currencies` fields carry every currency group, and other currencies are no longer added in.
+    - The dashboard category breakdown now includes uncategorized expense and categories flagged `excludeFromAnalytics`, and is no longer cut to 10 rows. The dashboard cashflow trend returns every month of the window, zero-filled. The analytics daily cashflow groups by the user's local date. Breakdown, trend, daily, and hot-budget rows gain an additive `currency` field.
+    - `GET /transactions` gains additive `totals`, computed over every row matching the filters. The dashboard cashflow gains an optional end `month`, and the overview gains additive `periodStart`, `periodEnd`, and `timeZone`.
+    - Stored currency codes that differ only in case count as one currency.
+  - Transaction validation tightening (T034), all returned as 400 field errors:
+    - `amount` must be greater than 0, with at most 2 decimals, and at most 9,999,999,999,999.99.
+    - `currency` and base currencies must be upper-case ISO 4217 codes.
+    - `transactionTime`, `postedDate`, list `from`/`to`, and analytics `from`/`to` need an ISO 8601 date-time with a UTC offset.
+    - `isDuplicate: true` needs a `duplicateOfTransactionId`, and a transaction cannot reference itself.
+    - List `month` cannot be combined with `from`/`to`, and `from` cannot be after `to`.
+    - Profile, registration, and admin timezones must be IANA zones.
+    - Malformed dashboard and analytics `month` values, and month keys outside 1900-01..2099-12, return 400 instead of failing.
+    - `null` for `amount`, `currency`, `direction`, `transactionTime`, `status`, `isDuplicate`, or `duplicateOfTransactionId` returns 400; `page` is at most 1,000,000.
   - Budget `thresholdPercent` of 100 or more on write now returns 400.
   - Goal statuses change to `SAFE|ACCEPTABLE|RISKY|NOT_RECOMMENDED|INSUFFICIENT_DATA`, and `feasibilityScore` becomes nullable; deploy web and API atomically.
   - Goal simulation now honors `targetDate`. `months` now reports the remaining periods used, and `horizonSource`/`pastDeadline` are additive.

@@ -1,10 +1,17 @@
 import { Injectable } from '@nestjs/common';
-import { TransactionDirection } from '@prisma/client';
+import {
+  TimeRange,
+  eligibleTransactionWhere,
+} from '../../common/finance/financial-period-policy';
+import {
+  byLocalDate,
+  eligibleAmountsByCategory,
+  eligibleCashflowBuckets,
+  eligibleTotals,
+  loadFinancialContext,
+} from '../../common/finance/financial-summary.query';
 import { BaseRepository } from '../../common/repositories/base.repository';
 import { PrismaService } from '../../prisma/prisma.service';
-import {
-  buildAnalyticsTransactionWhere,
-} from './query/analytics.query';
 
 @Injectable()
 export class AnalyticsRepository extends BaseRepository {
@@ -12,46 +19,29 @@ export class AnalyticsRepository extends BaseRepository {
     super();
   }
 
-  sumAmount(
-    userId: string,
-    range: { from: Date; to: Date },
-    directions: TransactionDirection[],
-  ) {
-    return this.prisma.transaction.aggregate({
-      where: {
-        ...buildAnalyticsTransactionWhere(userId, range),
-        direction: { in: directions },
-      },
-      _sum: { amount: true },
-    });
+  financialContext(userId: string) {
+    return loadFinancialContext(this.prisma, userId);
   }
 
-  countPostedTransactions(userId: string, range: { from: Date; to: Date }) {
-    return this.prisma.transaction.count({
-      where: buildAnalyticsTransactionWhere(userId, range),
-    });
+  totals(userId: string, baseCurrency: string, range: TimeRange) {
+    return eligibleTotals(this.prisma, userId, baseCurrency, { range });
   }
 
-  recentTransactions(userId: string, range: { from: Date; to: Date }) {
+  recentTransactions(userId: string, range: TimeRange) {
     return this.prisma.transaction.findMany({
-      where: buildAnalyticsTransactionWhere(userId, range),
+      where: eligibleTransactionWhere(userId, range),
       include: { account: true, category: true },
-      orderBy: [{ transactionTime: 'desc' }],
+      orderBy: [
+        { transactionTime: 'desc' },
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ],
       take: 10,
     });
   }
 
-  categoryBreakdown(userId: string, range: { from: Date; to: Date }) {
-    return this.prisma.transaction.groupBy({
-      by: ['categoryId', 'direction'],
-      where: {
-        ...buildAnalyticsTransactionWhere(userId, range),
-        category: { excludeFromAnalytics: false },
-      },
-      _sum: { amount: true },
-      _count: { _all: true },
-      orderBy: { _sum: { amount: 'desc' } },
-    });
+  amountsByCategory(userId: string, range: TimeRange) {
+    return eligibleAmountsByCategory(this.prisma, userId, range);
   }
 
   findCategories(ids: string[]) {
@@ -60,15 +50,18 @@ export class AnalyticsRepository extends BaseRepository {
     });
   }
 
-  cashflowTransactions(userId: string, range: { from: Date; to: Date }) {
-    return this.prisma.transaction.findMany({
-      where: buildAnalyticsTransactionWhere(userId, range),
-      select: {
-        amount: true,
-        direction: true,
-        transactionTime: true,
-      },
-      orderBy: [{ transactionTime: 'asc' }],
-    });
+  dailyCashflow(
+    userId: string,
+    range: TimeRange,
+    currency: string,
+    timeZone: string,
+  ) {
+    return eligibleCashflowBuckets(
+      this.prisma,
+      userId,
+      range,
+      currency,
+      byLocalDate(timeZone),
+    );
   }
 }

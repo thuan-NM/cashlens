@@ -184,6 +184,8 @@ Run this on the **same reference release host and `.env.release-test` profile as
 $c = @('-p','cashlens-bench','--env-file','.env.release-test','-f','docker-compose.prod.yml','-f','docker-compose.bench.yml')
 docker compose @c run --rm migrate
 docker compose @c up -d
+# Throwaway password for the bench user; both steps read it, nothing prints it.
+$b = New-Object byte[] 24; [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); $env:BENCH_USER_PASSWORD = [Convert]::ToBase64String($b)
 yarn workspace api bench:dashboard:seed --env-file .env.release-test      # reads DB credentials from the profile; prints none
 $env:NODE_EXTRA_CA_CERTS = "<path-to-release-test-CA.pem>"
 yarn workspace api bench:dashboard --base-url https://<release-test-host>/api

@@ -334,6 +334,15 @@ All six use the current month, the web default. A load's duration runs from the 
 - Concurrent load testing: this is not a throughput feature.
 - k6 or autocannon: an extra tool with no benefit at this scale.
 
+**As built (T036):**
+- **Anchor.** The generator is pure, and the seeder and runner share one anchor date (`--anchor YYYY-MM-DD`, default today in Asia/Ho_Chi_Minh). Every month draws the same number of random values, so the current-month amounts depend on the seed alone; any anchor in the same month verifies. The "elapsed part of the month" runs through the end of the anchor day, so some rows may carry later-today timestamps. They stay inside the current month and change neither totals nor timing.
+- **Sign-in password.** The bench user's password comes from `BENCH_USER_PASSWORD` (12–72 characters), which both the seeder and the runner read and never print. Generate a throwaway value in the session, as quickstart.md §7b does.
+- **Seeder guards.** The seeder refuses (exit 2) when the target database holds any account other than `bench@cashlens.test`. With `BENCH_DATABASE_URL`, it also refuses a database name without "bench" or "test".
+- **Runner output.** Its median is nearest-rank (the 100th of 200). Exit codes: 0 pass, 1 p95 over 1,000 ms, 2 usage error, 3 totals mismatch, 4 failed response (including warm-up, readiness, and sign-in).
+- **Compose override.** `docker-compose.bench.yml` pins the project name `cashlens-bench`, so leaving out `-p` never touches the `cashlens-prod` stack.
+- **Load shape.** A load is the six concurrent month-less requests of `DashboardPage.tsx`; the page issues exactly those, with no request gated on another (T035).
+- **Non-gating smoke run (T036), development mode over HTTP.** It ran on a dedicated test database: 20 loads after 2 warm-ups; final re-run on the finished code: min 44.1 ms, median 47.2 ms, p95 59.2 ms, max 62.3 ms, 0 failed responses, totals matched (an earlier run gave p95 78.0 ms). Host: AMD Ryzen 5 4600H, 12 logical CPUs, 15.4 GiB, Windows, Node 22. This is not SC-010 evidence, which T101 records on the reference release host.
+
 ## Goal rounding and periods (GOAL-002 to GOAL-004)
 
 **Decision**: Use inclusive user-month counting and a visible horizon precedence (query → `targetDate` → `goal.months` → a 6-month default, reported as `horizonSource`).

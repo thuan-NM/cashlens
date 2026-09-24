@@ -75,9 +75,13 @@ describe('CashLens current modules smoke test (e2e)', () => {
   const email = `smoke-${testRunId}@example.com`;
   const managedUserEmail = `smoke-managed-${testRunId}@example.com`;
   const password = syntheticPassword();
-  const transactionTime = new Date().toISOString();
-  const month = transactionTime.slice(0, 7);
-  const date = transactionTime.slice(0, 10);
+  // Deterministic period (T036): the manual transactions share the user month
+  // of the parsed fixture email (20/06/2026), so the monthly summary never
+  // depends on the current date. 05:00Z is local midday in Asia/Ho_Chi_Minh,
+  // so the UTC and local calendar dates agree.
+  const transactionTime = '2026-06-15T05:00:00.000Z';
+  const month = '2026-06';
+  const date = '2026-06-15';
 
   let userId: string;
   let accountId: string;
@@ -742,6 +746,7 @@ describe('CashLens current modules smoke test (e2e)', () => {
       const cashflow = bodyData<
         Array<{
           date: string;
+          currency: string;
           income: number;
           expense: number;
           netCashflow: number;
@@ -749,6 +754,7 @@ describe('CashLens current modules smoke test (e2e)', () => {
       >(cashflowResponse);
       expect(cashflow).toContainEqual({
         date,
+        currency: 'VND',
         income: 5000000,
         expense: 250000,
         netCashflow: 4750000,

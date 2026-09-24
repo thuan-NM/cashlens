@@ -8,7 +8,8 @@ const numberOrZero = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-export function AreaChart({ data }: { data: MonthData[] }) {
+/** `currency` only formats the tooltip amounts; omitted, the tooltip keeps the default "₫" format. */
+export function AreaChart({ data, currency }: { data: MonthData[]; currency?: string }) {
   const [hover, setHover] = useState<number | null>(null);
   const W = 580, H = 246, pl = 12, pr = 12, pt = 18, pb = 30;
   const innerW = W - pl - pr, innerH = H - pt - pb;
@@ -74,15 +75,15 @@ export function AreaChart({ data }: { data: MonthData[] }) {
           <div className="font-bold mb-1.5">Tháng {chartData[hover].m.replace("T", "")}</div>
           <div className="flex justify-between gap-3 mb-0.5">
             <span style={{ color: "var(--muted)" }}>Thu</span>
-            <b style={{ color: "var(--income)" }}>{formatMoney(chartData[hover].income)}</b>
+            <b style={{ color: "var(--income)" }}>{formatMoney(chartData[hover].income, currency)}</b>
           </div>
           <div className="flex justify-between gap-3 mb-0.5">
             <span style={{ color: "var(--muted)" }}>Chi</span>
-            <b style={{ color: "var(--expense)" }}>{formatMoney(chartData[hover].expense)}</b>
+            <b style={{ color: "var(--expense)" }}>{formatMoney(chartData[hover].expense, currency)}</b>
           </div>
           <div className="flex justify-between gap-3 pt-1 mt-1 border-t" style={{ borderColor: "var(--border)" }}>
             <span style={{ color: "var(--muted)" }}>Ròng</span>
-            <b>{formatMoney(chartData[hover].income - chartData[hover].expense)}</b>
+            <b>{formatMoney(chartData[hover].income - chartData[hover].expense, currency)}</b>
           </div>
         </div>
       )}

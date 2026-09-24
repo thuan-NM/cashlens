@@ -1,4 +1,11 @@
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  MinLength,
+  IsTimeZone,
+} from 'class-validator';
+import { IsCurrencyCode } from '../../../common/finance/finance-validation';
 
 export class RegisterDto {
   @IsEmail()
@@ -14,6 +21,7 @@ export class RegisterDto {
 
   @IsOptional()
   @IsString()
+  @IsTimeZone()
   timezone?: string;
 
   @IsOptional()
@@ -21,7 +29,6 @@ export class RegisterDto {
   locale?: string;
 
   @IsOptional()
-  @IsString()
+  @IsCurrencyCode()
   baseCurrency?: string;
-
 }

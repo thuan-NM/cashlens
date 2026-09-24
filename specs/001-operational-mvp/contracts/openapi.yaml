@@ -225,19 +225,84 @@ components:
       type: object
       properties:
         fullName: { type: string, maxLength: 120 }
-        timezone: { type: string, maxLength: 64 }
+        timezone: { type: string, maxLength: 64, description: 'IANA time zone (DASH-002); an unknown zone gets 400. Registration and the admin user bodies use the same rule' }
         locale: { type: string, maxLength: 16 }
-        baseCurrency: { type: string, maxLength: 3 }
+        baseCurrency: { type: string, pattern: '^[A-Z]{3}$', description: 'Upper-case ISO 4217 code; registration and the admin user bodies use the same rule' }
     TransactionWriteRules:
       description: >-
         Rules for the existing transaction create/update bodies (SEC-004, TX-002). userId, classificationSource, and
         classificationConfidence are not accepted (400); provenance is derived on the server (MANUAL when the owner
         chooses a category). status accepts PENDING, POSTED, IGNORED, or NEEDS_REVIEW, never DELETED: deletion uses
         DELETE /transactions/{id}, an audited soft delete. Related ids (financialAccountId, categoryId,
-        duplicateOfTransactionId) must be non-empty and owned (or a system category), otherwise 400 or owner-safe 404.
+        duplicateOfTransactionId) must be non-empty and owned (or a system category), otherwise 400 or owner-safe 404;
+        an archived account or category gets the same 404. isDuplicate true needs a duplicateOfTransactionId (sent or
+        already stored); a reference alone marks the record as a duplicate; isDuplicate false clears the reference and
+        cannot be sent together with one; a transaction cannot reference itself. Every refusal is a 400 whose message
+        names the field (T034).
       type: object
       properties:
         status: { enum: [PENDING, POSTED, IGNORED, NEEDS_REVIEW] }
+        amount: { type: number, exclusiveMinimum: 0, maximum: 9999999999999.99, multipleOf: 0.01, description: 'Always positive; the direction carries the sign' }
+        currency: { type: string, pattern: '^[A-Z]{3}$', description: 'Upper-case ISO 4217 code' }
+        transactionTime: { type: string, format: date-time, description: 'ISO 8601 date-time with a UTC offset or Z; a time without an offset gets 400. It decides the user month (data-model.md "Financial period policy")' }
+        postedDate: { type: string, format: date-time, description: Same rule as transactionTime }
+        feeAmount: { type: number, minimum: 0, multipleOf: 0.01 }
+
+    CurrencyTotals:
+      description: Eligible totals of one currency (data-model.md "Financial period policy"); money is never summed across currencies.
+      type: object
+      required: [currency, income, expense, netCashflow, transactionCount]
+      properties:
+        currency: { type: string }
+        income: { type: number }
+        expense: { type: number }
+        netCashflow: { type: number }
+        transactionCount: { type: integer, description: Eligible records of every direction, transfers and adjustments included }
+    TotalsSummary:
+      description: >-
+        Base-currency totals plus every currency group. income, expense, and netCashflow are the account base
+        currency (named by currency); transactionCount spans every currency; currencies lists each group, sorted by
+        code, and is empty when nothing is eligible.
+      allOf:
+        - $ref: '#/components/schemas/CurrencyTotals'
+        - type: object
+          required: [currencies]
+          properties:
+            currencies: { type: array, items: { $ref: '#/components/schemas/CurrencyTotals' } }
+    DashboardOverview:
+      description: >-
+        Existing overview fields plus additive currency, currencies, periodStart, periodEnd, and timeZone. month is a user month
+        (timezone and month-start day). savingRate is base-currency net / income x 100 rounded half up to a whole
+        percent, 0 without income.
+      allOf:
+        - $ref: '#/components/schemas/TotalsSummary'
+        - type: object
+          required: [month, savingRate, unreadAlerts, periodStart, periodEnd, timeZone]
+          properties:
+            month: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }
+            savingRate: { type: integer }
+            unreadAlerts: { type: integer }
+            periodStart: { type: string, format: date-time }
+            periodEnd: { type: string, format: date-time, description: Exclusive }
+            timeZone: { type: string, description: 'Additive; the account IANA zone the period uses, so clients format dates without another request' }
+    CashflowMonth:
+      type: object
+      required: [month, currency, income, expense, netCashflow]
+      properties:
+        month: { type: string }
+        currency: { type: string, description: Additive; the base currency }
+        income: { type: number }
+        expense: { type: number }
+        netCashflow: { type: number }
+    CategoryBreakdownRow:
+      type: object
+      required: [categoryId, category, currency, amount, count]
+      properties:
+        categoryId: { type: [string, 'null'], description: null groups uncategorized records }
+        category: { type: [object, 'null'], description: 'The category, including excludeFromAnalytics, which no longer removes the row' }
+        currency: { type: string, description: Additive }
+        amount: { type: number }
+        count: { type: integer }
 
   responses:
     Unauthorized: { description: 'Missing, expired, or invalid session', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
@@ -436,6 +501,89 @@ paths:
       responses:
         '200': { description: Updated template (enveloped) }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /transactions:
+    get:
+      summary: >-
+        Existing owner list (never soft-deleted rows) plus additive totals: the eligible totals of every row matching the
+        same filters, not only the page. With the same month and no other filter they equal the dashboard overview.
+      parameters:
+        - { in: query, name: month, schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }, description: 'Additive; a user month. Cannot be combined with from/to (400)' }
+        - { in: query, name: from, schema: { type: string, format: date-time }, description: 'Inclusive; needs a UTC offset; must not be after to' }
+        - { in: query, name: to, schema: { type: string, format: date-time }, description: 'Inclusive; needs a UTC offset' }
+        - { in: query, name: search, schema: { type: string, maxLength: 200 } }
+      responses:
+        '200':
+          description: 'Enveloped { data, total, page, limit, totals }'
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties:
+                      data:
+                        type: object
+                        properties:
+                          data: { type: array, items: { type: object } }
+                          total: { type: integer }
+                          page: { type: integer }
+                          limit: { type: integer }
+                          totals: { $ref: '#/components/schemas/TotalsSummary' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+    post:
+      summary: Existing owner create; body rules in TransactionWriteRules
+      responses:
+        '201': { description: Created transaction (enveloped) }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
+  /dashboard/overview:
+    get:
+      summary: Existing monthly overview over eligible persisted records (DASH-001, DASH-002)
+      parameters:
+        - { in: query, name: month, schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }, description: 'User month; default the one containing now; malformed gets 400' }
+      responses:
+        '200':
+          description: Overview (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { $ref: '#/components/schemas/DashboardOverview' } }
+        '400': { $ref: '#/components/responses/ValidationError' }
+  /dashboard/cashflow:
+    get:
+      summary: Existing trend, now one zero-filled entry per user month, oldest first, in the base currency
+      parameters:
+        - { in: query, name: months, schema: { type: integer, minimum: 1, maximum: 24, default: 6 } }
+        - { in: query, name: month, schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }, description: 'Additive; the last month of the trend; default the one containing now' }
+      responses:
+        '200':
+          description: Trend (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { type: array, items: { $ref: '#/components/schemas/CashflowMonth' } } }
+  /dashboard/category-breakdown:
+    get:
+      summary: >-
+        Existing breakdown of eligible expense per category and currency, uncategorized included and not truncated;
+        base-currency rows first, then by amount. The rows of one currency add up to that expense (SC-009). The
+        recent-transactions, hot-budgets (additive currency; spend in the budget currency), insights, and analytics
+        routes take the same month parameter and policy; analytics monthly-summary gains the TotalsSummary fields
+        and analytics daily cashflow groups base-currency amounts by local date with an additive currency.
+      parameters:
+        - { in: query, name: month, schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' } }
+      responses:
+        '200':
+          description: Breakdown (enveloped)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - properties: { data: { type: array, items: { $ref: '#/components/schemas/CategoryBreakdownRow' } } }
   /transactions/{id}:
     parameters:
       - { in: path, name: id, required: true, schema: { type: string } }

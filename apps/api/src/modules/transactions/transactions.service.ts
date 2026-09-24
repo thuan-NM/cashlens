@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AuditActorType, TransactionStatus } from '@prisma/client';
+import { userMonthForKey } from '../../common/finance/financial-period-policy';
 import type { RequestUser } from '../../common/types/request-user.type';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { ListTransactionsDto } from './dto/list-transactions.dto';
@@ -18,6 +19,17 @@ import {
 import { UsersRepository } from '../users/users.repository';
 import { TransactionsRepository } from './transactions.repository';
 
+/** Fields every transaction carries: null cannot clear them (TX-002). */
+const NOT_NULLABLE = [
+  'amount',
+  'currency',
+  'direction',
+  'transactionTime',
+  'status',
+  'isDuplicate',
+  'duplicateOfTransactionId',
+] as const;
+
 @Injectable()
 export class TransactionsService {
   constructor(
@@ -25,11 +37,36 @@ export class TransactionsService {
     private readonly users: UsersRepository,
   ) {}
 
+  /**
+   * A page of the owner's visible transactions plus `totals`: the eligible
+   * income, expense, and net of every row matching the same filters (not just
+   * the page), under the same policy as the dashboard (TX-003).
+   */
   async list(user: RequestUser, query: ListTransactionsDto) {
-    const { data, total, page, limit } =
-      await this.transactionsRepository.listByUser(user.id, query);
+    if (query.month && (query.from || query.to)) {
+      throw new BadRequestException([
+        'month cannot be combined with from or to',
+      ]);
+    }
+    if (query.from && query.to && new Date(query.from) > new Date(query.to)) {
+      throw new BadRequestException(['from must not be after to']);
+    }
+    const context = await this.transactionsRepository.financialContext(user.id);
+    const { data, total, page, limit, totals } =
+      await this.transactionsRepository.listByUser(user.id, query, {
+        baseCurrency: context.baseCurrency,
+        month: query.month
+          ? userMonthForKey(query.month, context.settings)
+          : undefined,
+      });
 
-    return { data: data.map(toTransactionResponse), total, page, limit };
+    return {
+      data: data.map(toTransactionResponse),
+      total,
+      page,
+      limit,
+      totals,
+    };
   }
 
   async findById(user: RequestUser, id: string) {
@@ -46,21 +83,26 @@ export class TransactionsService {
   }
 
   async create(user: RequestUser, dto: CreateTransactionDto) {
+    this.rejectNulls(dto);
+    const duplicate = this.duplicateFields(dto);
     await this.assertRelatedEntities(user.id, {
       financialAccountId: dto.financialAccountId,
       categoryId: dto.categoryId,
       duplicateOfTransactionId: dto.duplicateOfTransactionId,
     });
 
-    const transaction = await this.transactionsRepository.create(
-      toCreateTransactionInput(user.id, dto),
-    );
+    const transaction = await this.transactionsRepository.create({
+      ...toCreateTransactionInput(user.id, dto),
+      ...duplicate,
+    });
 
     return toTransactionResponse(transaction);
   }
 
   async update(user: RequestUser, id: string, dto: UpdateTransactionDto) {
+    this.rejectNulls(dto);
     const before = await this.findById(user, id);
+    const duplicate = this.duplicateFields(dto, before);
     await this.assertRelatedEntities(user.id, {
       financialAccountId: dto.financialAccountId,
       categoryId: dto.categoryId,
@@ -68,11 +110,10 @@ export class TransactionsService {
     });
 
     const transaction = this.found(
-      await this.transactionsRepository.updateById(
-        user.id,
-        id,
-        toUpdateTransactionInput(dto),
-      ),
+      await this.transactionsRepository.updateById(user.id, id, {
+        ...toUpdateTransactionInput(dto),
+        ...duplicate,
+      }),
     );
     if (dto.categoryId !== undefined) {
       await this.auditCategoryChange(user, before.categoryId, transaction);
@@ -178,6 +219,60 @@ export class TransactionsService {
       resourceId: transaction.id,
       metadata: { fromCategoryId, toCategoryId: transaction.categoryId },
     });
+  }
+
+  /** Optional fields may be omitted, but never sent as null. */
+  private rejectNulls(dto: CreateTransactionDto | UpdateTransactionDto) {
+    const sent = dto as Record<string, unknown>;
+    const fields = NOT_NULLABLE.filter((field) => sent[field] === null);
+    if (fields.length) {
+      throw new BadRequestException(
+        fields.map((field) =>
+          field === 'duplicateOfTransactionId'
+            ? 'duplicateOfTransactionId must be a transaction id; send isDuplicate false to clear it'
+            : `${field} must not be null`,
+        ),
+      );
+    }
+  }
+
+  /**
+   * isDuplicate and duplicateOfTransactionId describe one state (TX-002,
+   * TX-003): a confirmed duplicate names the transaction it duplicates. A
+   * reference alone marks the record as a duplicate, as PATCH /:id/duplicate
+   * does; isDuplicate false clears the reference.
+   */
+  private duplicateFields(
+    dto: { isDuplicate?: boolean; duplicateOfTransactionId?: string },
+    current?: { id: string; duplicateOfTransactionId: string | null },
+  ): { isDuplicate?: boolean; duplicateOfTransactionId?: string | null } {
+    const reference = dto.duplicateOfTransactionId;
+    if (current && reference === current.id) {
+      throw new BadRequestException([
+        'duplicateOfTransactionId must not reference the transaction itself',
+      ]);
+    }
+    if (dto.isDuplicate === false) {
+      if (reference) {
+        throw new BadRequestException([
+          'isDuplicate cannot be false when duplicateOfTransactionId is set',
+        ]);
+      }
+      return { isDuplicate: false, duplicateOfTransactionId: null };
+    }
+    if (
+      dto.isDuplicate === true &&
+      !reference &&
+      !current?.duplicateOfTransactionId
+    ) {
+      throw new BadRequestException([
+        'duplicateOfTransactionId is required when isDuplicate is true',
+      ]);
+    }
+    if (reference) {
+      return { isDuplicate: true, duplicateOfTransactionId: reference };
+    }
+    return dto.isDuplicate === true ? { isDuplicate: true } : {};
   }
 
   private found<T>(transaction: T | null): T {

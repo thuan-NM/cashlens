@@ -6,15 +6,22 @@ import {
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
-  IsDateString,
   IsEnum,
   IsIn,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
+  Max,
   MaxLength,
+  Min,
 } from 'class-validator';
+import {
+  IsCurrencyCode,
+  IsInstant,
+  IsMoney,
+  MAX_TRANSACTION_AMOUNT,
+} from '../../../common/finance/finance-validation';
 
 // Soft deletion goes through DELETE /transactions/:id only (audited, SEC-006).
 const WRITABLE_STATUSES = Object.values(TransactionStatus).filter(
@@ -25,25 +32,29 @@ const WRITABLE_STATUSES = Object.values(TransactionStatus).filter(
  * Owner-writable transaction fields. Ownership (userId) and classification
  * provenance (classificationSource, classificationConfidence) are derived on
  * the server, so the global ValidationPipe rejects them (SEC-004, TX-002).
+ * The amount is always positive; the direction carries the sign.
  */
 export class CreateTransactionDto {
   @Type(() => Number)
-  @IsNumber()
+  @IsMoney()
+  @IsPositive({ message: 'amount must be greater than 0' })
+  @Max(MAX_TRANSACTION_AMOUNT, {
+    message: `amount must not be greater than ${MAX_TRANSACTION_AMOUNT}`,
+  })
   amount!: number;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(3)
+  @IsCurrencyCode()
   currency?: string;
 
   @IsEnum(TransactionDirection)
   direction!: TransactionDirection;
 
-  @IsDateString()
+  @IsInstant()
   transactionTime!: string;
 
   @IsOptional()
-  @IsDateString()
+  @IsInstant()
   postedDate?: string;
 
   @IsOptional()
@@ -72,18 +83,23 @@ export class CreateTransactionDto {
 
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsMoney()
+  @Min(-MAX_TRANSACTION_AMOUNT)
+  @Max(MAX_TRANSACTION_AMOUNT)
   balanceAfter?: number;
 
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsMoney()
+  @Min(0)
+  @Max(MAX_TRANSACTION_AMOUNT)
   feeAmount?: number;
 
   @IsOptional()
   @IsIn(WRITABLE_STATUSES)
   status?: TransactionStatus;
 
+  /** Must agree with duplicateOfTransactionId; see TransactionsService. */
   @IsOptional()
   @IsBoolean()
   isDuplicate?: boolean;

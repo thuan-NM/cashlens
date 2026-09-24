@@ -1,0 +1,40 @@
+# CashLens dashboard benchmark override (DASH-004, SC-010; T036 tooling, T101 gate).
+# TEST-ONLY. Never use it for a real deployment.
+#
+# It layers on docker-compose.prod.yml, which stays unchanged, and runs a
+# disposable benchmark stack under its own project name:
+#   $c = @('-p','cashlens-bench','--env-file','.env.release-test','-f','docker-compose.prod.yml','-f','docker-compose.bench.yml')
+#   docker compose @c run --rm migrate
+#   docker compose @c up -d
+#   # A throwaway sign-in password for the bench user, never printed:
+#   $b = New-Object byte[] 24; [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); $env:BENCH_USER_PASSWORD = [Convert]::ToBase64String($b)
+#   yarn workspace api bench:dashboard:seed --env-file .env.release-test
+#   $env:NODE_EXTRA_CA_CERTS = "<path-to-release-test-CA.pem>"
+#   yarn workspace api bench:dashboard --base-url https://<release-test-host>/api
+#   docker compose @c down -v
+#
+# It changes exactly two things:
+#   * PostgreSQL is published on 127.0.0.1:55432 (loopback only), solely so the
+#     host-side seeder can load the fixture. The production file never
+#     publishes the database.
+#   * The database lives in its own named volume, so benchmark data never
+#     mixes with any release-check or production data; `down -v` removes it.
+#
+# The stack keeps the production API/web loopback ports and pinned subnet, so
+# stop the release-check stack first; the benchmark stack takes its place
+# behind the same reverse proxy (plan.md "Dashboard benchmark"). Port 55432
+# must be free on the host.
+# Pinned, so leaving out -p can never apply this override to the release-check
+# (cashlens-prod) stack; the last file's name wins.
+name: cashlens-bench
+
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      # Same container path as the production entry, so this one replaces it.
+      - cashlens_bench_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  cashlens_bench_postgres_data:

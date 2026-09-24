@@ -62,6 +62,31 @@ Revoking the last active administrator returns the deployment to the zero-admin 
 | `FINANCIAL_ACCOUNT_ARCHIVED` | USER | `financial_account` | none |
 | `TRANSACTION_CATEGORY_ARCHIVED` | USER | `transaction_category` | none |
 
+## Financial period policy (US2) — no schema change
+
+One policy, `apps/api/src/common/finance/financial-period-policy.ts`, feeds transaction list totals, the dashboard, and analytics, and is the base for budgets, alerts, and goals (TX-003, DASH-001–DASH-003, DATA-004). Its golden cases are `financial-period-policy.spec.ts` (T031).
+
+**Treatment of each record** (every status × direction):
+
+| Record | Lists | Income / expense / net | `transactionCount` |
+|---|---|---|---|
+| `POSTED`, not duplicate, `INCOME` or `EXPENSE` | shown | counted | counted |
+| `POSTED`, not duplicate, `TRANSFER_IN` or `TRANSFER_OUT` | shown, labelled as a transfer | excluded | counted |
+| `POSTED`, not duplicate, `ADJUSTMENT` | shown | excluded (neither income nor expense) | counted |
+| `PENDING`, `NEEDS_REVIEW`, `IGNORED`, or a confirmed duplicate (`isDuplicate`) | shown | excluded | not counted |
+| `DELETED` (soft-deleted) | never shown | excluded | not counted |
+
+- **Period timestamp.** A record belongs to the period containing its `transactionTime`. The "occurredAt" of "Budget period instances" above is `transactionTime`; `postedDate` is informational.
+- **User month.** It starts on `UserSettings.defaultMonthStartDay` (1–28) at the start of that local day in `User.timezone`, and ends, exclusive, where the next one starts. It is labelled `YYYY-MM` by the local month in which it starts: with day 25, the month containing 2026-09-23 is `2026-08` (2026-08-25 to 2026-09-25). A local day starts at its earliest instant: after the gap when daylight saving skips midnight, and at the first occurrence when midnight happens twice. The dashboard, analytics, and transaction-list `month` parameters all use this label.
+- **Stored settings that cannot be used.** A stored timezone that is not a valid IANA zone falls back to `Asia/Ho_Chi_Minh`, and a month-start day outside 1–28 falls back to 1. New values are validated on write: `@IsTimeZone` on registration, `PATCH /users/me`, and the admin user DTOs.
+- **Currencies.** Money is summed with exact decimals and never across currencies. The existing `income`, `expense`, and `netCashflow` fields mean the account's **base currency** (`User.baseCurrency`); the additive `currency` field names it, and the additive `currencies` array carries every currency group, sorted by code. Currency codes are upper-case ISO 4217 on the transaction, registration, profile, and admin user writes (budget and financial-account DTOs still accept any 3 characters; follow-up T069/T070); stored codes that differ only in case or padding (for example a legacy or parser-written `vnd`) are read as the same currency, so one currency never forms two groups. Codes that are not the same letters (such as `VNĐ`) stay separate groups. There is no conversion.
+- **Month keys and period metadata.** Month keys accept 1900-01 through 2099-12; other values get 400. The overview also returns `periodStart`, `periodEnd` (exclusive), and the account `timeZone`, so clients format the period without another request.
+- **Counts and rates.** `transactionCount` is the number of eligible records of every direction and currency. The dashboard `savingRate` is base-currency net ÷ income × 100, rounded half up to a whole percent, 0 without income, and negative when spending exceeds income. The analytics `savingsRate` stays the unrounded ratio, or `null` without income.
+- **Category breakdown.** It contains every eligible expense, grouped by category and currency, with uncategorized records as their own row (`categoryId: null`) and no truncation. The rows of one currency therefore add up to that currency's expense (SC-009). `TransactionCategory.excludeFromAnalytics` no longer removes rows server-side; the flag is still returned on each row's `category` so a client may hide it.
+- **Trends.** The dashboard cashflow returns one entry per user month, oldest first, and months without eligible records are zero-filled. The analytics daily cashflow groups base-currency income and expense by the user's local date.
+- **Transaction list totals.** `GET /transactions` adds `totals`: the eligible totals of every visible row matching the same filters, not only the returned page. With the same `month` and no other filter, they equal the dashboard overview.
+- **Hot budgets.** They spend eligible expense in the budget's own currency and category within the requested user month. Budgets without a category, and clipping to `startsAt`/`endsAt`, remain T070's shared spend aggregate.
+
 ## Proposed schema deltas
 
 ### EmailConnection progress (DB-M1)
