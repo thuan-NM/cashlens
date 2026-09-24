@@ -137,9 +137,23 @@ export async function eligibleTotals(
 }
 
 /**
- * Eligible amounts per category, direction, and currency. Uncategorized rows
- * form their own group (`categoryId: null`), so the groups of one direction
- * and currency always add up to that total.
+ * Records a category breakdown may show: uncategorized ones, and those whose
+ * category is not flagged `excludeFromAnalytics`. The flag hides a category
+ * from every analytics breakdown; it does not change financial eligibility,
+ * so the same records still count in income, expense, net, and trends.
+ */
+const analyticsCategoryWhere: Prisma.TransactionWhereInput = {
+  OR: [
+    { categoryId: null },
+    { category: { is: { excludeFromAnalytics: false } } },
+  ],
+};
+
+/**
+ * Eligible amounts per category, direction, and currency for category
+ * breakdowns. Uncategorized rows form their own group (`categoryId: null`).
+ * Categories flagged `excludeFromAnalytics` are left out, so the groups of one
+ * direction and currency add up to that total minus the excluded categories.
  */
 export async function eligibleAmountsByCategory(
   db: FinanceDb,
@@ -149,11 +163,12 @@ export async function eligibleAmountsByCategory(
 ): Promise<CategoryAmountRow[]> {
   const rows = await db.transaction.groupBy({
     by: ['categoryId', 'direction', 'currency'],
-    where: eligible(
-      userId,
-      range,
-      directions ? { direction: { in: directions } } : undefined,
-    ),
+    where: eligible(userId, range, {
+      AND: [
+        analyticsCategoryWhere,
+        ...(directions ? [{ direction: { in: directions } }] : []),
+      ],
+    }),
     _sum: { amount: true },
     _count: { _all: true },
   });

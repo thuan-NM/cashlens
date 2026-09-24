@@ -78,6 +78,10 @@ Reconciliation of the specification with the verified US1 implementation (T009�
 - Q: How is an account pending deletion treated? → A: Like a disabled account: it cannot sign in, renew a session, or use an existing session.
 - Q: Which commit range and exceptions does the release secret scan use on this branch? → A: The commit range starts at the historical baseline `80f3e0d`, the last commit of this branch that was merged into `dev` (PR #7), because the default branch holds only the initial scaffold and predates the existing codebase. The range therefore also rescans the implementation baseline `b273f14` and every feature commit. The only exceptions besides the placeholder allowlist are reviewed, exact, commit-scoped fingerprints of two synthetic test fixtures in pushed commit `219f8e9`; each is documented in `.gitleaksignore`, and no broader exception is accepted.
 
+### Session 2026-09-24 (US2 closure)
+
+- Q: Do transactions in a category marked "exclude from analytics" appear in category breakdowns? → A: No. They are left out of every category breakdown (dashboard and analytics). Exclusion from analytics does not change financial eligibility: the same transactions still count in total income, total expense, net income, savings rate, the cashflow trend, transaction list totals, and budgets. A category breakdown therefore totals less than the expense total whenever such a category has spending, and the dashboard says so instead of presenting the breakdown as the whole expense.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Securely use personal financial data (Priority: P1)
@@ -351,7 +355,7 @@ The following baseline was established from the PRD/SRS, the implementation at c
 - **TX-003**: Income, expense, transfer, duplicate, ignored, pending, and deleted states MUST have one documented treatment used consistently by transaction lists, dashboard totals, budgets, classification, and goals.
 - **TX-004**: A manual category correction MUST be retained as the authoritative category until the user explicitly requests another correction or reclassification.
 - **TX-005**: Mutating a transaction MUST trigger or make available deterministic recalculation of every affected current summary and budget period.
-- **DASH-001**: Monthly dashboard results MUST derive from the authenticated user's persisted eligible records and include total income, total expense, net income, savings rate, category breakdown, cashflow trend, and recent transactions.
+- **DASH-001**: Monthly dashboard results MUST derive from the authenticated user's persisted eligible records and include total income, total expense, net income, savings rate, category breakdown, cashflow trend, and recent transactions. The category breakdown MUST leave out categories marked "exclude from analytics"; those transactions still count in every total.
 - **DASH-002**: Dashboard period boundaries MUST honor the user's timezone and configured month-start rule.
 - **DASH-003**: Identical eligible source records and period settings MUST always produce identical dashboard totals independent of any AI-generated content.
 - **DASH-004**: On the reference benchmark, at least 95% of dashboard loads MUST return complete monthly results within one second. The reference benchmark is defined as follows:

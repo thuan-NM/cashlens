@@ -299,7 +299,7 @@ components:
       required: [categoryId, category, currency, amount, count]
       properties:
         categoryId: { type: [string, 'null'], description: null groups uncategorized records }
-        category: { type: [object, 'null'], description: 'The category, including excludeFromAnalytics, which no longer removes the row' }
+        category: { type: [object, 'null'], description: 'The category. Categories flagged excludeFromAnalytics never appear in a breakdown' }
         currency: { type: string, description: Additive }
         amount: { type: number }
         count: { type: integer }
@@ -569,7 +569,9 @@ paths:
     get:
       summary: >-
         Existing breakdown of eligible expense per category and currency, uncategorized included and not truncated;
-        base-currency rows first, then by amount. The rows of one currency add up to that expense (SC-009). The
+        base-currency rows first, then by amount. Categories flagged excludeFromAnalytics never appear, although their
+        transactions still count in the overview expense, trends, and list totals; the rows of one currency therefore add
+        up to that expense minus the excluded categories (equal when none has spending). The
         recent-transactions, hot-budgets (additive currency; spend in the budget currency), insights, and analytics
         routes take the same month parameter and policy; analytics monthly-summary gains the TotalsSummary fields
         and analytics daily cashflow groups base-currency amounts by local date with an additive currency.

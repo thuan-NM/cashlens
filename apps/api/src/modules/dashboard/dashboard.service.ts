@@ -74,8 +74,9 @@ export class DashboardService {
   }
 
   /**
-   * Eligible expense per category and currency, uncategorized included, so
-   * the rows of the base currency add up to the overview expense.
+   * Eligible expense per category and currency, uncategorized included.
+   * Categories flagged `excludeFromAnalytics` never appear, so the rows add up
+   * to the overview expense minus those categories' spending.
    */
   async categoryBreakdown(user: RequestUser, query: DashboardMonthQueryDto) {
     const context = await this.dashboardRepository.financialContext(user.id);

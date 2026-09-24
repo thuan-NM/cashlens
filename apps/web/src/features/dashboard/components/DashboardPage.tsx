@@ -321,22 +321,31 @@ export function DashboardPage() {
               ? [{ label: `${rest.length} nhóm khác`, value: rest.reduce((sum, row) => sum + row.amount, 0), color: "#c9c3b8" }]
               : []),
           ];
+          // Categories marked "exclude from analytics" never appear here, so the
+          // breakdown can total less than the month's expense, which still counts them.
+          const breakdownTotal = Math.round(baseRows.reduce((sum, row) => sum + row.amount * 100, 0)) / 100;
+          const hasExcludedCategories = overview.expense - breakdownTotal >= 0.005;
           return (
             <>
               <div className="relative flex justify-center [&_text]:hidden">
                 <DonutChart segments={segments} />
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-[10px] text-[var(--muted)]">Tổng chi</span>
-                  <span className="text-[16px] font-bold tabular-nums">{formatMoneyShort(overview.expense, currency)}</span>
+                  <span className="text-[10px] text-[var(--muted)]">Chi theo nhóm</span>
+                  <span className="text-[16px] font-bold tabular-nums">{formatMoneyShort(breakdownTotal, currency)}</span>
                 </div>
               </div>
+              {hasExcludedCategories && (
+                <p className="mt-2 text-center text-[10.5px] leading-relaxed text-[var(--muted)]">
+                  Không hiển thị các nhóm được loại khỏi phân tích; tổng chi của tháng vẫn gồm các khoản đó.
+                </p>
+              )}
               <div className="mt-3 space-y-1.5">
                 {segments.map((segment) => (
                   <div key={segment.label} className="flex items-center gap-2 text-[11.5px]">
                     <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: segment.color }} />
                     <span className="min-w-0 flex-1 truncate">{segment.label}</span>
                     <span className="tabular-nums text-[var(--muted)]">
-                      {overview.expense > 0 ? `${Math.round((segment.value / overview.expense) * 100)}%` : ""}
+                      {breakdownTotal > 0 ? `${Math.round((segment.value / breakdownTotal) * 100)}%` : ""}
                     </span>
                     <b className="tabular-nums">{formatMoneyShort(segment.value, currency)}</b>
                   </div>

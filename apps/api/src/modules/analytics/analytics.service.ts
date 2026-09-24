@@ -25,7 +25,10 @@ export class AnalyticsService {
     return toMonthlySummaryResponse({ month, totals, recentTransactions });
   }
 
-  /** Eligible amounts per category, direction, and currency. */
+  /**
+   * Eligible amounts per category, direction, and currency; categories flagged
+   * `excludeFromAnalytics` never appear.
+   */
   async categoryBreakdown(user: RequestUser, query: MonthlyAnalyticsQueryDto) {
     const context = await this.analyticsRepository.financialContext(user.id);
     const month = analyticsMonth(context.settings, query.month);

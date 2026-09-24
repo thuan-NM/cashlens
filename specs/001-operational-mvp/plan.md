@@ -268,7 +268,7 @@ Rules:
   - Financial totals (US2, data-model.md "Financial period policy"):
     - Dashboard and analytics `month` values, and the new `month` filter on `GET /transactions`, are user months in the account timezone with its month-start day, not UTC calendar months.
     - `income`, `expense`, and `netCashflow` now cover the base currency only. The additive `currency` and `currencies` fields carry every currency group, and other currencies are no longer added in.
-    - The dashboard category breakdown now includes uncategorized expense and categories flagged `excludeFromAnalytics`, and is no longer cut to 10 rows. The dashboard cashflow trend returns every month of the window, zero-filled. The analytics daily cashflow groups by the user's local date. Breakdown, trend, daily, and hot-budget rows gain an additive `currency` field.
+    - The dashboard category breakdown now includes uncategorized expense and is no longer cut to 10 rows. Categories flagged `excludeFromAnalytics` stay out of every breakdown (unchanged), but their transactions count in all totals, so a breakdown can total less than the expense. The dashboard cashflow trend returns every month of the window, zero-filled. The analytics daily cashflow groups by the user's local date. Breakdown, trend, daily, and hot-budget rows gain an additive `currency` field.
     - `GET /transactions` gains additive `totals`, computed over every row matching the filters. The dashboard cashflow gains an optional end `month`, and the overview gains additive `periodStart`, `periodEnd`, and `timeZone`.
     - Stored currency codes that differ only in case count as one currency.
   - Transaction validation tightening (T034), all returned as 400 field errors:

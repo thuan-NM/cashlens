@@ -334,7 +334,9 @@ describe('Transactions to dashboard: canonical ledger (T036)', () => {
       });
     });
 
-    it('category breakdown adds up to the eligible expense, uncategorized included', async () => {
+    // T7 (300,000) is in a category flagged excludeFromAnalytics: it counts in
+    // expense, net, trends, and list totals, but never in a category breakdown.
+    it('category breakdown hides excluded-from-analytics categories; totals still count them', async () => {
       const rows = await get<BreakdownRow[]>(
         alice,
         '/api/dashboard/category-breakdown',
@@ -362,12 +364,6 @@ describe('Transactions to dashboard: canonical ledger (T036)', () => {
         },
         { categoryId: null, currency: 'VND', amount: 450_000, count: 1 },
         {
-          categoryId: categories.excluded,
-          currency: 'VND',
-          amount: 300_000,
-          count: 1,
-        },
-        {
           categoryId: categories.travel,
           currency: 'USD',
           amount: 12.04,
@@ -375,6 +371,16 @@ describe('Transactions to dashboard: canonical ledger (T036)', () => {
         },
         { categoryId: null, currency: 'USD', amount: 0.3, count: 1 },
       ]);
+      // Breakdown 4,150,000 = expense 4,450,000 − the excluded 300,000.
+      const vndBreakdown = rows
+        .filter((row) => row.currency === 'VND')
+        .reduce((total, row) => total + row.amount, 0);
+      expect(vndBreakdown).toBe(4_150_000);
+      expect((await overview(alice, JUNE)).expense).toBe(4_450_000);
+      expect(
+        (await list(alice, { month: JUNE, categoryId: categories.excluded }))
+          .totals.expense,
+      ).toBe(300_000);
     });
 
     it('cashflow trend has one entry per user month, empty months included', async () => {
@@ -517,7 +523,11 @@ describe('Transactions to dashboard: canonical ledger (T036)', () => {
           )
           .reduce((total, row) => total + Math.round(row.amount * 100), 0) /
         100;
-      expect(sum('VND', 'EXPENSE')).toBe(4_450_000);
+      // The excluded-from-analytics category (T7, 300,000) is not broken down.
+      expect(rows.some((row) => row.categoryId === categories.excluded)).toBe(
+        false,
+      );
+      expect(sum('VND', 'EXPENSE')).toBe(4_150_000);
       expect(sum('VND', 'INCOME')).toBe(30_000_000);
       expect(sum('USD', 'EXPENSE')).toBe(12.34);
       expect(sum('USD', 'INCOME')).toBe(100.1);
@@ -616,7 +626,6 @@ describe('Transactions to dashboard: canonical ledger (T036)', () => {
       ).toEqual([
         [categories.food, 1_650_000],
         [null, 777_000],
-        [categories.excluded, 300_000],
       ]);
     });
 
