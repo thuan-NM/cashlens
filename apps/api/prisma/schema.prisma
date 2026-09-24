@@ -22,6 +22,11 @@ enum TransactionSourceType {
   API
 }
 
+enum TransactionDeduplicationStrategy {
+  TRANSACTION_CODE
+  FINGERPRINT
+}
+
 enum TransactionStatus {
   PENDING
   POSTED
@@ -37,6 +42,34 @@ enum ClassificationSource {
   MANUAL
   SYSTEM
   UNKNOWN
+  USER_RULE
+  SYSTEM_RULE
+  FALLBACK
+}
+
+/// Where a category decision came from (CLASS-005); events never carry ML/LLM.
+enum CategoryDecisionSource {
+  MANUAL
+  USER_RULE
+  SYSTEM_RULE
+  FALLBACK
+}
+
+/// What caused a category decision.
+enum CategoryDecisionTrigger {
+  CREATE
+  IMPORT
+  MANUAL_CORRECTION
+  EXPLICIT_RECLASSIFY
+  AUTOMATIC_RERUN
+}
+
+/// The outcome of a category decision.
+enum CategoryDecisionReason {
+  MANUAL_SET
+  MANUAL_CLEARED
+  RULE_MATCHED
+  NO_RULE_MATCHED
 }
 
 enum TransactionCategoryType {
@@ -126,6 +159,27 @@ enum AlertSeverity {
   CRITICAL
 }
 
+/// Condition lifecycle (ALERT-010); independent of the read state.
+enum AlertStatus {
+  ACTIVE
+  DISMISSED
+  RESOLVED
+}
+
+/// Delivery channel of an alert outcome; only EMAIL rows are written in the
+/// MVP (the alert itself is the in-app delivery). IN_APP is reserved.
+enum AlertDeliveryChannel {
+  EMAIL
+  IN_APP
+}
+
+enum AlertDeliveryStatus {
+  PENDING
+  SENT
+  SKIPPED
+  FAILED
+}
+
 enum AlertType {
   BUDGET_THRESHOLD
   LARGE_TRANSACTION
@@ -168,6 +222,7 @@ enum EmailSyncStatus {
   SUCCESS
   PARTIAL_FAILED
   FAILED
+  EXPIRED
 }
 
 enum BankProviderStatus {
@@ -230,7 +285,9 @@ model User {
   goals            Goal[]
   alerts           Alert[]
   alertSettings    AlertSetting[]
+  alertDeliveries  AlertDelivery[]
   merchantRules    MerchantRule[]
+  categoryEvents   TransactionCategoryEvent[]
   emailConnections EmailConnection[]
   emailListenRules EmailListenRule[]
   emailMessages    EmailMessage[]
@@ -307,50 +364,59 @@ model RawEmail {
 }
 
 model Transaction {
-  id                       String                @id @default(cuid())
+  id                       String                            @id @default(cuid())
   userId                   String
   rawEmailId               String?
-  emailMessageId           String?               @unique
+  emailMessageId           String?                           @unique
   categoryId               String?
   financialAccountId       String?
   bankProviderId           String?
   bankName                 String?
   merchantName             String?
   counterpartyName         String?
-  sourceType               TransactionSourceType @default(MANUAL)
+  sourceType               TransactionSourceType             @default(MANUAL)
   sourceId                 String?
   externalTransactionId    String?
   transactionCode          String?
-  amount                   Decimal               @db.Decimal(18, 2)
-  currency                 String                @default("VND")
+  amount                   Decimal                           @db.Decimal(18, 2)
+  currency                 String                            @default("VND")
   direction                TransactionDirection
   transactionTime          DateTime
   postedDate               DateTime?
   description              String?
   normalizedDescription    String?
-  balanceAfter             Decimal?              @db.Decimal(18, 2)
-  feeAmount                Decimal?              @db.Decimal(18, 2)
-  status                   TransactionStatus     @default(POSTED)
-  isDuplicate              Boolean               @default(false)
+  balanceAfter             Decimal?                          @db.Decimal(18, 2)
+  feeAmount                Decimal?                          @db.Decimal(18, 2)
+  status                   TransactionStatus                 @default(POSTED)
+  isDuplicate              Boolean                           @default(false)
   duplicateOfTransactionId String?
-  classificationSource     ClassificationSource  @default(UNKNOWN)
-  classificationConfidence Decimal?              @db.Decimal(5, 4)
+  deduplicationFingerprint String?
+  deduplicationStrategy    TransactionDeduplicationStrategy?
+  classificationSource     ClassificationSource              @default(UNKNOWN)
+  classificationConfidence Decimal?                          @db.Decimal(5, 4)
+  /// The rule that won the current decision; null for MANUAL/FALLBACK, or when the rule was since deleted.
+  classificationRuleId     String?
+  /// When the current category decision was made; null for rows decided before US4.
+  classifiedAt             DateTime?
   userNote                 String?
   confidence               Float?
   metadata                 Json?
-  createdAt                DateTime              @default(now())
-  updatedAt                DateTime              @updatedAt
+  createdAt                DateTime                          @default(now())
+  updatedAt                DateTime                          @updatedAt
 
-  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rawEmail     RawEmail?            @relation(fields: [rawEmailId], references: [id], onDelete: SetNull)
-  emailMessage EmailMessage?        @relation(fields: [emailMessageId], references: [id], onDelete: SetNull)
-  category     TransactionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  account      FinancialAccount?    @relation(fields: [financialAccountId], references: [id], onDelete: SetNull)
-  duplicateOf  Transaction?         @relation("TransactionDuplicate", fields: [duplicateOfTransactionId], references: [id], onDelete: SetNull)
-  duplicates   Transaction[]        @relation("TransactionDuplicate")
-  parserRuns   ParserRun[]
+  user               User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rawEmail           RawEmail?                  @relation(fields: [rawEmailId], references: [id], onDelete: SetNull)
+  emailMessage       EmailMessage?              @relation(fields: [emailMessageId], references: [id], onDelete: SetNull)
+  category           TransactionCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  account            FinancialAccount?          @relation(fields: [financialAccountId], references: [id], onDelete: SetNull)
+  duplicateOf        Transaction?               @relation("TransactionDuplicate", fields: [duplicateOfTransactionId], references: [id], onDelete: SetNull)
+  duplicates         Transaction[]              @relation("TransactionDuplicate")
+  parserRuns         ParserRun[]
+  classificationRule MerchantRule?              @relation(fields: [classificationRuleId], references: [id], onDelete: SetNull)
+  categoryEvents     TransactionCategoryEvent[]
 
   @@unique([userId, externalTransactionId])
+  @@unique([userId, deduplicationFingerprint])
   @@index([userId, transactionTime])
   @@index([userId, direction])
   @@index([userId, status])
@@ -358,6 +424,36 @@ model Transaction {
   @@index([userId, categoryId])
   @@index([userId, financialAccountId])
   @@index([userId, merchantName])
+  @@index([classificationRuleId])
+}
+
+/// Append-only history of category decisions (CLASS-005). Rows are never
+/// updated, and only foreign-key cascades may delete them (DB triggers).
+/// Category, rule, and actor ids are plain columns so later deletions never
+/// rewrite history.
+model TransactionCategoryEvent {
+  id                 String                  @id @default(cuid())
+  transactionId      String
+  userId             String
+  /// 1, 2, 3… per transaction: the append order.
+  sequence           Int
+  previousCategoryId String?
+  newCategoryId      String?
+  source             CategoryDecisionSource
+  trigger            CategoryDecisionTrigger
+  reason             CategoryDecisionReason
+  merchantRuleId     String?
+  actorType          AuditActorType
+  actorUserId        String?
+  /// Ranked candidate rules and the tie-break (ids and codes only).
+  explanation        Json?
+  createdAt          DateTime                @default(now())
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([transactionId, sequence])
+  @@index([userId, createdAt])
 }
 
 model TransactionCategory {
@@ -480,11 +576,57 @@ model Alert {
   metadata     Json?
   createdAt    DateTime      @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Lifecycle (DB-M4). A partial unique index, created in SQL only, allows
+  /// one open (ACTIVE or DISMISSED) row per (userId, conditionKey).
+  status           AlertStatus @default(ACTIVE)
+  /// Stable condition identity; null for legacy and user-authored alerts.
+  conditionKey     String?
+  thresholdValue   Decimal?    @db.Decimal(18, 4)
+  observedValue    Decimal?    @db.Decimal(18, 4)
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  triggeredAt      DateTime    @default(now())
+  resolvedAt       DateTime?
+  resolutionReason String?
+  dismissedAt      DateTime?
+
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries AlertDelivery[]
 
   @@index([userId, isRead, createdAt])
   @@index([userId, severity, createdAt])
   @@index([resourceType, resourceId])
+  @@index([userId, status, triggeredAt])
+  @@index([userId, conditionKey, triggeredAt(sort: Desc)])
+}
+
+/// The single email outcome of an evaluator-created alert (DB-M5, ALERT-005,
+/// ALERT-006). Legacy and user-authored alerts have none. A CHECK constraint,
+/// created in SQL only, keeps attemptCount between 0 and 3.
+model AlertDelivery {
+  id             String               @id @default(cuid())
+  alertId        String
+  userId         String
+  channel        AlertDeliveryChannel @default(EMAIL)
+  /// smtp, log, or none
+  provider       String
+  status         AlertDeliveryStatus
+  /// NOT_CRITICAL, EMAIL_DISABLED, NOTIFICATIONS_DISABLED, TRANSPORT_DISABLED
+  skipReason     String?
+  attemptCount   Int                  @default(0)
+  lastAttemptAt  DateTime?
+  sentAt         DateTime?
+  /// Sanitized: TIMEOUT, CONNECTION, REJECTED, AUTH, INTERRUPTED, ...
+  failureCode    String?
+  failureMessage String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([alertId, channel])
+  @@index([userId, status])
 }
 
 model AlertSetting {
@@ -504,9 +646,12 @@ model AlertSetting {
   @@index([userId, inAppEnabled])
 }
 
+/// A classification rule (CLASS-001): userId null is a system rule. A DB
+/// trigger keeps system rules on system categories and user rules on their
+/// owner's or system categories.
 model MerchantRule {
   id                 String                @id @default(cuid())
-  userId             String
+  userId             String?
   categoryId         String?
   merchantPattern    String?
   descriptionPattern String?
@@ -517,11 +662,13 @@ model MerchantRule {
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
 
-  user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category TransactionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  user         User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     TransactionCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  transactions Transaction[]
 
   @@index([userId, isActive])
   @@index([userId, priority])
+  @@index([isActive, userId])
 }
 
 model BankProvider {
@@ -578,6 +725,12 @@ model EmailConnection {
   connectedAt           DateTime              @default(now())
   disconnectedAt        DateTime?
   errorMessage          String?
+  lastFailedAt          DateTime?
+  syncCursor            String?
+  backfillFrom          DateTime?
+  backfillCompletedAt   DateTime?
+  syncLeaseToken        String?
+  syncLeaseExpiresAt    DateTime?
   createdAt             DateTime              @default(now())
   updatedAt             DateTime              @updatedAt
 
@@ -627,12 +780,18 @@ model EmailSyncRun {
   emailsMatched       Int                  @default(0)
   emailsParsed        Int                  @default(0)
   transactionsCreated Int                  @default(0)
+  emailsFailed        Int                  @default(0)
+  hasMore             Boolean              @default(false)
+  leaseToken          String?
+  cursorBefore        String?
+  cursorAfter         String?
   errorMessage        String?
   createdAt           DateTime             @default(now())
 
   emailConnection EmailConnection @relation(fields: [emailConnectionId], references: [id], onDelete: Cascade)
 
   @@index([emailConnectionId, startedAt])
+  @@index([emailConnectionId, status])
   @@index([status, startedAt])
 }
 

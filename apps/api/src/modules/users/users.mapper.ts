@@ -30,6 +30,8 @@ export function toUserResponse(user: UserWithSettings): UserResponseDto {
     settings: user.settings
       ? {
           storeRawEmailBody: user.settings.storeRawEmailBody,
+          // DATA-001: a stored value (even a legacy true) has no effect.
+          rawEmailBodyAvailable: false,
           allowAiInsights: user.settings.allowAiInsights,
           autoClassificationEnabled: user.settings.autoClassificationEnabled,
           defaultMonthStartDay: user.settings.defaultMonthStartDay,

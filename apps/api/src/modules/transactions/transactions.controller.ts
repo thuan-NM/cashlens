@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -15,6 +16,7 @@ import type { RequestUser } from '../../common/types/request-user.type';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { ListTransactionsDto } from './dto/list-transactions.dto';
 import { MarkDuplicateDto } from './dto/mark-duplicate.dto';
+import { ReclassifyTransactionDto } from './dto/reclassify-transaction.dto';
 import { UpdateTransactionCategoryDto } from './dto/update-transaction-category.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { TransactionsService } from './transactions.service';
@@ -55,6 +57,27 @@ export class TransactionsController {
     @Body() dto: UpdateTransactionCategoryDto,
   ) {
     return this.transactionsService.updateCategory(user, id, dto);
+  }
+
+  /**
+   * Applies the rules now, replacing a manual category if there is one
+   * (CLASS-006). The client warns before calling it; the body must be empty.
+   */
+  @Post(':id/reclassify')
+  @HttpCode(200)
+  reclassify(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    // Bound only so the ValidationPipe refuses any body property (SEC-004).
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    @Body() _dto: ReclassifyTransactionDto,
+  ) {
+    return this.transactionsService.reclassify(user, id);
+  }
+
+  @Get(':id/category-history')
+  categoryHistory(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.transactionsService.categoryHistory(user, id);
   }
 
   @Patch(':id/duplicate')

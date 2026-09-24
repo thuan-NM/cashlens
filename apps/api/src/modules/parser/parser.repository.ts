@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, TransactionDeduplicationStrategy } from '@prisma/client';
 import { BaseRepository } from '../../common/repositories/base.repository';
+import { isUniqueViolation } from '../../common/utils/prisma-errors';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  ClassificationService,
+  decisionColumns,
+} from '../transactions/classification.service';
 import {
   ParserTemplateWithFields,
   toParserTemplateCreateInput,
@@ -9,6 +14,7 @@ import {
 } from './parser.mapper';
 import { CreateParserTemplateDto } from './dto/create-parser-template.dto';
 import { UpdateParserTemplateDto } from './dto/update-parser-template.dto';
+import type { FieldEvidence } from './parser-engine.service';
 
 const templateInclude = {
   fields: { orderBy: { priority: 'asc' as const } },
@@ -16,7 +22,10 @@ const templateInclude = {
 
 @Injectable()
 export class ParserRepository extends BaseRepository {
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly classification: ClassificationService,
+  ) {
     super();
   }
 
@@ -90,11 +99,18 @@ export class ParserRepository extends BaseRepository {
     });
   }
 
+  /**
+   * Records a sanitized failed attempt. A message another path has already
+   * imported keeps its PARSED status.
+   */
   createFailureRun(data: Prisma.ParserRunUncheckedCreateInput) {
     return this.prisma.$transaction(async (tx) => {
       const run = await tx.parserRun.create({ data });
-      await tx.emailMessage.update({
-        where: { id: data.emailMessageId },
+      await tx.emailMessage.updateMany({
+        where: {
+          id: data.emailMessageId,
+          processingStatus: { not: 'PARSED' },
+        },
         data: {
           processingStatus: 'FAILED',
           errorMessage: data.errorMessage,
@@ -111,6 +127,15 @@ export class ParserRepository extends BaseRepository {
     });
   }
 
+  /**
+   * Imports one valid parse result atomically with layered deduplication
+   * (EMAIL-007, EMAIL-008): the message's own transaction first, then the
+   * owner's transaction with the same identity key (transaction code, else
+   * fingerprint). A repeated event links to that transaction instead of
+   * creating another. The owner-scoped unique indexes settle a concurrent
+   * race; the losing write is retried once and then finds the winner.
+   * Parser runs keep match status and the deduplication decision only.
+   */
   async createTransactionFromParse(input: {
     messageId: string;
     templateId: string;
@@ -127,16 +152,82 @@ export class ParserRepository extends BaseRepository {
     transactionCode?: string;
     merchantName?: string;
     counterpartyName?: string;
-    extracted: Prisma.InputJsonValue;
-    normalized: Prisma.InputJsonValue;
+    deduplicationKey: string;
+    deduplicationStrategy: TransactionDeduplicationStrategy;
+    evidence: Record<string, FieldEvidence>;
     confidence: number;
   }) {
+    try {
+      return await this.importOnce(input);
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      return this.importOnce(input);
+    }
+  }
+
+  private importOnce(
+    input: Parameters<ParserRepository['createTransactionFromParse']>[0],
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const existing = await tx.transaction.findUnique({
         where: { emailMessageId: input.messageId },
       });
-      if (existing) return { transaction: existing, created: false };
+      if (existing) {
+        return {
+          transaction: existing,
+          created: false,
+          duplicate: false,
+          suspectedDuplicate: false,
+        };
+      }
 
+      const original = await tx.transaction.findUnique({
+        where: {
+          userId_deduplicationFingerprint: {
+            userId: input.userId,
+            deduplicationFingerprint: input.deduplicationKey,
+          },
+        },
+      });
+      const sameFacts = original && {
+        amount: original.amount.equals(input.amount),
+        direction: original.direction === input.direction,
+        currency: original.currency === input.currency,
+      };
+      // Only the bank's own transaction code with identical facts proves the
+      // same event; any other match is kept, flagged, and reversible.
+      if (
+        original &&
+        sameFacts &&
+        input.deduplicationStrategy === 'TRANSACTION_CODE' &&
+        sameFacts.amount &&
+        sameFacts.direction &&
+        sameFacts.currency
+      ) {
+        await this.recordSuccess(tx, input, null, {
+          strategy: input.deduplicationStrategy,
+          outcome: 'DUPLICATE',
+          duplicateOfTransactionId: original.id,
+          sameFacts,
+        });
+        return {
+          transaction: original,
+          created: false,
+          duplicate: true,
+          suspectedDuplicate: false,
+        };
+      }
+
+      // A created row gets the automatic decision in the same transaction
+      // (T055); a replay or a certain duplicate creates nothing to classify.
+      const decision = await this.classification.decideNew(tx, {
+        userId: input.userId,
+        merchantName: input.merchantName,
+        counterpartyName: input.counterpartyName,
+        description: input.description,
+        bankName: input.bankName,
+        direction: input.direction,
+      });
       const transaction = await tx.transaction.create({
         data: {
           userId: input.userId,
@@ -157,27 +248,74 @@ export class ParserRepository extends BaseRepository {
           merchantName: input.merchantName,
           counterpartyName: input.counterpartyName,
           status: 'POSTED',
-          classificationSource: 'UNKNOWN',
+          ...(decision
+            ? decisionColumns(decision, new Date())
+            : { classificationSource: 'UNKNOWN' as const }),
           confidence: input.confidence,
+          deduplicationStrategy: input.deduplicationStrategy,
+          // A suspected duplicate is excluded from totals (US2 eligibility)
+          // until the user clears the flag; it holds no identity key.
+          ...(original
+            ? { isDuplicate: true, duplicateOfTransactionId: original.id }
+            : { deduplicationFingerprint: input.deduplicationKey }),
         },
       });
+      if (decision) {
+        await this.classification.record(tx, {
+          transactionId: transaction.id,
+          userId: input.userId,
+          previousCategoryId: null,
+          decision,
+          trigger: 'IMPORT',
+          actor: { type: 'SYSTEM' },
+        });
+      }
+      await this.recordSuccess(
+        tx,
+        input,
+        transaction.id,
+        original
+          ? {
+              strategy: input.deduplicationStrategy,
+              outcome: 'SUSPECTED_DUPLICATE',
+              duplicateOfTransactionId: original.id,
+              sameFacts,
+            }
+          : { strategy: input.deduplicationStrategy, outcome: 'CREATED' },
+      );
+      return {
+        transaction,
+        created: true,
+        duplicate: false,
+        suspectedDuplicate: Boolean(original),
+      };
+    });
+  }
 
-      await tx.parserRun.create({
-        data: {
-          emailMessageId: input.messageId,
-          parserTemplateId: input.templateId,
-          status: 'SUCCESS',
-          confidenceScore: input.confidence,
-          extractedPayload: input.extracted,
-          normalizedPayload: input.normalized,
-          createdTransactionId: transaction.id,
-        },
-      });
-      await tx.emailMessage.update({
-        where: { id: input.messageId },
-        data: { processingStatus: 'PARSED', errorMessage: null },
-      });
-      return { transaction, created: true };
+  /**
+   * The sanitized success record: match status per field and the
+   * deduplication decision (EMAIL-008 explainability), never captured text.
+   */
+  private async recordSuccess(
+    tx: Prisma.TransactionClient,
+    input: Parameters<ParserRepository['createTransactionFromParse']>[0],
+    createdTransactionId: string | null,
+    deduplication: Prisma.InputJsonObject,
+  ) {
+    await tx.parserRun.create({
+      data: {
+        emailMessageId: input.messageId,
+        parserTemplateId: input.templateId,
+        status: 'SUCCESS',
+        confidenceScore: input.confidence,
+        extractedPayload: input.evidence,
+        normalizedPayload: { deduplication },
+        createdTransactionId,
+      },
+    });
+    await tx.emailMessage.update({
+      where: { id: input.messageId },
+      data: { processingStatus: 'PARSED', errorMessage: null },
     });
   }
 }

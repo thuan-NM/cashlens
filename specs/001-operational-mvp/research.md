@@ -24,17 +24,83 @@
 **Rationale**: Meets incremental/concurrent-safe requirements without a scheduler/worker.  
 **Alternatives considered**: Cron, Redis queue, Gmail push, unbounded request—outside clarified MVP.
 
+**As built (US3, T041–T044)**:
+- **Constants** (`apps/api/src/modules/email-ingestion/sync-policy.ts`, `gmail-api.service.ts`):
+  - batch 50 messages per run;
+  - default backfill 30 days when no rule sets a start date;
+  - lease TTL 5 minutes;
+  - run budget 25 seconds (no new message is started after it);
+  - incremental overlap 10 minutes.
+  - Gmail requests: at most 3 attempts, full-jitter exponential backoff (500 ms base, 4 s cap, `Retry-After` honoured up to 5 s), 10-second timeout per attempt.
+  - Google OAuth and profile calls: 10-second timeout.
+- **Response time.** Worst case, the response is about one minute: the budget plus one message's retries. The run budget is kept short so that a synchronous request finishes inside common reverse-proxy read timeouts (nginx defaults to 60 s). The operator's proxy must allow at least 90 s on `POST /api/email-connections/{id}/sync`; this belongs in T105.
+- **Access-token refresh.** Access tokens are refreshed unless they outlive a whole lease. A 401 during a run therefore means refused access: the connection becomes `EXPIRED` (reconnect required).
+- **Refusals that are not the user's.** Only `invalid_grant` on refresh, a Gmail 401, or a Gmail 403 `insufficientPermissions`/`authError` means reconnect. Any other refresh refusal (such as `invalid_client` after a wrong client secret) is a temporary 503 that changes no connection. Any other Gmail 403 is `REFUSED` (project quota, API disabled, policy): not retried, a run-level provider failure, never a reconnect. `dailyLimitExceeded` is a rate limit.
+- **Token writes.** Refreshed tokens are written only while the connection is still connected with the grant that was refreshed, and a reconnect-required mark never overwrites a disconnect.
+- **Poison messages.** A transient Gmail failure or an unexpected error on one message counts an attempt in the cursor (`retries`); at 3 attempts the message is given up (a still-`PENDING` row becomes `FAILED` with `PROCESSING_FAILED`) and the page can advance. Rate limits and refusals never count. Every run attempts at least one message, even after a slow listing.
+- **Cursor.** The cursor is opaque JSON: `{v, queryHash, windowStart, windowEnd, pageToken, watermark}`.
+  - A window is `[start, end)` in epoch seconds and is read newest-first, page by page.
+  - The cursor advances only when a page was fully handled. A transient failure or a budget stop re-reads the same page, and handled messages are skipped by provider id.
+  - A page token that Gmail refuses restarts the same window from its start.
+  - The first window starts at `backfillFrom`, which is fixed at the first sync. Later windows start at the watermark minus the overlap.
+  - Changing the listen rules drops an unfinished page token, but does not re-import older mail.
+- **Message status.** Messages already `PARSED`, `FAILED`, or `IGNORED` are not fetched again; only `PENDING` is retried.
+- **Lease.**
+  - The lease is acquired by one conditional `UPDATE`, so under PostgreSQL row locking a concurrent attempt matches nothing and gets 409 `SYNC_IN_PROGRESS`.
+  - The new holder records every still-`RUNNING` run as `EXPIRED`.
+  - `finishRun` is the only writer of the run outcome and of the connection's cursor, status, and progress. It writes connection state only while the run still holds the lease. A run that lost its lease keeps its counts (its row is keyed by its own lease token) and is recorded `EXPIRED`.
+  - A disconnect records any `RUNNING` run of the connection as `EXPIRED`, and the run list shows a run still `RUNNING` after a whole lease as `EXPIRED`.
+  - Times come from the application clock (one host with NTP); a clock stepped far forward could skip mail.
+
 ## Parsing and deduplication
 
 **Decision**: Provider-message uniqueness first, then normalized transaction identity, then owner-scoped deterministic fingerprint; store strategy/key as sanitized evidence.  
 **Rationale**: Covers retries and the same event reported by different messages, with DB uniqueness as concurrency defense.  
 **Alternatives considered**: Message ID only or fuzzy/ML dedupe—insufficient or unexplainable.
 
+**As built (US3, T045)**:
+- **Identity key** (`transaction-identity.ts`):
+  - With a transaction code: `code:v1:<bankProviderId>:<CODE>`, where the code is upper-cased with ASCII whitespace removed.
+  - Otherwise: `fp:v1:sha256(bank|direction|currency|amount.toFixed(2)|UTC minute|balanceAfter?.toFixed(2))`.
+  - The key is stored in `Transaction.deduplicationFingerprint` with its strategy, unique per user.
+- **Repeated events.** Only a match on the bank's transaction code with the same amount, direction, and currency is certain. That message links to the existing transaction and creates nothing: it is `PARSED`, and its parser run records `{deduplication: {strategy, outcome: DUPLICATE, duplicateOfTransactionId, sameFacts}}`.
+- **Suspected duplicates.** Any other match is kept as its own `POSTED` row, flagged `isDuplicate: true` with `duplicateOfTransactionId` and no identity key, so it is excluded from totals (US2 eligibility) until the user clears the flag. The parser run records outcome `SUSPECTED_DUPLICATE` with `sameFacts`. Two cases lead here: a fingerprint match (a fingerprint cannot prove identity, for example two same-minute, same-amount purchases without a code or balance), and a reused code whose facts differ (for example both legs of a transfer). No real transaction is ever silently dropped.
+- **Races.** A concurrent race is settled by the unique indexes: one retry after P2002 finds the winner.
+- **Output gate** (`ParserEngineService.parse`, EMAIL-011). Output is either a complete normalized transaction or `ParserOutputError(code, fields)`, with codes `MISSING_REQUIRED_FIELDS`, `INVALID_AMOUNT`, `INVALID_CURRENCY`, `INVALID_DATETIME`, and `AMBIGUOUS_DIRECTION`.
+  - **Amounts** are positive. The sign may confirm the direction, never contradict or replace it.
+  - **`vnd_money`** is whole dong with consistent separators; only an all-zero fraction is accepted.
+  - **Currency.** `VND`, `VNĐ`, `đ`, `Đ`, and `₫` normalize to `VND`; any other value must be ISO 4217.
+  - **`vi_datetime`** is read as wall time in `Asia/Ho_Chi_Minh`, independent of the server zone.
+  - **Fallback patterns.** Rows sharing a field name are fallback patterns: the first match wins.
+  - **Hardening after a fuzz review** (120k parses in 6 time zones):
+    - A fact read twice with different values fails as `AMBIGUOUS_VALUE`.
+    - Direction labels come from a whitelist, and every part of a label must agree.
+    - Money is parsed strictly and linearly: no leading `0` group; no-break and thin spaces are separators; a Unicode minus is a minus; one trailing currency token is allowed.
+    - X-codes and fund codes are refused.
+    - Years must be in 1900–2099.
+    - The body is read in NFC.
+    - Values are capped at 64 characters, and free text at 500.
+    - The declared template captures whole lines, so nothing is truncated. A transaction code must be one alphanumeric token.
+    - Accepted residual risk: a pre-1976 Vietnamese wall time that never existed is still accepted.
+- **Parser-run payloads** hold match status per field and the deduplication decision only, never captured text. Failures store the code and field names only.
+- **Raw data.** The raw body exists only in the sync call; NUL characters are dropped from Gmail text because PostgreSQL refuses them. Gmail snippets are no longer written. Snippets stored before this release stay in their rows (a message already processed is not rewritten) and are still returned to their owner; clearing them is a follow-up (see tasks.md "US3 follow-ups").
+- **Manual parse.** `POST /email-messages/{id}/parse` parses from a transient body or a legacy snippet. Without either it answers 409 `EMAIL_BODY_UNAVAILABLE` and records nothing, so a `PENDING` message stays available to the next sync. A failure record never overwrites a message another path already `PARSED`.
+- **Where the import lives.** The atomic import lives in `ParserRepository`, the existing owner of the parse write, so `transactions.repository.ts` needed no change.
+
 ## Classification
 
 **Decision**: Extend `MerchantRule` for nullable system ownership and append `TransactionCategoryEvent`; evaluate manual protection, user priority, system priority, then fallback.  
 **Rationale**: Reuses existing patterns/priority/category/provenance and adds only missing audit evidence.  
 **Alternatives considered**: Second rules subsystem or JSON history—duplicate or poorly queryable.
+
+As built (T050–T057):
+- **Manual lock.** The lock is `classificationSource = MANUAL` rather than a separate flag, so there is one source of truth; a cleared category (`null`) chosen by the owner is locked too.
+- **Fallback.** The fallback is `categoryId` null with source `FALLBACK`, rather than `sys_cat_uncategorized` or a `NEEDS_REVIEW` status. A status change would remove the row from totals, and the system category would split US2's uncategorized row in two.
+- **Matching.** Matching is literal and normalized: no diacritics, case, or extra spaces, and never regexes. Rule text therefore cannot cause catastrophic backtracking, and Vietnamese bank text with or without accents matches the same rule.
+- **Id tie-break.** The last tie-break compares ids by UTF-16 code unit in the application, not by a database collation, so the order is the same on every host (SC-006).
+- **Explanation storage.** The explanation is stored with each event as ids and codes, so a later rule change or deletion never rewrites why a past decision was made.
+- **Import hook.** The import hook lives in `ParserRepository.importOnce`, inside the transaction that creates the row. A replay or a certain duplicate never reaches it, so imports stay idempotent without extra checks. `email-ingestion.service.ts` (named by T055) needed no change.
+- **Rules UI.** User rules have a CRUD API (`/classification-rules`) because CLASS-001 requires user-owned rules. A rules management page and system-rule operator tooling are follow-ups.
 
 ## Financial calculations
 
@@ -370,6 +436,12 @@ Past deadline means 0 periods, with the whole remaining amount due now. The full
 - Round-half-even: harder to hand-calculate.
 - Excluding the current month: surprising for deadlines in the current month.
 
+As built (T058–T063):
+- **Precision.** The arithmetic uses a 64-digit decimal context rather than floating point. Division is then exact far below one unit for every `Decimal(18,2)` amount, and `ceil`/`floor` never see a rounded quotient.
+- **Observation query.** It reads the earliest eligible record per stored currency code (`groupBy`) and the window's eligible income and expense. The codes are matched in code with `normalizeCurrency`, so a free-form goal currency is never a database pattern. A Prisma case-insensitive `equals` would become `ILIKE`, where `%` or `_` match other currencies.
+- **Shared helper left alone.** The dashboard's `eligibleCashflowBuckets` (GitNexus: HIGH risk, feeding the dashboard and analytics cashflow) was not changed; the goal helper reuses the same eligibility, direction, and month primitives. An e2e test shows the goal nets equal `/dashboard/cashflow` for the same months.
+- **Clock.** A `Clock` provider (`common/time/clock.ts`) makes `now` controllable. The e2e suite overrides it to reproduce the worked examples through the API.
+
 ## Budget period types (BUDGET-005)
 
 **Decision**: Alert evaluation covers MONTHLY budgets only, per user month, clipped to `startsAt`/`endsAt`. WEEKLY, YEARLY, and CUSTOM budgets stay accepted and readable but are excluded from evaluation. They are flagged `alertsSupported: false` and `usageBasis: CALENDAR_MONTH_APPROXIMATION`.
@@ -451,6 +523,7 @@ Vitest with Testing Library (T096) stays the only component runner. The two do n
 - Responses add `rawEmailBodyAvailable: false`.
 - The UI renders the control disabled and labeled "Unavailable in this release".
 - Ingestion never reads the flag.
+- As built (T045b): the service refuses `true` before any write, with 400 `{code: RAW_EMAIL_BODY_UNAVAILABLE, fields: {storeRawEmailBody: [...]}}`. The DTO keeps `@IsBoolean`, so a non-boolean is still a plain validation error. The Settings page shows the switch off and disabled with the label "Không khả dụng trong phiên bản này (Unavailable in this release)", whatever the stored value.
 
 **Rationale**: This is consistent with preserving stored preferences (the I2 decision) and is the smallest change that makes the capability visibly unavailable.
 

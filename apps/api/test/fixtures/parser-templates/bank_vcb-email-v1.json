@@ -1,0 +1,59 @@
+{
+  "bankProviderId": "bank_vcb",
+  "name": "VCB balance change email (synthetic format)",
+  "version": 1,
+  "channel": "EMAIL",
+  "language": "vi",
+  "subjectPattern": "Biến động số dư",
+  "priority": 50,
+  "fields": [
+    {
+      "fieldName": "direction",
+      "fieldType": "DIRECTION",
+      "regexPattern": "^[ \\t]*Loại giao dịch:[ \\t]*([^\\n]+)",
+      "isRequired": true,
+      "priority": 1
+    },
+    {
+      "fieldName": "amount",
+      "fieldType": "MONEY",
+      "regexPattern": "^[ \\t]*Số tiền:[ \\t]*([^\\n]+)",
+      "normalizer": "vnd_money",
+      "isRequired": true,
+      "priority": 2
+    },
+    {
+      "fieldName": "currency",
+      "fieldType": "TEXT",
+      "regexPattern": "^[ \\t]*Số tiền:[^\\n]*[\\d \\t\\u00a0\\u202f\\u2009]([^\\s\\d.,;:+\\-]+)[ \\t]*$",
+      "priority": 3
+    },
+    {
+      "fieldName": "transaction_time",
+      "fieldType": "DATETIME",
+      "regexPattern": "^[ \\t]*Thời gian:[ \\t]*([^\\n]+)",
+      "normalizer": "vi_datetime",
+      "isRequired": true,
+      "priority": 4
+    },
+    {
+      "fieldName": "transaction_code",
+      "fieldType": "TEXT",
+      "regexPattern": "^[ \\t]*Số tham chiếu:[ \\t]*([A-Za-z0-9]+)[ \\t]*$",
+      "priority": 5
+    },
+    {
+      "fieldName": "description",
+      "fieldType": "TEXT",
+      "regexPattern": "^[ \\t]*Nội dung:[ \\t]*([^\\n]+)",
+      "priority": 6
+    },
+    {
+      "fieldName": "balance_after",
+      "fieldType": "MONEY",
+      "regexPattern": "^[ \\t]*Số dư:[ \\t]*([^\\n]+)",
+      "normalizer": "vnd_money",
+      "priority": 7
+    }
+  ]
+}

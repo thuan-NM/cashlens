@@ -49,7 +49,7 @@ export const MONTHS = [
   { m: "T6", income: 28000000, expense: 20800000 },
 ];
 
-export const BUDGETS: Budget[] = [
+export const BUDGETS: Pick<Budget, "cat" | "limit" | "spent" | "threshold">[] = [
   { cat: "food", limit: 4000000, spent: 3120000, threshold: 80 },
   { cat: "move", limit: 1500000, spent: 980000, threshold: 80 },
   { cat: "shop", limit: 3000000, spent: 3260000, threshold: 90 },
@@ -64,7 +64,7 @@ export const GOALS: Goal[] = [
   { id: "fund", name: "Quỹ dự phòng 6 tháng", type: "Emergency fund", target: 60000000, saved: 42000000, date: "06/2027", months: 12, priority: "Rất cao" },
 ];
 
-export const ALERTS: Alert[] = [
+export const ALERTS: Pick<Alert, "id" | "type" | "severity" | "typeLabel" | "title" | "desc" | "time">[] = [
   { id: "a1", type: "budget_threshold", severity: "critical", typeLabel: "Vượt ngân sách", title: 'Ngân sách "Mua sắm" đã vượt 100%', desc: "Đã chi 3.260.000₫ / 3.000.000₫ trong tháng này.", time: "2 giờ trước" },
   { id: "a2", type: "large_transaction", severity: "warning", typeLabel: "Giao dịch lớn", title: "Phát hiện giao dịch lớn", desc: "Chi 6.500.000₫ tại Điện máy XANH qua Techcombank.", time: "2 giờ trước" },
   { id: "a3", type: "goal_risk", severity: "warning", typeLabel: "Rủi ro mục tiêu", title: 'Mục tiêu "Mua xe máy" đang rủi ro', desc: "Cần tiết kiệm 4.500.000₫/tháng, cao hơn dòng tiền khả dụng.", time: "Hôm nay" },

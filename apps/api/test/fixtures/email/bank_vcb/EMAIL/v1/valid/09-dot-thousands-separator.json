@@ -1,0 +1,29 @@
+{
+  "description": "Dots as thousands separators",
+  "message": {
+    "from": "Vietcombank <notify@vcb.example.test>",
+    "subject": "Vietcombank - Biến động số dư tài khoản",
+    "receivedAt": "2026-08-15T13:31:00.000Z",
+    "body": [
+      "Kính gửi Quý khách,",
+      "Vietcombank xin thông báo tài khoản của Quý khách vừa phát sinh giao dịch:",
+      "Số tài khoản: xxxxxxxxx0001",
+      "Loại giao dịch: Ghi nợ",
+      "Số tiền: -1.234.000 VND",
+      "Thời gian: 15/08/2026 20:30:00",
+      "Số tham chiếu: FT26227SHP",
+      "Nội dung: Mua sam Shopee",
+      "Số dư: 31.322.000 VND",
+      "Đây là email tự động, vui lòng không trả lời."
+    ]
+  },
+  "expected": {
+    "amount": 1234000,
+    "currency": "VND",
+    "direction": "EXPENSE",
+    "transactionTime": "2026-08-15T13:30:00.000Z",
+    "transactionCode": "FT26227SHP",
+    "description": "Mua sam Shopee",
+    "balanceAfter": 31322000
+  }
+}

@@ -3231,6 +3231,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/nodemailer@npm:^7.0.12":
+  version: 7.0.12
+  resolution: "@types/nodemailer@npm:7.0.12"
+  dependencies:
+    "@types/node": "npm:*"
+  checksum: 10c0/12c22af0a9d7bc251897e0dbb840d97cf232736ec89675b390bad395a62234ea787d3eda7804460abf22074d6056a061bf69d8c0c333adaab7fa8eff8aaab567
+  languageName: node
+  linkType: hard
+
 "@types/passport-jwt@npm:^4.0.1":
   version: 4.0.1
   resolution: "@types/passport-jwt@npm:4.0.1"
@@ -4154,6 +4163,7 @@ __metadata:
     "@types/express": "npm:^5.0.0"
     "@types/jest": "npm:^30.0.0"
     "@types/node": "npm:^24.0.0"
+    "@types/nodemailer": "npm:^7.0.12"
     "@types/passport": "npm:^0"
     "@types/passport-jwt": "npm:^4.0.1"
     "@types/pg": "npm:^8"
@@ -4169,6 +4179,7 @@ __metadata:
     globals: "npm:^17.0.0"
     jest: "npm:^30.0.0"
     nestjs-pino: "npm:^4.6.1"
+    nodemailer: "npm:^7.0.0"
     passport: "npm:^0.7.0"
     passport-jwt: "npm:^4.0.1"
     pg: "npm:^8.22.0"
@@ -8733,6 +8744,13 @@ __metadata:
   version: 2.0.48
   resolution: "node-releases@npm:2.0.48"
   checksum: 10c0/17eac8493c0be99130793e87fd67feb6291aecb9f4e473dea3b00f59c002cc8b9c0bdc923227c9aa84968da6b2e4c58e75251981503eb367ec9c742715175a34
+  languageName: node
+  linkType: hard
+
+"nodemailer@npm:^7.0.0":
+  version: 7.0.13
+  resolution: "nodemailer@npm:7.0.13"
+  checksum: 10c0/b26aa5b9fa4a033bbc1e1c16ef75ee2a9c8641fd290c00a8361d6a251b3c1b8bad545a23efa627f59cb266340a448891ea8aa49d8a9307c767b8505219d95079
   languageName: node
   linkType: hard
 

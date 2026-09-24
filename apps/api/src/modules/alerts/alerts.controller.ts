@@ -26,6 +26,12 @@ export class AlertsController {
     return this.alertsService.list(user, query);
   }
 
+  /** ALERT-004: unread alerts, whatever their lifecycle status. */
+  @Get('unread-count')
+  unreadCount(@CurrentUser() user: RequestUser) {
+    return this.alertsService.unreadCount(user);
+  }
+
   @Post()
   create(@CurrentUser() user: RequestUser, @Body() dto: CreateAlertDto) {
     return this.alertsService.create(user, dto);
@@ -52,5 +58,11 @@ export class AlertsController {
   @Patch(':id/read')
   markRead(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     return this.alertsService.markRead(user, id);
+  }
+
+  /** ACTIVE -> DISMISSED, marking it read; 409 when resolved (ALERT-010). */
+  @Patch(':id/dismiss')
+  dismiss(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.alertsService.dismiss(user, id);
   }
 }

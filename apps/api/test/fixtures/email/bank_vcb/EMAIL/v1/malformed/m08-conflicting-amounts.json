@@ -1,0 +1,21 @@
+{
+  "description": "Two different amounts are ambiguous",
+  "message": {
+    "from": "Vietcombank <notify@vcb.example.test>",
+    "subject": "Vietcombank - Biến động số dư tài khoản",
+    "receivedAt": "2026-09-19T09:03:00.000Z",
+    "body": [
+      "Kính gửi Quý khách,",
+      "Vietcombank xin thông báo tài khoản của Quý khách vừa phát sinh giao dịch:",
+      "Số tài khoản: xxxxxxxxx0001",
+      "Loại giao dịch: Ghi nợ",
+      "Số tiền: -500,000 VND",
+      "Thời gian: 19/09/2026 09:00:00",
+      "Số tham chiếu: FT26262AMB",
+      "Nội dung: Kiem tra",
+      "Số tiền: -9,000,000 USD",
+      "Đây là email tự động, vui lòng không trả lời."
+    ]
+  },
+  "expectedFailure": "AMBIGUOUS_VALUE: amount, currency"
+}

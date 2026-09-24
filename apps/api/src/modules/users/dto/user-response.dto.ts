@@ -1,5 +1,7 @@
 export class UserSettingsResponseDto {
   storeRawEmailBody!: boolean;
+  /** Always false: raw email bodies are never retained (DATA-001). */
+  rawEmailBodyAvailable!: false;
   allowAiInsights!: boolean;
   autoClassificationEnabled!: boolean;
   defaultMonthStartDay!: number;

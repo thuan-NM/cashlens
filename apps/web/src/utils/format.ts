@@ -52,6 +52,14 @@ export function formatDateTime(iso: string | null | undefined, timeZone?: string
   return date.toLocaleString("vi-VN", withTimeZone({ dateStyle: "short", timeStyle: "short" }, timeZone));
 }
 
+/** The calendar date of an instant in the account time zone when known, otherwise the browser's. */
+export function formatDate(iso: string | null | undefined, timeZone?: string): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("vi-VN", withTimeZone({ day: "2-digit", month: "2-digit", year: "numeric" }, timeZone));
+}
+
 /** A user month's inclusive date range; periodEnd is exclusive. */
 export function formatPeriod(periodStart: string | undefined, periodEnd: string | undefined, timeZone?: string): string {
   if (!periodStart || !periodEnd) return "";

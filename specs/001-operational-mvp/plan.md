@@ -124,6 +124,15 @@ EmailConnectionsModule┘
   - `AlertsModule` currently has no `imports`.
   - No feature module imports `AlertsModule` today.
 - **Verified by T079.** The `alerts.module.ts` imports list contains no feature module, and the app boots with no circular-dependency warning.
+- **As built (T079–T083).**
+  - `ParserModule` also imports `AlertsModule`: `POST /email-messages/:id/parse` can create an imported transaction, which must be evaluated like any other.
+  - The shared budget threshold rule is `common/finance/budget-threshold.policy.ts`. `budgets/budget-threshold.policy.ts` only re-exports it, so the alert code and the dashboard never import the budgets feature.
+  - `alerts.architecture.spec.ts` asserts:
+    - no module `imports`;
+    - no `forwardRef(`;
+    - no feature import other than `goals/goal-feasibility`;
+    - that `goal-feasibility` itself imports no Nest code and no feature.
+  - `AlertsModule` provides its own `Clock`. The e2e suites override it for every module at once.
 
 ### TLS boundary and same-origin routing (OPS-009, AUTH-003)
 
@@ -280,9 +289,24 @@ Rules:
     - Profile, registration, and admin timezones must be IANA zones.
     - Malformed dashboard and analytics `month` values, and month keys outside 1900-01..2099-12, return 400 instead of failing.
     - `null` for `amount`, `currency`, `direction`, `transactionTime`, `status`, `isDuplicate`, or `duplicateOfTransactionId` returns 400; `page` is at most 1,000,000.
+  - Classification (US4, data-model.md "TransactionCategoryEvent"):
+    - A new transaction without a category is classified by the rules. Its `classificationSource` becomes `USER_RULE`, `SYSTEM_RULE`, or `FALLBACK` (no match: `categoryId` stays null) instead of `UNKNOWN`. `UNKNOWN` remains when the owner turned automatic classification off. The same applies to rows created by an email import.
+    - `PATCH /transactions/{id}` with `categoryId: null` now stores a locked manual clear (`MANUAL`) instead of `UNKNOWN`. Any `categoryId` sent there is a manual correction with a category event, exactly like `PATCH /transactions/{id}/category`.
+    - `PATCH /transactions/{id}/category` now requires the `categoryId` key: a category id or null. An empty body gets 400 instead of clearing the category. The response adds a `decision` object.
+    - Transactions gain the additive fields `classificationRuleId` and `classifiedAt`. The write bodies reject both (400), as they already reject the other provenance fields.
+    - Legacy rows with a category and `UNKNOWN` are backfilled to `MANUAL` (protected), with no history events.
+    - New: `POST /transactions/{id}/reclassify` answers 200, not the NestJS POST default of 201. `GET /transactions/{id}/category-history` and `/classification-rules` are also new.
   - Budget `thresholdPercent` of 100 or more on write now returns 400.
   - Goal statuses change to `SAFE|ACCEPTABLE|RISKY|NOT_RECOMMENDED|INSUFFICIENT_DATA`, and `feasibilityScore` becomes nullable; deploy web and API atomically.
   - Goal simulation now honors `targetDate`. `months` now reports the remaining periods used, and `horizonSource`/`pastDeadline` are additive.
+  - Goal simulation (US6, as built):
+    - The fixed 3,900,000 capacity and the INSTALLMENT 1.099 multiplier are gone. Available cashflow is the owner's completed-month history in the goal currency; with fewer than 2 months the result is `INSUFFICIENT_DATA` with a null score.
+    - `monthlyRequired` rounds up to the unit, instead of to the nearest. `totalCost` always equals `remainingAmount`.
+    - `reason`, `availableMonthlyCashflow`, `observationMonths`, and `monthsRequired` are additive.
+    - Goal `remainingAmount` is computed with exact decimals.
+    - Without `months` the goal's own horizon applies, instead of `goal.months ?? 6`.
+    - The web page no longer offers the "12-month installment" scenario (GOAL-007).
+    - `PATCH /goals/{id}` with `targetDate: null` now clears the date instead of being ignored, so a goal can return to its planned months or the default horizon (GOAL-001, GOAL-002).
   - `defaultAlertSettings` stops enabling email for new settings; existing stored settings are unchanged.
   - `PATCH /users/me/settings` with `storeRawEmailBody: true` now returns 400 `RAW_EMAIL_BODY_UNAVAILABLE`; additive `rawEmailBodyAvailable: false`.
   - In production only, authentication and session-issuing routes return 403 `HTTPS_REQUIRED` when not reached over HTTPS through the trusted proxy.

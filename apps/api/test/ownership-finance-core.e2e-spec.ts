@@ -102,6 +102,8 @@ type AliceState = {
   account: FinancialAccount;
   category: TransactionCategory;
   transaction: Transaction;
+  /** Category history rows (T054): a refused call appends none. */
+  categoryEvents: number;
 };
 
 let app: INestApplication<App>;
@@ -179,6 +181,9 @@ async function aliceState(): Promise<AliceState> {
     account: await accountRow(aliceAccount.id),
     category: await categoryRow(aliceCategory.id),
     transaction: await transactionRow(aliceTransaction.id),
+    categoryEvents: await prisma.transactionCategoryEvent.count({
+      where: { transactionId: aliceTransaction.id },
+    }),
   };
 }
 
@@ -284,6 +289,19 @@ const ID_ROUTES: IdRoute[] = [
     resource: 'transaction',
     path: (id) => transactionPath(id, '/category'),
     body: () => ({ categoryId: systemSnapshot?.id }),
+  },
+  {
+    name: 'POST /transactions/:id/reclassify',
+    method: 'post',
+    resource: 'transaction',
+    path: (id) => transactionPath(id, '/reclassify'),
+    body: () => ({}),
+  },
+  {
+    name: 'GET /transactions/:id/category-history',
+    method: 'get',
+    resource: 'transaction',
+    path: (id) => transactionPath(id, '/category-history'),
   },
   {
     name: 'PATCH /transactions/:id/duplicate',

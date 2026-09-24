@@ -10,7 +10,9 @@ import {
   compareCategoryRows,
   emptyCashflowPoint,
 } from '../../common/finance/financial-summary.query';
+import { monthlyInstanceForMonth } from '../../common/finance/budget-spend.query';
 import type { RequestUser } from '../../common/types/request-user.type';
+import { budgetThresholdState } from '../../common/finance/budget-threshold.policy';
 import { toTransactionResponse } from '../transactions/transactions.mapper';
 import {
   DashboardCashflowQueryDto,
@@ -114,7 +116,12 @@ export class DashboardService {
     return transactions.map(toTransactionResponse);
   }
 
-  /** Budgets over their warning threshold, spent in the budget's currency. */
+  /**
+   * Budgets at or over their threshold in the month, by the shared threshold
+   * rule and spend aggregate (BUDGET-002, BUDGET-004), each in its own
+   * currency. A MONTHLY budget counts its period instance in that month; the
+   * other periods count the whole month. Read-only: no alert is written.
+   */
   async hotBudgets(user: RequestUser, query: DashboardMonthQueryDto) {
     const context = await this.dashboardRepository.financialContext(user.id);
     const month = dashboardMonth(context.settings, query.month);
@@ -122,41 +129,32 @@ export class DashboardService {
       user.id,
       month,
     );
-    const categoryIds = Array.from(
-      new Set(
-        budgets
-          .map((budget) => budget.categoryId)
-          .filter((id): id is string => Boolean(id)),
-      ),
+    const scoped = budgets.flatMap((budget) => {
+      if (budget.period !== 'MONTHLY') return [{ budget, range: month }];
+      const result = monthlyInstanceForMonth(budget, month, context.settings);
+      return result.supported && result.instance
+        ? [{ budget, range: result.instance.usage }]
+        : [];
+    });
+    const spend = await this.dashboardRepository.budgetSpend(
+      user.id,
+      scoped.map(({ budget, range }) => ({
+        id: budget.id,
+        categoryId: budget.categoryId,
+        currency: budget.currency,
+        range,
+      })),
     );
-    const spendingRows = categoryIds.length
-      ? await this.dashboardRepository.budgetSpending(
-          user.id,
-          categoryIds,
-          month,
-        )
-      : [];
-    // Currency codes that differ only in case are one currency.
-    const spentMap = new Map<string, Prisma.Decimal>();
-    for (const row of spendingRows) {
-      const key = `${row.categoryId ?? ''}|${normalizeCurrency(row.currency)}`;
-      spentMap.set(
-        key,
-        (spentMap.get(key) ?? toDecimal(0)).plus(toDecimal(row._sum.amount)),
-      );
-    }
 
-    return budgets
-      .map((budget) => {
+    return scoped
+      .map(({ budget }) => {
         const amount = toDecimal(budget.amount);
-        const spent = budget.categoryId
-          ? (spentMap.get(
-              `${budget.categoryId}|${normalizeCurrency(budget.currency)}`,
-            ) ?? toDecimal(0))
-          : toDecimal(0);
-        const percentUsed = amount.isZero()
-          ? 0
-          : Math.round(spent.div(amount).times(100).toNumber());
+        const spent = spend.get(budget.id) ?? toDecimal(0);
+        const state = budgetThresholdState({
+          thresholdPercent: budget.thresholdPercent,
+          amount,
+          spent,
+        });
         const remaining = amount.minus(spent);
 
         return {
@@ -167,12 +165,22 @@ export class DashboardService {
           amount: amount.toNumber(),
           spent: spent.toNumber(),
           remaining: remaining.isNegative() ? 0 : remaining.toNumber(),
-          percentUsed,
+          percentUsed: state.percentUsed
+            ? state.percentUsed
+                .toDecimalPlaces(0, Prisma.Decimal.ROUND_HALF_UP)
+                .toNumber()
+            : 0,
           thresholdPercent: budget.thresholdPercent,
           category: budget.category,
+          isNearThreshold: state.isNearThreshold,
         };
       })
-      .filter((budget) => budget.percentUsed >= budget.thresholdPercent)
+      .filter((budget) => budget.isNearThreshold)
+      .map((budget) => {
+        const { isNearThreshold, ...view } = budget;
+        void isNearThreshold; // filtered on, not returned
+        return view;
+      })
       .sort(
         (a, b) =>
           b.percentUsed - a.percentUsed ||

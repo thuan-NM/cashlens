@@ -1,0 +1,29 @@
+{
+  "description": "Bilingual direction label",
+  "message": {
+    "from": "Vietcombank <notify@vcb.example.test>",
+    "subject": "Vietcombank - Biến động số dư tài khoản",
+    "receivedAt": "2026-09-12T01:01:00.000Z",
+    "body": [
+      "Kính gửi Quý khách,",
+      "Vietcombank xin thông báo tài khoản của Quý khách vừa phát sinh giao dịch:",
+      "Số tài khoản: xxxxxxxxx0001",
+      "Loại giao dịch: Ghi có (Credit)",
+      "Số tiền: +300,000 VND",
+      "Thời gian: 12/09/2026 08:00:00",
+      "Số tham chiếu: FT26255TRF",
+      "Nội dung: NGUYEN VAN A chuyen tien",
+      "Số dư: 151,577,000 VND",
+      "Đây là email tự động, vui lòng không trả lời."
+    ]
+  },
+  "expected": {
+    "amount": 300000,
+    "currency": "VND",
+    "direction": "INCOME",
+    "transactionTime": "2026-09-12T01:00:00.000Z",
+    "transactionCode": "FT26255TRF",
+    "description": "NGUYEN VAN A chuyen tien",
+    "balanceAfter": 151577000
+  }
+}

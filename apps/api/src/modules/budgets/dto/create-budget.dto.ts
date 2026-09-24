@@ -43,11 +43,16 @@ export class CreateBudgetDto {
   @IsDateString()
   endsAt?: string;
 
+  /**
+   * The warning threshold, 1–99 (BUDGET-001); critical is fixed at 100 and
+   * not writable. Stored legacy values of 100 or more are kept but can no
+   * longer be written.
+   */
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(200)
+  @Max(99)
   thresholdPercent?: number;
 
   @IsOptional()

@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import {
+  BudgetSpendScope,
+  budgetSpend,
+} from '../../common/finance/budget-spend.query';
+import {
   EXPENSE_DIRECTIONS,
   TimeRange,
   UserMonth,
@@ -81,21 +85,9 @@ export class DashboardRepository extends BaseRepository {
     });
   }
 
-  /** Eligible expense per category and currency (TX-003, BUDGET-002). */
-  budgetSpending(userId: string, categoryIds: string[], range: TimeRange) {
-    return this.prisma.transaction.groupBy({
-      by: ['categoryId', 'currency'],
-      where: {
-        AND: [
-          eligibleTransactionWhere(userId, range),
-          {
-            categoryId: { in: categoryIds },
-            direction: { in: EXPENSE_DIRECTIONS },
-          },
-        ],
-      },
-      _sum: { amount: true },
-    });
+  /** The shared budget spend aggregate (BUDGET-002), per scope id. */
+  budgetSpend(userId: string, scopes: BudgetSpendScope[]) {
+    return budgetSpend(this.prisma, userId, scopes);
   }
 
   unreadCriticalAlerts(userId: string) {

@@ -48,7 +48,7 @@ export class ParserController {
 
   @Post('email-messages/:id/parse')
   parse(@CurrentUser() user: RequestUser, @Param('id') id: string) {
-    return this.service.parseMessage(user, id);
+    return this.service.parseRequested(user, id);
   }
 
   @Get('email-messages/:id/parser-runs')

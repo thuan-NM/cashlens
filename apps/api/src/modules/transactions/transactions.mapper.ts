@@ -1,4 +1,4 @@
-import { ClassificationSource, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 
@@ -49,6 +49,8 @@ export const toTransactionResponse = (
   classificationConfidence: decimalToNumber(
     transaction.classificationConfidence,
   ),
+  classificationRuleId: transaction.classificationRuleId,
+  classifiedAt: dateToIso(transaction.classifiedAt),
   userNote: transaction.userNote,
   metadata: transaction.metadata,
   account: transaction.account,
@@ -57,13 +59,19 @@ export const toTransactionResponse = (
   updatedAt: transaction.updatedAt.toISOString(),
 });
 
+/**
+ * A new manual transaction without its classification: the service adds the
+ * decision columns (a MANUAL category, or the automatic decision, T055).
+ */
 export const toCreateTransactionInput = (
   userId: string,
   dto: CreateTransactionDto,
-): Prisma.TransactionUncheckedCreateInput => ({
+): Omit<
+  Prisma.TransactionUncheckedCreateInput,
+  'categoryId' | 'classificationSource'
+> => ({
   userId,
   financialAccountId: dto.financialAccountId,
-  categoryId: dto.categoryId,
   sourceType: 'MANUAL',
   amount: dto.amount,
   currency: dto.currency,
@@ -79,23 +87,24 @@ export const toCreateTransactionInput = (
   status: dto.status ?? 'POSTED',
   isDuplicate: dto.isDuplicate,
   duplicateOfTransactionId: dto.duplicateOfTransactionId,
-  // Provenance is derived on the server, never taken from input (SEC-004).
-  classificationSource: dto.categoryId
-    ? ClassificationSource.MANUAL
-    : ClassificationSource.UNKNOWN,
   userNote: dto.userNote,
   metadata: dto.metadata,
 });
 
+/**
+ * The non-category fields of an update. A category change is a manual
+ * correction written by the service with its event (T054).
+ */
 export const toUpdateTransactionInput = (
   dto: UpdateTransactionDto,
 ): Prisma.TransactionUncheckedUpdateInput => ({
   financialAccountId: dto.financialAccountId,
-  categoryId: dto.categoryId,
   amount: dto.amount,
   currency: dto.currency,
   direction: dto.direction,
-  transactionTime: dto.transactionTime ? new Date(dto.transactionTime) : undefined,
+  transactionTime: dto.transactionTime
+    ? new Date(dto.transactionTime)
+    : undefined,
   postedDate: dto.postedDate ? new Date(dto.postedDate) : undefined,
   merchantName: dto.merchantName,
   counterpartyName: dto.counterpartyName,
@@ -106,15 +115,6 @@ export const toUpdateTransactionInput = (
   status: dto.status,
   isDuplicate: dto.isDuplicate,
   duplicateOfTransactionId: dto.duplicateOfTransactionId,
-  // A category chosen by the owner is a manual classification (SEC-004).
-  ...(dto.categoryId === undefined
-    ? {}
-    : {
-        classificationSource: dto.categoryId
-          ? ClassificationSource.MANUAL
-          : ClassificationSource.UNKNOWN,
-        classificationConfidence: dto.categoryId ? 1 : null,
-      }),
   userNote: dto.userNote,
   metadata: dto.metadata,
 });

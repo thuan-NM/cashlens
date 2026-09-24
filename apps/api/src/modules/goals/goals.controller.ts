@@ -34,6 +34,7 @@ export class GoalsController {
     return this.goalsService.create(user, dto);
   }
 
+  /** Enveloped `GoalFeasibility`; side-effect free (never touches alerts). */
   @Get(':id/simulation')
   simulate(
     @CurrentUser() user: RequestUser,

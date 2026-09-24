@@ -12,8 +12,22 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 
+/** Upper bound of one call to a Google OAuth or profile endpoint. */
+export const GMAIL_OAUTH_TIMEOUT_MS = 10_000;
+
 /** Lifetime of one connect flow: the signed state and its nonce cookie. */
 export const GMAIL_OAUTH_FLOW_TTL_MS = 10 * 60 * 1000;
+
+/**
+ * The provider refused the stored grant (revoked, expired, or invalid): only
+ * a new consent flow can recover the connection (reconnect required). Its
+ * message never carries a token or provider text.
+ */
+export class GmailReconnectRequiredError extends Error {
+  constructor() {
+    super('Gmail access must be reconnected');
+  }
+}
 
 type GmailTokenResponse = {
   access_token: string;
@@ -106,7 +120,7 @@ export class GmailOAuthService {
       grant_type: 'authorization_code',
     });
 
-    return this.requestToken(body);
+    return this.requestToken(body, 'exchange');
   }
 
   async refreshAccessToken(refreshToken: string): Promise<GmailTokenResponse> {
@@ -117,30 +131,105 @@ export class GmailOAuthService {
       grant_type: 'refresh_token',
     });
 
-    return this.requestToken(body);
+    return this.requestToken(body, 'refresh');
+  }
+
+  /**
+   * Best-effort provider revocation on disconnect (DATA-002). The token goes
+   * in a form body, never in the URL. It never throws: the local credentials
+   * are cleared whatever the provider answers.
+   */
+  async revokeToken(token: string): Promise<boolean> {
+    try {
+      const response = await fetch('https://oauth2.googleapis.com/revoke', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ token }).toString(),
+        signal: AbortSignal.timeout(GMAIL_OAUTH_TIMEOUT_MS),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 
   async profile(accessToken: string): Promise<GmailProfile> {
-    const response = await fetch(
-      'https://gmail.googleapis.com/gmail/v1/users/me/profile',
-      { headers: { Authorization: `Bearer ${accessToken}` } },
-    );
+    let response: Response;
+    try {
+      response = await fetch(
+        'https://gmail.googleapis.com/gmail/v1/users/me/profile',
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          signal: AbortSignal.timeout(GMAIL_OAUTH_TIMEOUT_MS),
+        },
+      );
+    } catch {
+      throw new ServiceUnavailableException('Gmail is temporarily unavailable');
+    }
     if (!response.ok) {
       throw new BadGatewayException('Unable to read Gmail profile');
     }
-    return response.json() as Promise<GmailProfile>;
+    return this.json<GmailProfile>(response, 'Unable to read Gmail profile');
   }
 
-  private async requestToken(body: URLSearchParams) {
-    const response = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body,
-    });
-    if (!response.ok) {
-      throw new BadGatewayException('Gmail OAuth token exchange failed');
+  /**
+   * Token endpoint call with sanitized failures (EMAIL-002). Only
+   * `invalid_grant` on refresh means the user's grant is gone (reconnect
+   * required). Any other refresh refusal, such as a misconfigured client, is
+   * an operator problem: a temporary 503 that leaves every connection as it
+   * is. A provider outage is also 503; a refused code exchange is a generic
+   * 502. Provider text is never copied.
+   */
+  private async requestToken(
+    body: URLSearchParams,
+    purpose: 'exchange' | 'refresh',
+  ) {
+    let response: Response;
+    try {
+      response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body,
+        signal: AbortSignal.timeout(GMAIL_OAUTH_TIMEOUT_MS),
+      });
+    } catch {
+      throw new ServiceUnavailableException('Gmail is temporarily unavailable');
     }
-    return response.json() as Promise<GmailTokenResponse>;
+    if (response.ok) {
+      return this.json<GmailTokenResponse>(
+        response,
+        'Gmail OAuth token exchange failed',
+      );
+    }
+    if (response.status >= 500) {
+      throw new ServiceUnavailableException('Gmail is temporarily unavailable');
+    }
+    if (purpose === 'refresh') {
+      if ((await this.tokenError(response)) === 'invalid_grant') {
+        throw new GmailReconnectRequiredError();
+      }
+      throw new ServiceUnavailableException('Gmail is temporarily unavailable');
+    }
+    throw new BadGatewayException('Gmail OAuth token exchange failed');
+  }
+
+  /** A JSON body, or a generic 502: a parse error could quote the body. */
+  private async json<T>(response: Response, failure: string): Promise<T> {
+    try {
+      return (await response.json()) as T;
+    } catch {
+      throw new BadGatewayException(failure);
+    }
+  }
+
+  /** Google's OAuth error code only; the description is never read. */
+  private async tokenError(response: Response) {
+    try {
+      const body = (await response.json()) as { error?: unknown };
+      return typeof body.error === 'string' ? body.error : '';
+    } catch {
+      return '';
+    }
   }
 
   private signState(userId: string, nonce: string) {

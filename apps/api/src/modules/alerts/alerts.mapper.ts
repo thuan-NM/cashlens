@@ -1,11 +1,36 @@
-import { Alert, AlertSetting, AlertType, Prisma } from '@prisma/client';
+import {
+  Alert,
+  AlertDelivery,
+  AlertSetting,
+  AlertType,
+  Prisma,
+} from '@prisma/client';
 import { CreateAlertDto } from './dto/create-alert.dto';
 import { UpdateAlertSettingDto } from './dto/update-alert-setting.dto';
 
 const decimalToNumber = (value: Prisma.Decimal | null) =>
   value === null ? null : Number(value.toString());
 
-export const toAlertResponse = (alert: Alert) => ({
+const iso = (value: Date | null) => value?.toISOString() ?? null;
+
+/** The email outcome (ALERT-005, ALERT-006); sanitized fields only. */
+export const toAlertDeliveryResponse = (delivery: AlertDelivery) => ({
+  channel: delivery.channel,
+  status: delivery.status,
+  skipReason: delivery.skipReason,
+  attemptCount: delivery.attemptCount,
+  lastAttemptAt: iso(delivery.lastAttemptAt),
+  sentAt: iso(delivery.sentAt),
+  failureCode: delivery.failureCode,
+});
+
+/**
+ * Existing fields plus the DB-M4 lifecycle. `emailDelivery` is null when the
+ * alert has no delivery row: legacy and user-authored alerts (ALERT-011).
+ */
+export const toAlertResponse = (
+  alert: Alert & { deliveries?: AlertDelivery[] },
+) => ({
   id: alert.id,
   userId: alert.userId,
   type: alert.type,
@@ -18,9 +43,28 @@ export const toAlertResponse = (alert: Alert) => ({
   readAt: alert.readAt?.toISOString() ?? null,
   metadata: alert.metadata,
   createdAt: alert.createdAt.toISOString(),
+  status: alert.status,
+  conditionKey: alert.conditionKey,
+  thresholdValue: decimalToNumber(alert.thresholdValue),
+  observedValue: decimalToNumber(alert.observedValue),
+  periodStart: iso(alert.periodStart),
+  periodEnd: iso(alert.periodEnd),
+  triggeredAt: alert.triggeredAt.toISOString(),
+  resolvedAt: iso(alert.resolvedAt),
+  resolutionReason: alert.resolutionReason,
+  dismissedAt: iso(alert.dismissedAt),
+  emailDelivery: (() => {
+    const email = alert.deliveries?.find(
+      (delivery) => delivery.channel === 'EMAIL',
+    );
+    return email ? toAlertDeliveryResponse(email) : null;
+  })(),
 });
 
-export const toAlertSettingResponse = (setting: AlertSetting) => ({
+export const toAlertSettingResponse = (
+  setting: AlertSetting,
+  emailAvailable: boolean,
+) => ({
   id: setting.id,
   userId: setting.userId,
   type: setting.type,
@@ -30,6 +74,7 @@ export const toAlertSettingResponse = (setting: AlertSetting) => ({
   metadata: setting.metadata,
   createdAt: setting.createdAt.toISOString(),
   updatedAt: setting.updatedAt.toISOString(),
+  emailAvailable,
 });
 
 export const toCreateAlertInput = (
@@ -44,6 +89,8 @@ export const toCreateAlertInput = (
   resourceType: dto.resourceType,
   resourceId: dto.resourceId,
   metadata: dto.metadata,
+  // User-authored: no condition identity, never evaluated (ALERT-011).
+  conditionKey: null,
 });
 
 export const toUpsertAlertSettingInput = (
@@ -58,12 +105,14 @@ export const toUpsertAlertSettingInput = (
   metadata: dto.metadata,
 });
 
+/**
+ * Settings created for an account that has none (ALERT-005): in-app on and
+ * email off for every type. Existing rows are never rewritten (I2).
+ */
 export const defaultAlertSettings = (userId: string) =>
   Object.values(AlertType).map((type) => ({
     userId,
     type,
     inAppEnabled: true,
-    emailEnabled:
-      type === AlertType.BUDGET_THRESHOLD ||
-      type === AlertType.LARGE_TRANSACTION,
+    emailEnabled: false,
   }));
