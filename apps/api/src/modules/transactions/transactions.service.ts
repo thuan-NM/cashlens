@@ -16,6 +16,7 @@ import {
   toTransactionResponse,
   toUpdateTransactionInput,
 } from './transactions.mapper';
+import { AlertEvaluationService } from '../alerts/alert-evaluation.service';
 import { UsersRepository } from '../users/users.repository';
 import {
   ClassificationService,
@@ -23,6 +24,19 @@ import {
   manualDecision,
 } from './classification.service';
 import { TransactionsRepository } from './transactions.repository';
+
+/**
+ * Fields whose change re-evaluates a transaction's large-transaction alert
+ * (ALERT-009: amount, currency, direction, or eligibility).
+ */
+const LARGE_TRANSACTION_FIELDS = [
+  'amount',
+  'currency',
+  'direction',
+  'status',
+  'isDuplicate',
+  'duplicateOfTransactionId',
+] as const;
 
 /** Fields every transaction carries: null cannot clear them (TX-002). */
 const NOT_NULLABLE = [
@@ -41,6 +55,7 @@ export class TransactionsService {
     private readonly transactionsRepository: TransactionsRepository,
     private readonly users: UsersRepository,
     private readonly classification: ClassificationService,
+    private readonly alerts: AlertEvaluationService,
   ) {}
 
   /**
@@ -136,6 +151,10 @@ export class TransactionsService {
       },
     );
 
+    // After the commit; evaluation never fails the write (ALERT-009).
+    await this.alerts.onTransactionsChanged(user.id, {
+      largeTransactionIds: [transaction.id],
+    });
     return toTransactionResponse(transaction);
   }
 
@@ -150,20 +169,28 @@ export class TransactionsService {
     });
 
     const changes = { ...toUpdateTransactionInput(dto), ...duplicate };
-    if (dto.categoryId === undefined) {
-      // No category in the request: the classification is left as it is.
-      return toTransactionResponse(
-        this.found(
-          await this.transactionsRepository.updateById(user.id, id, changes),
-        ),
-      );
-    }
-    const { transaction } = await this.correctCategory(
-      user,
-      id,
-      dto.categoryId ?? null,
-      changes,
-    );
+    const transaction =
+      dto.categoryId === undefined
+        ? // No category in the request: the classification is left as it is.
+          this.found(
+            await this.transactionsRepository.updateById(user.id, id, changes),
+          )
+        : (
+            await this.correctCategory(
+              user,
+              id,
+              dto.categoryId ?? null,
+              changes,
+            )
+          ).transaction;
+    const sent = { ...dto, ...duplicate } as Record<string, unknown>;
+    await this.alerts.onTransactionsChanged(user.id, {
+      largeTransactionIds: LARGE_TRANSACTION_FIELDS.some(
+        (field) => sent[field] !== undefined,
+      )
+        ? [id]
+        : [],
+    });
     return toTransactionResponse(transaction);
   }
 
@@ -184,6 +211,7 @@ export class TransactionsService {
       id,
       dto.categoryId ?? null,
     );
+    await this.alerts.onTransactionsChanged(user.id);
     return {
       ...toTransactionResponse(transaction),
       decision: { source: decision.source, reason: decision.reason, eventId },
@@ -243,6 +271,7 @@ export class TransactionsService {
       },
     );
 
+    await this.alerts.onTransactionsChanged(user.id);
     return {
       ...toTransactionResponse(result.transaction),
       decision: {
@@ -281,6 +310,9 @@ export class TransactionsService {
       ),
     );
 
+    await this.alerts.onTransactionsChanged(user.id, {
+      largeTransactionIds: [id],
+    });
     return toTransactionResponse(transaction);
   }
 
@@ -295,6 +327,9 @@ export class TransactionsService {
       ),
     );
 
+    await this.alerts.onTransactionsChanged(user.id, {
+      largeTransactionIds: [id],
+    });
     return toTransactionResponse(transaction);
   }
 
@@ -316,6 +351,9 @@ export class TransactionsService {
       resourceId: id,
     });
 
+    await this.alerts.onTransactionsChanged(user.id, {
+      largeTransactionIds: [id],
+    });
     return { id };
   }
 

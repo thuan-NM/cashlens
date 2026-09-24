@@ -1,3 +1,4 @@
+import type { AlertEvaluationService } from '../alerts/alert-evaluation.service';
 import { ConflictException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import type { EmailConnectionsService } from '../email-connections/email-connections.service';
@@ -185,6 +186,11 @@ describe('EmailIngestionService provider-message layer (T039)', () => {
       gmail as unknown as GmailApiService,
       parser as unknown as ParserService,
       users as unknown as UsersRepository,
+      {
+        onTransactionsChanged: jest.fn().mockResolvedValue({ ok: true }),
+        onSyncRunFinished: jest.fn().mockResolvedValue({ ok: true }),
+        onConnectionStatusChanged: jest.fn().mockResolvedValue({ ok: true }),
+      } as unknown as AlertEvaluationService,
     );
     await service.sync({ id: 'user-1' }, 'conn-1');
 
@@ -315,6 +321,11 @@ describe('EmailIngestionService bounded sync loop (T042, T044)', () => {
       gmail,
       parser as unknown as ParserService,
       users as unknown as UsersRepository,
+      {
+        onTransactionsChanged: jest.fn().mockResolvedValue({ ok: true }),
+        onSyncRunFinished: jest.fn().mockResolvedValue({ ok: true }),
+        onConnectionStatusChanged: jest.fn().mockResolvedValue({ ok: true }),
+      } as unknown as AlertEvaluationService,
     );
     service.now = () => new Date(clock);
     const finish = () => {

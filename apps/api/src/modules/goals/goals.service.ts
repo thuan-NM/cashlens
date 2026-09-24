@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { GoalScenarioType } from '@prisma/client';
 import { Clock } from '../../common/time/clock';
 import type { RequestUser } from '../../common/types/request-user.type';
+import { AlertEvaluationService } from '../alerts/alert-evaluation.service';
 import { CreateGoalDto } from './dto/create-goal.dto';
 import { GoalContributionDto } from './dto/goal-contribution.dto';
 import { GoalSimulationQueryDto } from './dto/goal-simulation-query.dto';
@@ -21,6 +22,7 @@ export class GoalsService {
   constructor(
     private readonly goalsRepository: GoalsRepository,
     private readonly clock: Clock,
+    private readonly alerts: AlertEvaluationService,
   ) {}
 
   async list(user: RequestUser, query: ListGoalsDto) {
@@ -42,6 +44,8 @@ export class GoalsService {
     const goal = await this.goalsRepository.create(
       toCreateGoalInput(user.id, dto),
     );
+    // After the write; evaluation never fails it (ALERT-009 goal risk).
+    await this.alerts.onGoalChanged(user.id);
     return toGoalResponse(goal);
   }
 
@@ -54,12 +58,14 @@ export class GoalsService {
         toUpdateGoalInput(dto),
       ),
     );
+    await this.alerts.onGoalChanged(user.id);
     return toGoalResponse(goal);
   }
 
   async archive(user: RequestUser, id: string) {
     await this.findById(user, id);
     this.found(await this.goalsRepository.archiveById(user.id, id));
+    await this.alerts.onGoalChanged(user.id);
     return { id };
   }
 
@@ -68,6 +74,7 @@ export class GoalsService {
     const goal = this.found(
       await this.goalsRepository.contribute(user.id, id, dto.amount),
     );
+    await this.alerts.onGoalChanged(user.id);
     return toGoalResponse(goal);
   }
 

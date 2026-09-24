@@ -1,17 +1,19 @@
 ﻿import { ApiError } from "@/api/client";
-import type { Alert } from "@/types/alert";
-import type { Budget } from "@/types/budget";
+import type { Alert, AlertSetting, AlertStatus, ApiAlert, ApiAlertSetting } from "@/types/alert";
+import type { ApiBudget, Budget } from "@/types/budget";
 import type { Goal } from "@/types/goal";
 import type { Category, Transaction } from "@/types/transaction";
 import { formatDate, formatDateTime } from "@/utils/format";
 
-const alertTypeLabels: Record<string, string> = {
+/** Labels of the API alert types (`AlertType`). */
+export const alertTypeLabels: Record<string, string> = {
   BUDGET_THRESHOLD: "Ngân sách",
   LARGE_TRANSACTION: "Giao dịch lớn",
-  CATEGORY_SPIKE: "Biến động danh mục",
+  CATEGORY_SHIFT: "Biến động danh mục",
   GOAL_RISK: "Rủi ro mục tiêu",
   CASHFLOW_RISK: "Rủi ro dòng tiền",
-  SYSTEM_ERROR: "Lỗi hệ thống",
+  PARSER_ISSUE: "Lỗi bóc tách",
+  SYSTEM: "Kết nối email",
 };
 
 const goalTypeLabels: Record<string, string> = {
@@ -196,11 +198,21 @@ export const apiFieldErrors = (
   return { fieldErrors, otherErrors };
 };
 
-export const mapBudget = (item: any): Budget => ({
-  cat: item.categoryId ?? item.id,
+export const mapBudget = (item: ApiBudget): Budget => ({
+  id: item.id,
+  cat: item.categoryId ?? null,
+  name: item.name ?? "",
   limit: Number(item.amount ?? 0),
   spent: Number(item.usage?.spent ?? 0),
+  percentUsed: Number(item.usage?.percentUsed ?? 0),
   threshold: Number(item.thresholdPercent ?? 80),
+  currency: item.currency ?? "VND",
+  period: item.period ?? "MONTHLY",
+  warningThresholdActive: item.warningThresholdActive !== false,
+  alertsSupported: item.alertsSupported !== false,
+  usageBasis: item.usageBasis ?? "PERIOD_INSTANCE",
+  isNearThreshold: Boolean(item.usage?.isNearThreshold),
+  isOverLimit: Boolean(item.usage?.isOverLimit),
 });
 
 /** A goal as the list shows it; its deadline is the calendar date in the account time zone (the one the API reads). */
@@ -224,12 +236,38 @@ const alertSeverity = (severity?: string): Alert["severity"] => {
   return "info";
 };
 
-export const mapAlert = (item: any): Alert => ({
+export const mapAlert = (item: ApiAlert): Alert => ({
   id: item.id,
   type: item.type,
   severity: alertSeverity(item.severity),
   typeLabel: alertTypeLabels[item.type] ?? String(item.type ?? "SYSTEM").replaceAll("_", " ").toLowerCase(),
   title: item.title,
   desc: item.message,
-  time: item.createdAt ? new Date(item.createdAt).toLocaleString("vi-VN") : "",
+  time: (() => {
+    const when = item.triggeredAt ?? item.createdAt;
+    return when ? new Date(when).toLocaleString("vi-VN") : "";
+  })(),
+  status: (item.status ?? "ACTIVE") as AlertStatus,
+  isRead: Boolean(item.isRead),
+  conditionKey: item.conditionKey ?? null,
+  dismissedAt: item.dismissedAt ?? null,
+  resolvedAt: item.resolvedAt ?? null,
+  resolutionReason: item.resolutionReason ?? null,
+  emailDelivery: item.emailDelivery
+    ? {
+        status: item.emailDelivery.status,
+        skipReason: item.emailDelivery.skipReason ?? null,
+        attemptCount: Number(item.emailDelivery.attemptCount ?? 0),
+        failureCode: item.emailDelivery.failureCode ?? null,
+        sentAt: item.emailDelivery.sentAt ?? null,
+      }
+    : null,
+});
+
+export const mapAlertSetting = (item: ApiAlertSetting): AlertSetting => ({
+  type: item.type,
+  inAppEnabled: item.inAppEnabled !== false,
+  emailEnabled: Boolean(item.emailEnabled),
+  threshold: item.threshold === null || item.threshold === undefined ? null : Number(item.threshold),
+  emailAvailable: Boolean(item.emailAvailable),
 });

@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, TransactionDirection } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import {
+  BudgetSpendScope,
+  budgetSpend,
+} from '../../common/finance/budget-spend.query';
+import { loadFinancialContext } from '../../common/finance/financial-summary.query';
 import { BaseRepository } from '../../common/repositories/base.repository';
 import { nullIfNotFound } from '../../common/utils/prisma-errors';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -71,33 +76,13 @@ export class BudgetsRepository extends BaseRepository {
     });
   }
 
-  async spentByCategory(
-    userId: string,
-    categoryIds: string[],
-    range: { from: Date; to: Date },
-  ) {
-    if (categoryIds.length === 0) {
-      return new Map<string, number>();
-    }
+  /** Timezone, month-start day, and base currency of the account. */
+  financialContext(userId: string) {
+    return loadFinancialContext(this.prisma, userId);
+  }
 
-    const rows = await this.prisma.transaction.groupBy({
-      by: ['categoryId'],
-      where: {
-        userId,
-        categoryId: { in: categoryIds },
-        direction: TransactionDirection.EXPENSE,
-        status: 'POSTED',
-        isDuplicate: false,
-        transactionTime: { gte: range.from, lt: range.to },
-      },
-      _sum: { amount: true },
-    });
-
-    return new Map(
-      rows.map((row) => [
-        row.categoryId ?? '',
-        Number(row._sum.amount?.toString() ?? 0),
-      ]),
-    );
+  /** The shared spend aggregate (BUDGET-002), per scope id. */
+  spend(userId: string, scopes: BudgetSpendScope[]) {
+    return budgetSpend(this.prisma, userId, scopes);
   }
 }

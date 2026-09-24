@@ -1,4 +1,10 @@
 import { Budget, Prisma, TransactionCategory } from '@prisma/client';
+import type { TimeRange } from '../../common/finance/financial-period-policy';
+import {
+  CRITICAL_THRESHOLD_PERCENT,
+  budgetThresholdState,
+  isWarningThresholdActive,
+} from './budget-threshold.policy';
 import { CreateBudgetDto } from './dto/create-budget.dto';
 import { UpdateBudgetDto } from './dto/update-budget.dto';
 
@@ -6,33 +12,78 @@ export type BudgetWithCategory = Budget & {
   category: TransactionCategory | null;
 };
 
+/**
+ * MONTHLY budgets report the user-month period instance (BUDGET-002); the
+ * other periods keep the calendar-month projection (BUDGET-005).
+ */
+export type UsageBasis = 'PERIOD_INSTANCE' | 'CALENDAR_MONTH_APPROXIMATION';
+
 export interface BudgetUsage {
   spent: number;
   remaining: number;
   percentUsed: number;
   isOverLimit: boolean;
   isNearThreshold: boolean;
+  /** The counted range; null when a MONTHLY budget has no instance then. */
+  periodStart: string | null;
+  periodEnd: string | null;
 }
+
+/** How the usage was computed: its basis and its counted range. */
+export type BudgetUsageContext = {
+  basis: UsageBasis;
+  range: TimeRange | null;
+};
 
 const decimalToNumber = (value: Prisma.Decimal | null) =>
   value === null ? 0 : Number(value.toString());
 
 const optionalDateToIso = (value: Date | null) => value?.toISOString() ?? null;
 
-export const toBudgetUsage = (budget: Budget, spent: number): BudgetUsage => {
-  const amount = decimalToNumber(budget.amount);
-  const percentUsed = amount === 0 ? 0 : Math.round((spent / amount) * 100);
+/**
+ * Read-time projection: `isNearThreshold` is the shared threshold rule
+ * (BUDGET-004); nothing here creates or resolves alerts.
+ */
+export const toBudgetUsage = (
+  budget: Budget,
+  spent: Prisma.Decimal.Value,
+  range: TimeRange | null = null,
+): BudgetUsage => {
+  const amount = new Prisma.Decimal(budget.amount);
+  const spentDecimal = new Prisma.Decimal(spent);
+  const state = budgetThresholdState({
+    thresholdPercent: budget.thresholdPercent,
+    amount,
+    spent: spentDecimal,
+  });
+  const remaining = amount.minus(spentDecimal);
 
   return {
-    spent,
-    remaining: Math.max(0, amount - spent),
-    percentUsed,
-    isOverLimit: spent > amount,
-    isNearThreshold: percentUsed >= budget.thresholdPercent,
+    spent: spentDecimal.toNumber(),
+    remaining: remaining.isNegative() ? 0 : remaining.toNumber(),
+    percentUsed: state.percentUsed
+      ? state.percentUsed
+          .toDecimalPlaces(0, Prisma.Decimal.ROUND_HALF_UP)
+          .toNumber()
+      : 0,
+    isOverLimit: spentDecimal.gt(amount),
+    isNearThreshold: state.isNearThreshold,
+    periodStart: range ? range.from.toISOString() : null,
+    periodEnd: range ? range.to.toISOString() : null,
   };
 };
 
-export const toBudgetResponse = (budget: BudgetWithCategory, spent = 0) => ({
+export const toBudgetResponse = (
+  budget: BudgetWithCategory,
+  spent: Prisma.Decimal.Value = 0,
+  context: BudgetUsageContext = {
+    basis:
+      budget.period === 'MONTHLY'
+        ? 'PERIOD_INSTANCE'
+        : 'CALENDAR_MONTH_APPROXIMATION',
+    range: null,
+  },
+) => ({
   id: budget.id,
   userId: budget.userId,
   categoryId: budget.categoryId,
@@ -43,10 +94,14 @@ export const toBudgetResponse = (budget: BudgetWithCategory, spent = 0) => ({
   startsAt: budget.startsAt.toISOString(),
   endsAt: optionalDateToIso(budget.endsAt),
   thresholdPercent: budget.thresholdPercent,
+  warningThresholdActive: isWarningThresholdActive(budget.thresholdPercent),
+  criticalThresholdPercent: CRITICAL_THRESHOLD_PERCENT,
+  alertsSupported: budget.period === 'MONTHLY',
+  usageBasis: context.basis,
   rollover: budget.rollover,
   isActive: budget.isActive,
   category: budget.category,
-  usage: toBudgetUsage(budget, spent),
+  usage: toBudgetUsage(budget, spent, context.range),
   createdAt: budget.createdAt.toISOString(),
   updatedAt: budget.updatedAt.toISOString(),
 });

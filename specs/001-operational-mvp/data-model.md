@@ -339,6 +339,27 @@ Unique `(alertId, channel)`: exactly one email outcome per evaluator-created ale
 
 **Interrupted delivery:** a `PENDING` row whose `lastAttemptAt` (or `createdAt` when there are no attempts) is older than the delivery total time budget plus a 30-second margin is set to `FAILED`/`INTERRUPTED` on the next alert read or evaluation for that user. It is never resent.
 
+As built (T064–T091):
+- **Migrations.** `20260924130000_alert_lifecycle` (DB-M4) and `20260924130100_alert_delivery` (DB-M5).
+  - `triggeredAt` is added nullable, backfilled from `createdAt`, then set NOT NULL. The application sets it from the injectable clock.
+  - The partial unique index and the `attemptCount` CHECK exist only in SQL. Prisma's schema diff ignores both, so T008 reports no drift.
+  - The cooldown index is declared in `schema.prisma`, with a list index `(userId, status, triggeredAt)`.
+  - Existing `AlertSetting` rows were byte-identical after the upgrade (md5 proof), and no delivery rows were backfilled.
+- **Evaluation.** `AlertEvaluationService` (see plan.md) serializes a user's evaluations with `pg_advisory_xact_lock`. Each evaluator family re-reads the user's whole current state, so a condition resolves once it no longer holds, or when its budget instance, goal, or connection is gone (`PERIOD_ENDED` or `TARGET_REMOVED`). The exception is large transaction, which evaluates only the transactions the trigger changed.
+- **Inserts.** They use `INSERT … ON CONFLICT DO NOTHING` (Prisma `createManyAndReturn` with `skipDuplicates`). A concurrent winner is therefore a no-op that keeps the transaction usable.
+- **Resolution reasons.** The as-built set is `BELOW_THRESHOLD`, `PERIOD_ENDED`, `TARGET_REMOVED`, `INSUFFICIENT_DATA`, `CONDITION_CLEARED`, `RECONNECTED`, `DISCONNECTED`, and `SYNC_SUCCEEDED`.
+- **Skip reasons.** They apply in this order: `TRANSPORT_DISABLED` (with email disabled, every delivery), `NOT_CRITICAL`, `EMAIL_DISABLED`, `NOTIFICATIONS_DISABLED`.
+- **Delivery.** The row is written in the evaluation transaction; attempts run after the commit.
+  - The backoff counts against the total budget, so a third attempt happens only if the backoff before it still fits.
+  - The interruption sweep compares the injectable clock with `lastAttemptAt`, or, before any attempt, with `createdAt` (also set from the clock).
+- **All-categories budgets.** A budget with no category counts every eligible expense in its currency, uncategorized included, except categories marked `excludeFromBudget`. The spec does not settle this; before, such budgets always reported 0.
+- **Budget dates.**
+  - A budget date stored at exactly UTC midnight is a date-only value (`YYYY-MM-DD`, which the budgets page sends) and means that calendar date in every time zone.
+  - Any other instant is read in the user's time zone.
+  - Without this, a date-only value would fall on the previous day west of UTC (review finding).
+- **Evidence columns.** A threshold or observed value outside `Decimal(18,4)`, such as a goal target near the `Decimal(18,2)` maximum, is stored as null. The exact value stays in the sanitized metadata, so an overflow can never abort an evaluation (review finding).
+- **Budget summary.** `GET /budgets/summary` totals only budgets in the account's base currency and reports that `currency`. The counts still cover every budget (review finding: amounts in different currencies were added together).
+
 ### Goal calculations (GOAL-002 to GOAL-004; derived, no new table)
 
 All arithmetic uses exact decimals and rounds only at the named steps. "Unit" means the currency's smallest unit: 1 for VND (0 decimals), 0.01 for other currencies. Months are user months: `User.timezone` plus `defaultMonthStartDay`, via the shared period policy. `monthIndex(m) = year × 12 + month` of the user month.

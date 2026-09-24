@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
@@ -61,6 +62,13 @@ export class BudgetsController {
     @Body() dto: UpdateBudgetDto,
   ) {
     return this.budgetsService.update(user, id, dto);
+  }
+
+  /** Re-evaluates the budget alert conditions now (BUDGET-003). */
+  @Post(':id/recalculate')
+  @HttpCode(200)
+  recalculate(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.budgetsService.recalculate(user, id);
   }
 
   @Delete(':id')

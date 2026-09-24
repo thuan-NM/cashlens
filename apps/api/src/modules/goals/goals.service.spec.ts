@@ -23,6 +23,7 @@ import {
 import { Clock } from '../../common/time/clock';
 import { Feasibility, computeFeasibility } from './goal-feasibility';
 import { GoalsRepository } from './goals.repository';
+import { AlertEvaluationService } from '../alerts/alert-evaluation.service';
 import { GoalsService } from './goals.service';
 
 // T058 (GOAL-002–GOAL-007, TEST-002, SC-008): the data-model worked examples
@@ -705,9 +706,24 @@ describe('GoalsService.simulate (T060, T061)', () => {
         GoalsService,
         { provide: GoalsRepository, useValue: repository },
         { provide: Clock, useValue: { now: () => NOW } },
+        { provide: AlertEvaluationService, useValue: alerts },
       ],
     }).compile();
     service = moduleRef.get(GoalsService);
+  });
+
+  const alerts = {
+    onGoalChanged: jest.fn(),
+    onTransactionsChanged: jest.fn(),
+  };
+
+  it('simulation is side-effect free: it never triggers alert evaluation (T082)', async () => {
+    repository.goals = [goal({ targetDate: new Date('2026-12-15') })];
+    repository.ledger = H1_LEDGER;
+    await service.simulate(user, 'goal-1', {});
+    await service.simulate(user, 'goal-1', { months: 3 });
+    expect(alerts.onGoalChanged).not.toHaveBeenCalled();
+    expect(alerts.onTransactionsChanged).not.toHaveBeenCalled();
   });
 
   it('G1 from persisted-style records: the contract fields, as plain numbers', async () => {

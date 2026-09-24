@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AlertsModule } from '../alerts/alerts.module';
 import { UsersModule } from '../users/users.module';
 import { EmailConnectionsModule } from '../email-connections/email-connections.module';
 import { ParserModule } from '../parser/parser.module';
@@ -8,7 +9,7 @@ import { EmailIngestionService } from './email-ingestion.service';
 import { GmailApiService } from './gmail-api.service';
 
 @Module({
-  imports: [EmailConnectionsModule, ParserModule, UsersModule],
+  imports: [EmailConnectionsModule, ParserModule, UsersModule, AlertsModule],
   controllers: [EmailIngestionController],
   providers: [EmailIngestionRepository, EmailIngestionService, GmailApiService],
 })

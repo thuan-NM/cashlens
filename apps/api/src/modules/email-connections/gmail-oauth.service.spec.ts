@@ -1,3 +1,4 @@
+import type { AlertEvaluationService } from '../alerts/alert-evaluation.service';
 import {
   BadGatewayException,
   HttpException,
@@ -291,6 +292,11 @@ describe('EmailConnectionsService status and recovery (T037)', () => {
       gmail as unknown as GmailOAuthService,
       encryption,
       users,
+      {
+        onTransactionsChanged: jest.fn().mockResolvedValue({ ok: true }),
+        onSyncRunFinished: jest.fn().mockResolvedValue({ ok: true }),
+        onConnectionStatusChanged: jest.fn().mockResolvedValue({ ok: true }),
+      } as unknown as AlertEvaluationService,
     );
 
   it('a user disconnect revokes best-effort, clears credentials, and is not reconnect-required', async () => {

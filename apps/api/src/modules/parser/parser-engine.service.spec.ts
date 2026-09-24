@@ -1,3 +1,4 @@
+import type { AlertEvaluationService } from '../alerts/alert-evaluation.service';
 import { ConflictException } from '@nestjs/common';
 import type { ParserField } from '@prisma/client';
 import {
@@ -347,6 +348,11 @@ describe('ParserService never posts malformed output (T039)', () => {
     const service = new ParserService(
       repository as unknown as ParserRepository,
       new ParserEngineService(),
+      {
+        onTransactionsChanged: jest.fn().mockResolvedValue({ ok: true }),
+        onSyncRunFinished: jest.fn().mockResolvedValue({ ok: true }),
+        onConnectionStatusChanged: jest.fn().mockResolvedValue({ ok: true }),
+      } as unknown as AlertEvaluationService,
     );
     return { repository, service };
   };

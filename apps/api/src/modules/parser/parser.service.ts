@@ -15,12 +15,14 @@ import {
 } from './parser-engine.service';
 import { toParserRunResponse, toParserTemplateResponse } from './parser.mapper';
 import { ParserRepository } from './parser.repository';
+import { AlertEvaluationService } from '../alerts/alert-evaluation.service';
 
 @Injectable()
 export class ParserService {
   constructor(
     private readonly repository: ParserRepository,
     private readonly engine: ParserEngineService,
+    private readonly alerts: AlertEvaluationService,
   ) {}
 
   async listTemplates() {
@@ -143,6 +145,22 @@ export class ParserService {
       ...(outcome.duplicate ? { duplicate: true } : {}),
       ...(outcome.suspectedDuplicate ? { suspectedDuplicate: true } : {}),
     };
+  }
+
+  /**
+   * `POST /email-messages/:id/parse`: a user-requested parse. A transaction
+   * it creates is evaluated for alerts like any imported or manual one
+   * (ALERT-009), after the write. A sync evaluates its whole batch once
+   * instead, so `parseMessage` itself never evaluates.
+   */
+  async parseRequested(user: RequestUser, messageId: string) {
+    const result = await this.parseMessage(user, messageId);
+    if ('transactionId' in result && result.created) {
+      await this.alerts.onTransactionsChanged(user.id, {
+        largeTransactionIds: [result.transactionId],
+      });
+    }
+    return result;
   }
 
   async listRuns(user: RequestUser, messageId: string) {

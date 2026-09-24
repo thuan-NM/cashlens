@@ -7,6 +7,7 @@ import {
 import { AuditActorType, EmailSyncStatus } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { RequestUser } from '../../common/types/request-user.type';
+import { AlertEvaluationService } from '../alerts/alert-evaluation.service';
 import { RECONNECT_REQUIRED_MESSAGE } from '../email-connections/email-connections.repository';
 import { EmailConnectionsService } from '../email-connections/email-connections.service';
 import { ParserService } from '../parser/parser.service';
@@ -69,6 +70,7 @@ export class EmailIngestionService {
     private readonly gmail: GmailApiService,
     private readonly parser: ParserService,
     private readonly users: UsersRepository,
+    private readonly alerts: AlertEvaluationService,
   ) {}
 
   /**
@@ -117,6 +119,8 @@ export class EmailIngestionService {
       emailsFailed: 0,
       transactionsCreated: 0,
     };
+    /** Transactions this batch created (for one alert evaluation). */
+    const createdTransactionIds: string[] = [];
     let listed = false;
     let handled = 0;
     let pageComplete = false;
@@ -148,6 +152,7 @@ export class EmailIngestionService {
             accessToken,
             providerMessageId,
             counts,
+            createdTransactionIds,
           );
           handled += 1;
           delete retries[providerMessageId];
@@ -261,6 +266,16 @@ export class EmailIngestionService {
     await this.auditSync(user, connectionId, finished.id, finished.status, {
       ...counts,
     });
+    // After the batch committed (ALERT-009): imported transactions are
+    // evaluated exactly like manual ones, once per batch; then the terminal
+    // run (and any run the lease expired) and the connection state.
+    // Evaluation never fails the sync.
+    if (createdTransactionIds.length) {
+      await this.alerts.onTransactionsChanged(user.id, {
+        largeTransactionIds: createdTransactionIds,
+      });
+    }
+    await this.alerts.onSyncRunFinished(user.id);
     return toEmailSyncRunResponse(finished);
   }
 
@@ -341,6 +356,7 @@ export class EmailIngestionService {
       emailsFailed: number;
       transactionsCreated: number;
     },
+    createdTransactionIds: string[],
   ) {
     const known = await this.repository.findMessageByProvider(
       connectionId,
@@ -383,7 +399,10 @@ export class EmailIngestionService {
     const result = await this.parser.parseMessage(user, saved.id, body);
     if ('transactionId' in result) {
       counts.emailsParsed += 1;
-      if (result.created) counts.transactionsCreated += 1;
+      if (result.created) {
+        counts.transactionsCreated += 1;
+        createdTransactionIds.push(result.transactionId);
+      }
     } else {
       counts.emailsFailed += 1; // a sanitized parser-run failure was recorded
     }

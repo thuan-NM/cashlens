@@ -273,6 +273,27 @@ These were found while implementing and reviewing US6 (T058–T063) and delibera
 | `apps/api/docs/swagger.json` has not been regenerated since before US1 | DOC | T101 (Swagger regeneration and contract comparison) |
 | The GOAL-005 option of an explicitly labeled, user-provided planning input is not implemented (it is a MAY) | GOAL-005 | Product decision |
 
+### US5 follow-ups (deferred, not part of US5)
+
+These were found while implementing and reviewing US5 (T064–T091) and deliberately left open. None of them blocks US5.
+
+| Issue | Requirement | Owner |
+|---|---|---|
+| Whether `POST /alerts` (user-authored alerts) is retained is still pending. It stays, with a null key and no delivery row | ALERT-011 | Product decision |
+| Cashflow risk does not subtract goal commitments (research.md default, "pending confirmation") | ALERT-009, GOAL-003 | Product decision |
+| Alert titles, messages, and the email text are English while the web UI is Vietnamese | ALERT-001, ALERT-007 | Localization follow-up |
+| Email delivery is awaited inside the triggering request after commit, up to the 12 s budget, so an opted-in CRITICAL alert can slow that response. This is the documented design (research.md), with no queue | ALERT-006 | Accepted; revisit only with a worker decision |
+| A timed-out SMTP attempt is abandoned, not cancelled, so the provider may still deliver it and a retry can send a second copy. Delivery is at-least-once within the 3-attempt cap | ALERT-006 | Known limitation |
+| Evaluation errors are logged with a correlation id through the Nest logger only; structured, redacted events come with T095 | ALERT-009, OPS-008 | T095 |
+| Overlapping budgets (a category budget plus an all-categories budget) both count the same expense, so the summary totals double-count spend, as they already double-count limits. The summary now adds only base-currency budgets | BUDGET-002 | Product decision (summary semantics) |
+| The budget list's `month` filter still selects budgets by UTC calendar month (`buildBudgetWhere`), while usage uses the user month | BUDGET-002, DASH-002 | Budget follow-up |
+| The budget create form sends no currency, so budgets get the default `VND` whatever the base currency. The same gap exists for goals | BUDGET-001 | UI follow-up |
+| `CreateBudgetDto.amount` allows 0, which holds no alert (no usage %). Tightening it is a write-contract change | BUDGET-001 | Contract decision |
+| `AlertSetting` rows are still created for `CATEGORY_SHIFT` and `PARSER_ISSUE`, which no evaluator produces. The settings UI hides them | ALERT-008 | Cleanup |
+| `uiStore.readAlerts` and its actions are now unused (the badge uses the server count) | ALERT-004 | Cleanup |
+| An expense whose date is moved into the current month without an amount, currency, direction, or eligibility change is not re-evaluated for large transaction, as the matrix defines | ALERT-009 | As specified |
+| `apps/api/docs/swagger.json` has not been regenerated | DOC | T101 |
+
 ---
 
 ## Phase 3: P1 — User Story 2: Trustworthy Transactions and Dashboard (Priority: P1)
@@ -595,12 +616,19 @@ These were found while implementing and reviewing US6 (T058–T063) and delibera
 
 ### Schema (strict migration stream continues)
 
-- [ ] T064 [US5] [ALERT-001–ALERT-004, ALERT-010, OPS-003] **DB-M4 (4/5)**: Add the `AlertStatus` enum and `status`, `conditionKey`, `thresholdValue`, `observedValue`, `periodStart`/`periodEnd`, `triggeredAt` (backfilled from `createdAt`), `resolvedAt`, `resolutionReason`, and `dismissedAt`. Add the open-key partial unique index and the cooldown lookup index as explicit SQL. Files: `apps/api/prisma/schema.prisma` and a new `apps/api/prisma/migrations/<ts4>_alert_lifecycle/migration.sql` with `ts4 > ts3`. Depends on T050. Verify legacy alerts read as `ACTIVE` with a null key and T008 passes.
-- [ ] T065 [US5] [ALERT-005–ALERT-007, OPS-003] **DB-M5 (5/5)**: Add `AlertDelivery` (EMAIL channel, status, skipReason, provider, `attemptCount` CHECK 0–3, timestamps, sanitized failure, unique `(alertId, channel)`) in `apps/api/prisma/schema.prisma` and a new `apps/api/prisma/migrations/<ts5>_alert_delivery/migration.sql` with `ts5 > ts4`. Depends on T064. **Schema-only.** It contains no `AlertSetting` data step; the final I2 decision is to preserve existing `emailEnabled` values (data-model "AlertSetting"). Verify no delivery backfill, `AlertSetting` rows byte-identical before and after, and that T008 passes.
+- [X] T064 [US5] [ALERT-001–ALERT-004, ALERT-010, OPS-003] **DB-M4 (4/5)**: Add the `AlertStatus` enum and `status`, `conditionKey`, `thresholdValue`, `observedValue`, `periodStart`/`periodEnd`, `triggeredAt` (backfilled from `createdAt`), `resolvedAt`, `resolutionReason`, and `dismissedAt`. Add the open-key partial unique index and the cooldown lookup index as explicit SQL. Files: `apps/api/prisma/schema.prisma` and a new `apps/api/prisma/migrations/<ts4>_alert_lifecycle/migration.sql` with `ts4 > ts3`. Depends on T050. Verify legacy alerts read as `ACTIVE` with a null key and T008 passes.
+  **As built:** `20260924130000_alert_lifecycle`.
+  - **Backfill.** `triggeredAt` is added nullable, set from `createdAt`, then made `NOT NULL DEFAULT CURRENT_TIMESTAMP`, so no legacy row is stamped with the migration time. The application sets `triggeredAt` from the injectable clock, never from the default.
+  - **Indexes.** The partial unique index `Alert_open_condition_key` exists only in SQL. A scratch-database check showed that Prisma 7.7's schema diff ignores it, so it causes no drift. The cooldown index `(userId, conditionKey, triggeredAt DESC)` and a list index `(userId, status, triggeredAt)` are declared in the schema.
+  - **Verification.** T008 passes: empty install, upgrade from the baseline, and repeated deploy, with no drift. An upgrade proof seeded legacy alerts at DB-M3. After DB-M4 they read `ACTIVE` with a null key and `triggeredAt = createdAt`, with read state unchanged. Two open rows with the same key are rejected; any number of `RESOLVED` rows plus one open row are accepted.
+- [X] T065 [US5] [ALERT-005–ALERT-007, OPS-003] **DB-M5 (5/5)**: Add `AlertDelivery` (EMAIL channel, status, skipReason, provider, `attemptCount` CHECK 0–3, timestamps, sanitized failure, unique `(alertId, channel)`) in `apps/api/prisma/schema.prisma` and a new `apps/api/prisma/migrations/<ts5>_alert_delivery/migration.sql` with `ts5 > ts4`. Depends on T064. **Schema-only.** It contains no `AlertSetting` data step; the final I2 decision is to preserve existing `emailEnabled` values (data-model "AlertSetting"). Verify no delivery backfill, `AlertSetting` rows byte-identical before and after, and that T008 passes.
+  **As built:** `20260924130100_alert_delivery`.
+  - **Schema.** The enums `AlertDeliveryChannel` (`EMAIL`, with `IN_APP` reserved) and `AlertDeliveryStatus`. `provider`, `skipReason`, and `failureCode` are text, with their values documented in the schema. The table cascades from both `Alert` and `User`, with an index on `(userId, status)`. The CHECK constraint `AlertDelivery_attemptCount_check` is SQL only and causes no drift.
+  - **Verification.** T008 passes. The upgrade proof seeded `AlertSetting` rows at DB-M3, including `emailEnabled = true` with in-app off. The md5 of their ordered `row_to_json` values is identical before and after DB-M4 and DB-M5. Zero delivery rows exist after the upgrade, and an `attemptCount` of 4 is rejected by the CHECK.
 
 ### Lifecycle core and API
 
-- [ ] T066 [P] [US5] [ALERT-002, ALERT-003, ALERT-010, ALERT-011, TEST-002] Add the `AlertCondition` type contract in `apps/api/src/modules/alerts/evaluators/alert-condition.ts` (key, holds, type, severity, threshold, observed, window, target, creation-limit flag). Add failing clock-controlled lifecycle tests in `apps/api/src/modules/alerts/alert-lifecycle.service.spec.ts`; depends on T030 and T064. Cover:
+- [X] T066 [P] [US5] [ALERT-002, ALERT-003, ALERT-010, ALERT-011, TEST-002] Add the `AlertCondition` type contract in `apps/api/src/modules/alerts/evaluators/alert-condition.ts` (key, holds, type, severity, threshold, observed, window, target, creation-limit flag). Add failing clock-controlled lifecycle tests in `apps/api/src/modules/alerts/alert-lifecycle.service.spec.ts`; depends on T030 and T064. Cover:
   - create when the condition holds, no key is open, and 24h have passed since the last trigger;
   - no create while `DISMISSED` is open;
   - resolve from `ACTIVE` and from `DISMISSED` (keeping `dismissedAt`);
@@ -608,8 +636,33 @@ These were found while implementing and reviewing US6 (T058–T063) and delibera
   - create at the first evaluation after 24h;
   - a concurrent unique violation leaves a single open row;
   - null-key rows are never touched.
-- [ ] T067 [US5] [ALERT-001–ALERT-003, ALERT-010] Implement `applyConditions()` in `apps/api/src/modules/alerts/alert-lifecycle.service.ts` and the lifecycle repository methods in `apps/api/src/modules/alerts/alerts.repository.ts`; depends on T066. Verify T066 passes.
-- [ ] T068 [US5] [ALERT-004, ALERT-005, ALERT-010, ALERT-011] Extend the alerts API. Files: `apps/api/src/modules/alerts/alerts.controller.ts`, `apps/api/src/modules/alerts/alerts.service.ts`, `apps/api/src/modules/alerts/dto/*`, `apps/api/src/modules/alerts/alerts.mapper.ts`. Depends on T022 and T067. Scope:
+  **As built:** `evaluators/alert-condition.ts` defines `AlertCondition`:
+  - the identity: key, `holds`, type, severity, target;
+  - the evidence: threshold, observed value, window;
+  - `mayCreate`, the matrix creation limit;
+  - the resolution reason;
+  - a sanitized title, message, and metadata.
+
+  It also exports `ALERT_COOLDOWN_MS` (24h).
+
+  `alert-lifecycle.service.spec.ts` has 14 tests (19 after the review's overflow regression tests) against a fake repository that enforces the partial unique index. The red baseline, against a stub, was 14 of 14 failing. Beyond the listed cases, it covers:
+  - a cooldown measured from the latest trigger, not the latest resolution;
+  - a creation limit that still resolves;
+  - independent warning and critical tiers;
+  - `RESOLVED` being terminal;
+  - another user's same key.
+- [X] T067 [US5] [ALERT-001–ALERT-003, ALERT-010] Implement `applyConditions()` in `apps/api/src/modules/alerts/alert-lifecycle.service.ts` and the lifecycle repository methods in `apps/api/src/modules/alerts/alerts.repository.ts`; depends on T066. Verify T066 passes.
+  **As built:** `applyConditions(tx, userId, conditions, now)` runs inside the caller's transaction.
+  - **Resolution first.** Open rows whose condition no longer holds resolve, grouped by reason.
+  - **Creation.** It opens a row only when the condition holds, `mayCreate` is true, no row is open, and the key's latest `triggeredAt` is at least 24h before `now`. A suppressed crossing is reported and never stored.
+  - **Repository methods (`alerts.repository.ts`):**
+    - `lockUserEvaluation`: `pg_advisory_xact_lock` per user;
+    - `openOccurrences` and `openOccurrencesWithPrefix`;
+    - `latestTriggers`;
+    - `insertOccurrence`: `createManyAndReturn` with `skipDuplicates`, i.e. `ON CONFLICT DO NOTHING`, so a concurrent winner leaves the transaction usable where a caught unique violation would abort it;
+    - `resolveOccurrences`: only rows that are still open.
+  - **Scope.** Only keyed rows are queried, so null-key rows are never touched, and read state is never written. `triggeredAt` and `createdAt` come from the passed clock. T066 passes, 14 of 14.
+- [X] T068 [US5] [ALERT-004, ALERT-005, ALERT-010, ALERT-011] Extend the alerts API. Files: `apps/api/src/modules/alerts/alerts.controller.ts`, `apps/api/src/modules/alerts/alerts.service.ts`, `apps/api/src/modules/alerts/dto/*`, `apps/api/src/modules/alerts/alerts.mapper.ts`. Depends on T022 and T067. Scope:
   - `PATCH /alerts/:id/dismiss` (409 when resolved);
   - `GET /alerts/unread-count` (`isRead = false`);
   - `status` filter and lifecycle response fields;
@@ -621,26 +674,63 @@ These were found while implementing and reviewing US6 (T058–T063) and delibera
   - `emailAvailable` on settings.
 
   Verify read does not change status and dismiss does not erase history.
+  **As built:**
+  - **New routes.** `GET /alerts/unread-count` returns `{count}`, where the count is `isRead = false` whatever the status. `PATCH /alerts/:id/dismiss`:
+    - ACTIVE → DISMISSED, setting `dismissedAt` from the clock and marking the alert read while keeping an earlier `readAt`;
+    - an already-DISMISSED alert is returned unchanged;
+    - RESOLVED gives 409 `ALERT_RESOLVED`;
+    - the write is conditional on ACTIVE, so a concurrent resolution wins;
+    - owner-safe 404.
+  - **List.** It adds a `status` filter and the contract's `isRead` query name; the old `read` name is kept.
+    - **Fix.** Both now parse `"false"` as false. The old `@Type(() => Boolean)` read `"false"` as true (pre-existing bug).
+    - **Order.** It gains an `id` tie-break.
+  - **Responses.** They carry every lifecycle field plus `emailDelivery`, which is null without a delivery row.
+  - **`POST /alerts`.** It writes `conditionKey: null` explicitly.
+  - **Settings.**
+    - `defaultAlertSettings()` sets email off for every type in newly created settings; `createMany(skipDuplicates)` never rewrites existing rows.
+    - `PATCH /alerts/settings` rejects a resulting `emailEnabled` with in-app off (400), checked whenever the request changes either flag.
+    - `threshold` must be greater than 0 for every type, per the contract's `exclusiveMinimum: 0` (0 was accepted before); `null` clears it.
+    - Responses carry `emailAvailable`, which is `EMAIL_TRANSPORT !== disabled`.
+  - **Providers.** `AlertsService` now injects `ConfigService` and `Clock`; `AlertsModule` provides `Clock` and `AlertLifecycleService`.
+  - **Verification.** Covered end to end in T091.
 
 ### Budget threshold semantics
 
-- [ ] T069 [P] [US5] [BUDGET-001, BUDGET-002, BUDGET-004, BUDGET-005, TEST-002] Add failing tests; depends on T033.
+- [X] T069 [P] [US5] [BUDGET-001, BUDGET-002, BUDGET-004, BUDGET-005, TEST-002] Add failing tests; depends on T033.
   - In `apps/api/src/modules/budgets/budget-threshold.policy.spec.ts`, for the shared pure threshold function: warning 1–99, critical at exactly 100, legacy values of 100 or more meaning no warning, and boundary equality.
   - In `apps/api/src/common/finance/budget-spend.query.spec.ts`, for the MONTHLY period instance:
     - user-month boundaries with month-start day 1 and 25; for example, 2026-09-23 with day 25 gives instance start `2026-08-25`;
     - clipping to `startsAt`/`endsAt`, and no instance outside the active range;
     - non-MONTHLY budgets return "not supported".
-- [ ] T070 [US5] [BUDGET-001, BUDGET-002, BUDGET-004, BUDGET-005] Implement the threshold policy, the MONTHLY period instance, and the shared spend aggregate; depends on T069.
+  **As built:**
+  - `budget-threshold.policy.spec.ts`: 15 tests.
+  - `budget-spend.query.spec.ts`: 19 tests (21 after the review's date-only regression tests), covering the active range (local dates, inclusive end, a zone west of UTC), instances (day 1 and day 25, the rollover instant, clipping at either end, no instance outside the range, a one-day instance, non-MONTHLY unsupported), and the spend aggregate through a fake `groupBy`.
+  - **Red baseline.** Against stubs, 33 of 34 failed; the one pass was the constant 100.
+- [X] T070 [US5] [BUDGET-001, BUDGET-002, BUDGET-004, BUDGET-005] Implement the threshold policy, the MONTHLY period instance, and the shared spend aggregate; depends on T069.
   - **Files:** `apps/api/src/modules/budgets/budget-threshold.policy.ts`, `apps/api/src/common/finance/budget-spend.query.ts`, `apps/api/src/modules/budgets/dto/*`, `apps/api/src/modules/budgets/budgets.mapper.ts`, `apps/api/src/modules/budgets/budgets.service.ts`, `apps/api/src/modules/dashboard/dashboard.repository.ts` (hot budgets use the same aggregate).
   - **Validation:** set DTO validation to `@Min(1) @Max(99)`. All period values stay accepted.
   - **Response fields:** add `warningThresholdActive`, `criticalThresholdPercent`, `alertsSupported` (MONTHLY only), and `usageBasis`.
   - **Projections:** recompute `isNearThreshold` and `GET /budgets/alerts` from the shared function, with no alert writes.
 
   Verify T069 passes, a threshold of 100 on write returns 400, and a WEEKLY budget is accepted with `alertsSupported: false`.
+  **As built:**
+  - **Threshold policy.** It is implemented in `common/finance/budget-threshold.policy.ts`, and the listed `budgets/budget-threshold.policy.ts` re-exports it (deviation), so the dashboard and the alert evaluator share it without a feature import. `budgetThresholdState` compares exact decimals: 79.999% is not 80%. A zero amount holds nothing. `isNearThreshold` is the warning when the warning is active, otherwise the critical.
+  - **Period instance.** `budget-spend.query.ts` provides `budgetActiveRange`, `monthlyInstanceForMonth`, and `monthlyInstanceAt`.
+  - **Spend aggregate.** `budgetSpend` runs one `groupBy` per distinct range, matches currency with `normalizeCurrency`, and never sums across currencies.
+  - **Decision (spec silent): all-categories budgets.** A budget with no category counts every eligible expense, uncategorized included, except categories marked `excludeFromBudget`. Before this, the spend of such budgets was always 0.
+  - **Budgets API.**
+    - DTO threshold is 1–99.
+    - Responses add `warningThresholdActive`, `criticalThresholdPercent`, `alertsSupported`, `usageBasis`, and `usage.periodStart`/`periodEnd`.
+    - MONTHLY usage is the period instance: the current one from the injectable `Clock`, or the requested user month for `?month=`.
+    - Other periods keep the calendar-month projection.
+    - `create` and `update` now return computed usage; before, they returned 0.
+  - **Dashboard.** Hot budgets use the same aggregate, instance, and threshold rule. The now-unused `budgetSpending` was removed.
+  - **Read-only projections.** No read writes alerts.
+  - **Verification.** T069 passes, 34 of 34. The dashboard and ownership planning/alerts e2e suites pass, 123 tests. 400 for a threshold of 100 and WEEKLY with `alertsSupported: false` are asserted in T085.
 
 ### Evaluators — one pure function and spec per matrix row (parallel files)
 
-- [ ] T071 [P] [US5] [ALERT-009 budget rows, BUDGET-002, BUDGET-003, BUDGET-005] TDD the budget-threshold evaluator in `apps/api/src/modules/alerts/evaluators/budget-threshold.evaluator.spec.ts` then `budget-threshold.evaluator.ts`; depends on T067 and T070. Cover:
+- [X] T071 [P] [US5] [ALERT-009 budget rows, BUDGET-002, BUDGET-003, BUDGET-005] TDD the budget-threshold evaluator in `apps/api/src/modules/alerts/evaluators/budget-threshold.evaluator.spec.ts` then `budget-threshold.evaluator.ts`; depends on T067 and T070. Cover:
   - **MONTHLY budgets only**; WEEKLY, YEARLY, and CUSTOM produce no conditions;
   - separate `WARNING` and `CRITICAL` conditions keyed `budget:{id}:{instanceStartLocalDate}:{severity}`, where the instance start is the user-month start in the user's timezone (for example, `2026-08-25` with month-start day 25);
   - clipping to the budget's `startsAt`/`endsAt`;
@@ -648,34 +738,65 @@ These were found while implementing and reviewing US6 (T058–T063) and delibera
   - past-period instances resolve only;
   - period end resolves with `PERIOD_ENDED`;
   - currency and category scoping.
-- [ ] T072 [P] [US5] [ALERT-009 large-transaction row] TDD the large-transaction evaluator in `apps/api/src/modules/alerts/evaluators/large-transaction.evaluator.spec.ts` then `large-transaction.evaluator.ts`; depends on T033 and T067. Cover:
+  **As built:** `evaluateBudgetThresholds({now, settings, budgets, openKeys})` is pure; its spec has 18 tests.
+  - **Conditions.** Only MONTHLY budgets with an instance at `now` produce conditions, with independent tiers. Legacy thresholds of 100 or more have no WARNING tier.
+  - **Evidence.** threshold = the tier percent; observed = the exact usage %; window = the clipped usage range; the metadata records currency, amount, spent, and the instance date.
+  - **Open keys not produced (`budget:` prefix):**
+    - another instance → `PERIOD_ENDED`;
+    - a budget that is gone, inactive, or no longer MONTHLY → `TARGET_REMOVED`;
+    - a warning tier that no longer exists (legacy) → `BELOW_THRESHOLD`.
+
+    These keys are never created.
+  - **Imports.** The threshold rule comes from `common/finance/budget-threshold.policy.ts`. `budgets/budget-threshold.policy.ts`, the T069/T070 path, only re-exports it, so the evaluator imports no budgets feature code.
+  - **Red baseline.** All 6 evaluator suites failed on missing modules before T071–T076 were implemented.
+- [X] T072 [P] [US5] [ALERT-009 large-transaction row] TDD the large-transaction evaluator in `apps/api/src/modules/alerts/evaluators/large-transaction.evaluator.spec.ts` then `large-transaction.evaluator.ts`; depends on T033 and T067. Cover:
   - fires at or above the threshold;
   - VND default of 5,000,000, and inactive for other currencies when unset;
   - base-currency only, transfers excluded;
   - creation only in the current user month;
   - resolves on delete, ignore, duplicate, or amount drop;
   - no retroactive re-evaluation when the threshold setting changes.
-- [ ] T073 [P] [US5] [ALERT-009 goal-risk row, GOAL-002, GOAL-004, SC-008] TDD the goal-risk evaluator in `apps/api/src/modules/alerts/evaluators/goal-risk.evaluator.spec.ts` then `goal-risk.evaluator.ts` using `computeFeasibility()`; depends on T060 and T067. It applies the same rounding rules as the simulation to the goal's **stored** horizon (`TARGET_DATE`, then `GOAL_MONTHS`, then `DEFAULT`; never the `QUERY` what-if value the Goals page slider sends). Cover:
+  **As built:** `evaluateLargeTransactions` evaluates only the ids the trigger passes: creates, and updates touching amount, currency, direction, status, or duplicate. Other updates pass none, so a threshold change never re-evaluates existing transactions.
+  - **Holds.** It holds for an eligible EXPENSE in the base currency at or above the threshold: the setting, else 5,000,000 for VND, else inactive.
+  - **Creation.** `mayCreate` is true only when the transaction is in the current user month.
+  - **Resolution reasons.** `TARGET_REMOVED` when the transaction is deleted, ignored, a duplicate, or pending. `CONDITION_CLEARED` when it is no longer a base-currency expense. `BELOW_THRESHOLD` when the amount dropped.
+  - **Tests.** 20.
+- [X] T073 [P] [US5] [ALERT-009 goal-risk row, GOAL-002, GOAL-004, SC-008] TDD the goal-risk evaluator in `apps/api/src/modules/alerts/evaluators/goal-risk.evaluator.spec.ts` then `goal-risk.evaluator.ts` using `computeFeasibility()`; depends on T060 and T067. It applies the same rounding rules as the simulation to the goal's **stored** horizon (`TARGET_DATE`, then `GOAL_MONTHS`, then `DEFAULT`; never the `QUERY` what-if value the Goals page slider sends). Cover:
   - fires when required > available (G1 holds; G2, G3, and G5 do not);
   - past deadline (G4) holds when the remaining amount exceeds available;
   - `INSUFFICIENT_DATA` (G8) resolves;
   - a completed, paused, archived, or deleted goal resolves.
-- [ ] T074 [P] [US5] [ALERT-009 cashflow-risk row, GOAL-003, SC-008] TDD the cashflow-risk evaluator in `apps/api/src/modules/alerts/evaluators/cashflow-risk.evaluator.spec.ts` then `cashflow-risk.evaluator.ts`; depends on T059, T060, and T067. The evaluator uses `completedMonthCashflow` in the user's base currency with floor rounding. Cover:
+  **As built:** `evaluateGoalRisk` calls the pure `computeFeasibility` without `queryMonths`, so it uses the stored horizon.
+  - **Holds.** It holds when the goal is ACTIVE, has a remaining amount, and the required amount exceeds the available amount. Insufficient history never holds.
+  - **Evidence.** threshold = available; observed = required; window = the observation months; the metadata records score, level, horizon source, and past deadline.
+  - **Resolution.** A non-ACTIVE goal, or a deleted goal's open key, resolves `TARGET_REMOVED`.
+  - **Tests.** 13, covering G1, G2 (stored horizon = DEFAULT), G3, G4 and a variant, G5, G6, G8, and G10(a).
+- [X] T074 [P] [US5] [ALERT-009 cashflow-risk row, GOAL-003, SC-008] TDD the cashflow-risk evaluator in `apps/api/src/modules/alerts/evaluators/cashflow-risk.evaluator.spec.ts` then `cashflow-risk.evaluator.ts`; depends on T059, T060, and T067. The evaluator uses `completedMonthCashflow` in the user's base currency with floor rounding. Cover:
   - a negative 2–3-month mean produces `CRITICAL` (G6: −1,500,001);
   - goal commitments are not subtracted (pending confirmation);
   - insufficient data resolves.
-- [ ] T075 [P] [US5] [ALERT-009 repeated-sync-failure row] TDD the sync-failure evaluator in `apps/api/src/modules/alerts/evaluators/sync-failure.evaluator.spec.ts` then `sync-failure.evaluator.ts`; depends on T044 and T067. Cover:
+  **As built:** `evaluateCashflowRisk` takes the available amount from `computeFeasibility` itself, with an empty goal in the base currency (its step 7), so floor and unit rounding cannot drift from the simulation.
+  - **Holds.** CRITICAL when the projection is below 0. Insufficient data resolves `INSUFFICIENT_DATA`.
+  - **Tests.** 9: G6 = −1,500,001, the zero boundary, flooring −0.5 → −1, the USD unit, and no goal subtraction.
+- [X] T075 [P] [US5] [ALERT-009 repeated-sync-failure row] TDD the sync-failure evaluator in `apps/api/src/modules/alerts/evaluators/sync-failure.evaluator.spec.ts` then `sync-failure.evaluator.ts`; depends on T044 and T067. Cover:
   - three consecutive terminal runs in `FAILED`, `EXPIRED`, or `PARTIAL_FAILED` produce `WARNING`;
   - a `SUCCESS` run resolves;
   - disconnect resolves.
-- [ ] T076 [P] [US5] [ALERT-009 reconnect-required row] TDD the reconnect-required evaluator in `apps/api/src/modules/alerts/evaluators/reconnect-required.evaluator.spec.ts` then `reconnect-required.evaluator.ts`; depends on T041 and T067. Cover:
+  **As built:** `evaluateSyncFailures` holds for a connected connection whose three newest terminal runs (RUNNING ignored) are all FAILED, EXPIRED, or PARTIAL_FAILED.
+  - **Resolution reasons.** `SYNC_SUCCEEDED` when the newest run is a SUCCESS; `DISCONNECTED` when the connection is disconnected; `TARGET_REMOVED` when it is removed.
+  - **Tests.** 9.
+- [X] T076 [P] [US5] [ALERT-009 reconnect-required row] TDD the reconnect-required evaluator in `apps/api/src/modules/alerts/evaluators/reconnect-required.evaluator.spec.ts` then `reconnect-required.evaluator.ts`; depends on T041 and T067. Cover:
   - a provider-auth failure produces `CRITICAL`;
   - a user disconnect never fires;
   - reconnect or removal resolves.
 
 ### Email delivery adapter
 
-- [ ] T077 [P] [US5] [ALERT-005–ALERT-007, CFG-007, TEST-002] Add failing delivery tests in `apps/api/src/modules/alerts/delivery/alert-delivery.service.spec.ts` with the in-memory fake in `apps/api/test/fakes/in-memory-email-transport.ts`; depends on T065 and T067. Cover:
+  **As built:** `evaluateReconnectRequired` holds for status `EXPIRED` with no `disconnectedAt`, which is the stored provider-auth state.
+  - **Never holds.** A user disconnect is REVOKED with `disconnectedAt`. `ERROR` is a provider or project failure: a project-wide 403 is classified REFUSED by `gmail-api.service`, never AUTH.
+  - **Resolution reasons.** `RECONNECTED` when ACTIVE, `DISCONNECTED` when disconnected, `TARGET_REMOVED` when removed.
+  - **Tests.** 5.
+- [X] T077 [P] [US5] [ALERT-005–ALERT-007, CFG-007, TEST-002] Add failing delivery tests in `apps/api/src/modules/alerts/delivery/alert-delivery.service.spec.ts` with the in-memory fake in `apps/api/test/fakes/in-memory-email-transport.ts`; depends on T065 and T067. Cover:
   - skip reasons (`NOT_CRITICAL`, `EMAIL_DISABLED`, `NOTIFICATIONS_DISABLED`, `TRANSPORT_DISABLED`);
   - no delivery row is created for user-authored or legacy alerts;
   - success on attempt 1, 2, or 3;
@@ -684,7 +805,20 @@ These were found while implementing and reviewing US6 (T058–T063) and delibera
   - total budget exhaustion;
   - a stale `PENDING` row becomes `FAILED/INTERRUPTED` and is never resent;
   - the body has no amount, merchant, category, account, or token.
-- [ ] T078 [US5] [ALERT-005–ALERT-007, CFG-007, ERR-004] Implement the `EmailTransport` port and the `alert-delivery.service.ts` post-commit bounded attempts; depends on T002, T036, T068, and T077. T036 is a dependency only because both tasks edit `apps/api/package.json`.
+  **As built:** `apps/api/test/fakes/in-memory-email-transport.ts` is a scriptable fake: `ok`, a failure code, or `hang`.
+  - **Service spec (26 tests after the review; 25 at the red baseline).** Covers the fake timer, the fake repository, and the fixed clock:
+    - every skip reason and their fixed order: transport (with email disabled, every delivery is `TRANSPORT_DISABLED`, per CFG-007 and research.md), then severity, then the type's opt-in, then notifications;
+    - no row for a null-key alert;
+    - success on attempt 1, 2, or 3, with the backoff sequence;
+    - retries capped at 3;
+    - REJECTED and AUTH not retried;
+    - a hung attempt timed out and retried;
+    - total-budget exhaustion;
+    - errors never thrown;
+    - interruption at budget + 30 s (from `lastAttemptAt` or `createdAt`), never resent, scoped to the user;
+    - privacy.
+  - **Red baseline.** Against a stub, 25 of 25 failed.
+- [X] T078 [US5] [ALERT-005–ALERT-007, CFG-007, ERR-004] Implement the `EmailTransport` port and the `alert-delivery.service.ts` post-commit bounded attempts; depends on T002, T036, T068, and T077. T036 is a dependency only because both tasks edit `apps/api/package.json`.
   - **Transports:** `smtp` (nodemailer) and `log` (redacted, non-production).
   - **Disabled mode:** `EMAIL_TRANSPORT=disabled` selects no transport; every delivery is recorded as `SKIPPED/TRANSPORT_DISABLED`.
   - **Files:** `apps/api/src/modules/alerts/delivery/*` and `apps/api/src/modules/alerts/alerts.module.ts` (provider binding).
@@ -694,7 +828,22 @@ These were found while implementing and reviewing US6 (T058–T063) and delibera
 
 ### Orchestration and wiring
 
-- [ ] T079 [US5] [ALERT-003, ALERT-005, ALERT-006, ALERT-008, ALERT-009] Implement the alert evaluation orchestrator in `apps/api/src/modules/alerts/alert-evaluation.service.ts` and the evaluator input reader in `apps/api/src/modules/alerts/queries/alert-inputs.query.ts`; depends on T071–T076 and T078.
+  **As built:** `delivery/`.
+  - **Port.** `email-transport.ts` defines the port and the sanitized `EmailSendError` codes: TIMEOUT, CONNECTION, and TEMPORARY are retried; REJECTED and AUTH are not.
+  - **Transports.**
+    - `smtp-email.transport.ts`: nodemailer 7. `requireTLS` unless `SMTP_SECURE`; nodemailer's own timeouts equal the attempt timeout. `classifySmtpError` maps 5xx to REJECTED, 4xx to TEMPORARY, EAUTH/530/535 to AUTH, and ETIMEDOUT to TIMEOUT.
+    - `log-email.transport.ts`: logs the recipient's domain and the subject only.
+  - **Binding.** `email-transport.provider.ts` binds null for `disabled`. `alert-delivery.repository.ts` makes every write conditional on PENDING and on the expected attempt count.
+  - **Service.** `alert-delivery.service.ts`:
+    - `plan` runs inside the evaluation transaction;
+    - `deliver` runs after commit, persisting each attempt before it is made;
+    - backoff is 500 then 1000 ms; each attempt is capped at `min(attempt timeout, remaining budget)`;
+    - `sweepInterrupted`.
+  - **Message.** The subject is `CashLens: new critical alert`; the body is the type label and `${APP_PUBLIC_URL}/app/alerts`.
+  - **Configuration.** It already existed from T002 and is unchanged; production still rejects `log`.
+  - **Dependencies.** `nodemailer ^7.0.0` and `@types/nodemailer ^7.0.12`.
+  - **Verification.** T077 passes. The binding and classification spec has 14 tests. No test opens a socket.
+- [X] T079 [US5] [ALERT-003, ALERT-005, ALERT-006, ALERT-008, ALERT-009] Implement the alert evaluation orchestrator in `apps/api/src/modules/alerts/alert-evaluation.service.ts` and the evaluator input reader in `apps/api/src/modules/alerts/queries/alert-inputs.query.ts`; depends on T071–T076 and T078.
   - **Dependency direction** (plan.md "Alert module dependency direction"):
     - The input reader uses only the global `PrismaService` and the `common/finance/*` helpers (`financial-period-policy`, `completed-month-cashflow`, `budget-spend.query`), plus the pure `goals/goal-feasibility.ts`.
     - `alerts.module.ts` imports **no** feature module and uses no `forwardRef`.
@@ -707,10 +856,51 @@ These were found while implementing and reviewing US6 (T058–T063) and delibera
   - delivery errors never propagate to the caller;
   - a unit check asserts that the `alerts.module.ts` `imports` list contains no feature module;
   - the app boots with no circular-dependency warning.
-- [ ] T080 [P] [US5] [BUDGET-003, TX-005, ALERT-009] Wire `onTransactionsChanged` for the old and new affected periods and categories in `apps/api/src/modules/transactions/transactions.service.ts` after create, update, delete, ignore, duplicate, and category mutations. `apps/api/src/modules/transactions/transactions.module.ts` imports `AlertsModule`. Depends on T055 and T079. Verify an edit that moves category or month resolves and creates the correct conditions.
-- [ ] T081 [P] [US5] [BUDGET-003, ALERT-009] Wire `onBudgetChanged` on budget create/update and add `POST /budgets/:id/recalculate` in `apps/api/src/modules/budgets/budgets.service.ts` and `apps/api/src/modules/budgets/budgets.controller.ts`. `apps/api/src/modules/budgets/budgets.module.ts` imports `AlertsModule`. Depends on T070 and T079. Verify threshold changes re-evaluate the current period.
-- [ ] T082 [P] [US5] [ALERT-009 goal-risk row] Wire `onGoalChanged` on goal create/update/contribution/status change in `apps/api/src/modules/goals/goals.service.ts`. `apps/api/src/modules/goals/goals.module.ts` imports `AlertsModule`. Depends on T060 and T079. Verify the simulation GET remains side-effect free.
-- [ ] T083 [P] [US5] [ALERT-009 system rows and imported transactions] Wire the email pipeline in `apps/api/src/modules/email-ingestion/email-ingestion.service.ts` and `apps/api/src/modules/email-connections/email-connections.service.ts`. `apps/api/src/modules/email-ingestion/email-ingestion.module.ts` and `apps/api/src/modules/email-connections/email-connections.module.ts` import `AlertsModule`. Depends on T055 and T079.
+  **As built:**
+  - **Inputs.** `queries/alert-inputs.query.ts` reads inside the evaluation transaction, using only the database client and the shared finance helpers:
+    - context and preferences (in-app on and email off by default when no settings row exists; notifications on by default);
+    - open keys by prefix;
+    - budgets with instance spend, from the shared aggregate;
+    - goals with a per-currency `completedMonthCashflow`;
+    - the base-currency cashflow;
+    - changed transactions;
+    - connections, and their last 3 terminal runs ordered `finishedAt DESC NULLS LAST`.
+  - **Orchestrator.** `alert-evaluation.service.ts`:
+    1. sweeps interrupted deliveries;
+    2. runs one `$transaction` that takes `pg_advisory_xact_lock` per user, runs the evaluators of the triggered families over the user's whole current state (level-triggered, so a move's old period and category resolve as well), withholds creation for types with in-app off, applies the lifecycle, and plans one delivery per new alert;
+    3. after commit, delivers the PENDING emails.
+
+    Errors are logged with a UUID correlation id and returned as `{ok: false}`, never thrown.
+  - **`AlertsService`.** It sweeps on list, and `emailAvailable` reflects the bound transport.
+  - **Verification.**
+    - `alerts.architecture.spec.ts`: `AlertsModule` has no `imports`; no `forwardRef(` appears under alerts; alerts imports no feature file except the pure `goals/goal-feasibility.ts`, which itself imports no Nest code or feature.
+    - `alert-evaluation.service.spec.ts`: the order plan → commit → deliver, error containment, and in-app gating.
+    - The full e2e suite boots `AppModule` with every feature importing `AlertsModule` and shows no circular-dependency error.
+  - **Independent review (after T091).** The review found no HIGH defects. Each finding below was fixed with a regression test, re-verified by the full gate:
+    1. A threshold or observed value beyond `Decimal(18,4)`, such as a goal target near the `Decimal(18,2)` maximum, made the insert overflow. That rolled back every later evaluation for the user. It is now stored as null with the exact value in metadata. Regression tests: 5 lifecycle unit tests, and an e2e goal of 5e14 that failed without the fix.
+    2. A date-only budget date (UTC midnight) fell on the previous day west of UTC. It is now read as that date. Regression: 3 unit tests.
+    3. PENDING deliveries were attempted one after another, so a later one could be swept as INTERRUPTED before its first attempt. They now start together. Regression: 1 unit test.
+    4. `PATCH /alerts/read-all` could deadlock with an evaluation resolving several rows. It now takes the user's evaluation lock.
+    5. `GET /budgets/summary` added amounts in different currencies. It now totals base-currency budgets only and reports `currency`. Regression: 1 e2e test.
+
+    Also from the review:
+    - Checked and found correct: the partial-index drift risk (T008 shows Prisma ignores the index).
+    - Recorded as US5 follow-ups: at-least-once email after a timeout, and double counting across overlapping budgets.
+- [X] T080 [P] [US5] [BUDGET-003, TX-005, ALERT-009] Wire `onTransactionsChanged` for the old and new affected periods and categories in `apps/api/src/modules/transactions/transactions.service.ts` after create, update, delete, ignore, duplicate, and category mutations. `apps/api/src/modules/transactions/transactions.module.ts` imports `AlertsModule`. Depends on T055 and T079. Verify an edit that moves category or month resolves and creates the correct conditions.
+  **As built:** Every mutation awaits `onTransactionsChanged` after its own commit: create, update, `PATCH /:id/category`, reclassify, duplicate, ignore, and delete.
+  - **Large-transaction ids.** They are passed on create, duplicate, ignore, and delete, and on an update that sends amount, currency, direction, status, isDuplicate, or duplicateOfTransactionId.
+  - **Moves.** The budget, goal, and cashflow families re-evaluate the whole current state, so a move resolves the old period or category and evaluates the new one.
+  - **Module.** `TransactionsModule` imports `AlertsModule`.
+  - **Test adjustment.** In the US1 ownership suite, Alice's 90% budget now opens a real WARNING. Its assertions now count her two user-authored alerts and assert that the evaluator alert also stays unread.
+- [X] T081 [P] [US5] [BUDGET-003, ALERT-009] Wire `onBudgetChanged` on budget create/update and add `POST /budgets/:id/recalculate` in `apps/api/src/modules/budgets/budgets.service.ts` and `apps/api/src/modules/budgets/budgets.controller.ts`. `apps/api/src/modules/budgets/budgets.module.ts` imports `AlertsModule`. Depends on T070 and T079. Verify threshold changes re-evaluate the current period.
+  **As built:**
+  - **Triggers.** Create, update, and archive call `onBudgetChanged` after the write. An archived budget's open keys resolve `TARGET_REMOVED`.
+  - **Recalculate.** `POST /budgets/:id/recalculate` (200, owner-safe 404) returns `{budget, alertChanges: {evaluated, created, resolved}}`.
+  - **Naming.** The injected field is named `alertEvaluation` because `BudgetsService.alerts()` already exists.
+  - **Module.** `BudgetsModule` imports `AlertsModule`.
+- [X] T082 [P] [US5] [ALERT-009 goal-risk row] Wire `onGoalChanged` on goal create/update/contribution/status change in `apps/api/src/modules/goals/goals.service.ts`. `apps/api/src/modules/goals/goals.module.ts` imports `AlertsModule`. Depends on T060 and T079. Verify the simulation GET remains side-effect free.
+  **As built:** Create, update, contribution, and archive call `onGoalChanged`; status changes go through update. `GoalsModule` imports `AlertsModule`. A new unit test asserts the simulation never calls the evaluator, and the goals e2e suite still passes.
+- [X] T083 [P] [US5] [ALERT-009 system rows and imported transactions] Wire the email pipeline in `apps/api/src/modules/email-ingestion/email-ingestion.service.ts` and `apps/api/src/modules/email-connections/email-connections.service.ts`. `apps/api/src/modules/email-ingestion/email-ingestion.module.ts` and `apps/api/src/modules/email-connections/email-connections.module.ts` import `AlertsModule`. Depends on T055 and T079.
   - Call `onTransactionsChanged` **once per committed sync batch** with the imported transactions' affected periods and categories, so imported expenses reach the budget, large-transaction, goal-risk, and cashflow-risk evaluators.
   - Call `onSyncRunFinished` for every terminal state, including lease expiry.
   - Call `onConnectionStatusChanged`.
@@ -719,7 +909,13 @@ These were found while implementing and reviewing US6 (T058–T063) and delibera
 
 ### Frontend
 
-- [ ] T084 [US5] [ALERT-004–ALERT-006, ALERT-010, BUDGET-004, BUDGET-005, CFG-007, ERR-005] Complete the alert and budget UI; depends on T027, T045b, T068, T070, and T079. Files: `apps/web/src/features/alerts/components/AlertsPage.tsx`, `apps/web/src/features/settings/components/SettingsPage.tsx`, `apps/web/src/features/budgets/components/BudgetsPage.tsx`. Scope:
+  **As built:**
+  - **Sync.** It collects the ids of the transactions it creates. After `finishRun` and the audit, it calls `onTransactionsChanged` once with them (the batch), then `onSyncRunFinished`. That call covers the terminal run, any RUNNING run that `acquireLease` expired, and a connection that became reconnect-required mid-run.
+  - **Connection status.** `validAccessToken` evaluates `onConnectionStatusChanged` before rethrowing reconnect-required. `completeGmail` (connect/reconnect) and `disconnect` do too; a disconnect only resolves.
+  - **Deviation.** The manual `POST /email-messages/:id/parse` can also create an imported transaction. It now goes through `ParserService.parseRequested`, which evaluates a created transaction, so `ParserModule` imports `AlertsModule`. A sync calls `parseMessage`, which never evaluates, so a batch is evaluated once.
+  - **Idempotency.** US3 idempotency is unchanged: a replay creates nothing, so there is no id to evaluate.
+  - **Modules.** `EmailIngestionModule`, `EmailConnectionsModule`, and `ParserModule` import `AlertsModule`.
+- [X] T084 [US5] [ALERT-004–ALERT-006, ALERT-010, BUDGET-004, BUDGET-005, CFG-007, ERR-005] Complete the alert and budget UI; depends on T027, T045b, T068, T070, and T079. Files: `apps/web/src/features/alerts/components/AlertsPage.tsx`, `apps/web/src/features/settings/components/SettingsPage.tsx`, `apps/web/src/features/budgets/components/BudgetsPage.tsx`. Scope:
   - lifecycle status filter;
   - independent unread badge;
   - dismiss;
@@ -733,7 +929,38 @@ These were found while implementing and reviewing US6 (T058–T063) and delibera
 
 ### Per-type integration verification (each evaluator has its own suite)
 
-- [ ] T085 [P] [US5] [SC-007, BUDGET-001–BUDGET-005, ALERT-009 budget rows] Add budget-alert integration tests in `apps/api/test/alerts-budget.e2e-spec.ts`; depends on T080, T081, and T083. Cover:
+  **As built:** No mock fallback anywhere; every number, status, and outcome comes from the API.
+  - **`AlertsPage.tsx`:**
+    - a lifecycle filter (open, dismissed, resolved, all), sent as `status`;
+    - per-alert status and resolution reason, with any earlier dismissal kept;
+    - mark read, and dismiss for an open alert only;
+    - the email outcome: sent, pending, skipped with its reason, failed with its attempt count and failure class, or "in-app only" when there is no delivery row;
+    - an unread count taken from `GET /alerts/unread-count`, with read-all;
+    - an email-unavailable notice;
+    - loading, empty, error, retry, and failed-refresh states;
+    - mutation errors (such as the 409) shown as messages.
+  - **Settings.** A new `settings/components/AlertSettingsCard.tsx`, mounted by `SettingsPage.tsx`, covers the five ALERT-009 types:
+    - in-app and email switches, the email switch disabled while in-app is off, the transport is disabled, or the type is never CRITICAL;
+    - the in-app switch locked while email is on, matching the server rule;
+    - a large-transaction threshold input with save;
+    - loading, error, and retry states.
+  - **`BudgetsPage.tsx`:**
+    - usage percent and status from the API;
+    - a threshold line: warning plus critical, or the legacy "Ngưỡng cũ …: chỉ cảnh báo khi đạt 100%", or for non-monthly budgets "Chỉ ngân sách tháng có cảnh báo (alerts available for monthly budgets only)";
+    - a calendar-month approximation note;
+    - a create form with name, category (empty means all), amount, period (MONTHLY by default), a date-only start defaulting to the first of the month, and a 1–99 threshold, plus server field errors;
+    - loading, empty, error, retry, and failed-refresh states.
+  - **Deviations (files not in the task list):**
+    - `TopBar.tsx`: the badge and drawer now use the server's unread count and `isRead`, replacing a browser-local read list;
+    - `utils/alertEvents.ts`: refreshes the count across components;
+    - `api/mappers.ts` and `types/alert.ts`, `types/budget.ts`: the lifecycle and delivery fields, and the corrected type labels (`CATEGORY_SHIFT`, `PARSER_ISSUE`, `SYSTEM`);
+    - `config/mockData.ts` (unused): annotations narrowed to `Pick<>` so it still type-checks.
+  - **Verification.**
+    - Web type check and production build.
+    - A headless-Edge run against a mock API passed 52 of 52 checks with no console errors or exceptions, and sent no email.
+    - A second pass against the real built API on the test database, with `EMAIL_TRANSPORT=log` (non-production; it logs only the recipient domain and the subject), passed 14 of 14 checks. It covered: a CRITICAL cashflow alert recorded as SENT, a WARNING skipped as `NOT_CRITICAL`, the unread count, dismiss, the settings opt-in and lock, and the monthly and weekly budget labels.
+  - **Lint.** Approximate lint (T096) reports only 5 pre-existing `any`, all on untouched lines. The official web lint config does not run (known limitation).
+- [X] T085 [P] [US5] [SC-007, BUDGET-001–BUDGET-005, ALERT-009 budget rows] Add budget-alert integration tests in `apps/api/test/alerts-budget.e2e-spec.ts`; depends on T080, T081, and T083. Cover:
   - create, update, delete, ignore, duplicate, and recategory;
   - warning/critical independence;
   - past-period no-create;
@@ -743,12 +970,70 @@ These were found while implementing and reviewing US6 (T058–T063) and delibera
   - an imported expense;
   - a month-start-day-25 user;
   - a WEEKLY budget that never alerts and reports `alertsSupported: false`.
-- [ ] T086 [P] [US5] [SC-007, ALERT-009 large-transaction row] Add large-transaction integration tests (manual and imported) in `apps/api/test/alerts-large-transaction.e2e-spec.ts`; depends on T080 and T083.
-- [ ] T087 [P] [US5] [SC-007, ALERT-009 goal-risk row] Add goal-risk integration tests, including a change caused by an imported transaction, in `apps/api/test/alerts-goal-risk.e2e-spec.ts`; depends on T080, T082, and T083.
-- [ ] T088 [P] [US5] [SC-007, ALERT-009 cashflow-risk row] Add cashflow-risk integration tests, including the email-eligible `CRITICAL` path and imported transactions, in `apps/api/test/alerts-cashflow-risk.e2e-spec.ts`; depends on T080 and T083.
-- [ ] T089 [P] [US5] [SC-007, ALERT-009 repeated-sync-failure row] Add repeated-sync-failure integration tests in `apps/api/test/alerts-sync-failure.e2e-spec.ts`; depends on T083.
-- [ ] T090 [P] [US5] [SC-007, ALERT-009 reconnect-required row] Add reconnect-required integration tests in `apps/api/test/alerts-reconnect.e2e-spec.ts`; depends on T083.
-- [ ] T091 [P] [US5] [SC-007, ALERT-001, ALERT-004–ALERT-008, ALERT-010, ALERT-011] Add lifecycle and delivery integration tests in `apps/api/test/alerts-lifecycle-delivery.e2e-spec.ts`; depends on T068, T078, and T080. Cover:
+  **As built:** `apps/api/test/alerts-budget.e2e-spec.ts`, 23 tests, with a controlled clock and one budget per scenario. It covers:
+  - the ALERT-001 fields and a WARNING without a CRITICAL;
+  - tier independence, and a single jump opening both tiers;
+  - delete, ignore, and duplicate resolving;
+  - recategory moving the condition to the new budget, and a move to a past month;
+  - no creation for a past period;
+  - `PERIOD_ENDED` at rollover;
+  - the 24h re-cross: the crossing is suppressed at +2h and +24h−1ms and created at exactly +24h;
+  - recalculation after a write that ran no trigger;
+  - a threshold change;
+  - archive (`TARGET_REMOVED`);
+  - a threshold of 100 rejected with 400 while 99 is accepted;
+  - a legacy threshold of 150;
+  - a WEEKLY budget: CRUD with `alertsSupported: false`, never alerting;
+  - currency scope;
+  - read-only projections writing no alerts (list, summary, projection, and hot budgets);
+  - a month-start-day-25 account;
+  - an imported expense equal to the manual one, with the replay idempotent;
+  - `SKIPPED/TRANSPORT_DISABLED` with `emailAvailable: false`: this suite's app binds no transport.
+- [X] T086 [P] [US5] [SC-007, ALERT-009 large-transaction row] Add large-transaction integration tests (manual and imported) in `apps/api/test/alerts-large-transaction.e2e-spec.ts`; depends on T080 and T083.
+  **As built:** `alerts-large-transaction.e2e-spec.ts`, 15 tests. It covers:
+  - holding at exactly 5,000,000, and nothing below;
+  - never for income, transfers, another currency, or last month;
+  - an amount drop resolving, with a re-raise inside 24h not stored and created after 24h;
+  - delete, ignore, non-expense, and duplicate resolving;
+  - a user threshold applied, and a change not re-evaluating existing transactions (description edits, other transactions);
+  - a USD base currency inactive until a threshold is set;
+  - in-app off: no creation, while an open alert still resolves;
+  - imported and manual transactions identical, one evaluation per batch, and a replay adding nothing.
+- [X] T087 [P] [US5] [SC-007, ALERT-009 goal-risk row] Add goal-risk integration tests, including a change caused by an imported transaction, in `apps/api/test/alerts-goal-risk.e2e-spec.ts`; depends on T080, T082, and T083.
+  **As built:** `alerts-goal-risk.e2e-spec.ts`, 12 tests, with the example clock and H1 rows. It covers:
+  - G1 with the stored-horizon evidence;
+  - the simulation GET, with and without `months`, and goal reads writing no alert;
+  - a contribution resolving it;
+  - G4 past deadline;
+  - G5 and the DEFAULT horizon never alerting;
+  - paused, completed, and deleted resolving `TARGET_REMOVED`;
+  - G8 never alerting;
+  - manual income resolving at exactly required = available;
+  - an imported August income resolving it (`BELOW_THRESHOLD`).
+- [X] T088 [P] [US5] [SC-007, ALERT-009 cashflow-risk row] Add cashflow-risk integration tests, including the email-eligible `CRITICAL` path and imported transactions, in `apps/api/test/alerts-cashflow-risk.e2e-spec.ts`; depends on T080 and T083.
+  **As built:** `alerts-cashflow-risk.e2e-spec.ts`, 8 tests, with the in-memory transport. It covers:
+  - G6 = −1,500,001 as CRITICAL, with `SKIPPED/EMAIL_DISABLED` by default;
+  - opted in, SENT exactly once after recording, with no financial detail in the message and no re-send while open;
+  - `NOTIFICATIONS_DISABLED`;
+  - no goal-commitment subtraction;
+  - base currency only;
+  - `INSUFFICIENT_DATA` resolution after deletes;
+  - recovery resolving it;
+  - an imported August expense opening and emailing the CRITICAL alert.
+- [X] T089 [P] [US5] [SC-007, ALERT-009 repeated-sync-failure row] Add repeated-sync-failure integration tests in `apps/api/test/alerts-sync-failure.e2e-spec.ts`; depends on T083.
+  **As built:** `alerts-sync-failure.e2e-spec.ts`, 4 tests, with Gmail spied. It covers:
+  - the third consecutive FAILED run opening a SYSTEM WARNING, and never reconnect-required;
+  - a SUCCESS run resolving it;
+  - a stale RUNNING run expired by the next lease counting as EXPIRED;
+  - a user disconnect resolving it (`DISCONNECTED`) with no reconnect alert.
+- [X] T090 [P] [US5] [SC-007, ALERT-009 reconnect-required row] Add reconnect-required integration tests in `apps/api/test/alerts-reconnect.e2e-spec.ts`; depends on T083.
+  **As built:** `alerts-reconnect.e2e-spec.ts`, 4 tests. It covers:
+  - a refused renewal (503 `RECONNECT_REQUIRED`) opening a SYSTEM CRITICAL, emailed once, with no mailbox address or token in the email;
+  - a repeat not duplicating it;
+  - a mid-sync 401 opening it, and an OAuth reconnect resolving it (`RECONNECTED`);
+  - a project-wide 403 (REFUSED) never counting;
+  - a user disconnect never alerting and resolving an open alert (`DISCONNECTED`).
+- [X] T091 [P] [US5] [SC-007, ALERT-001, ALERT-004–ALERT-008, ALERT-010, ALERT-011] Add lifecycle and delivery integration tests in `apps/api/test/alerts-lifecycle-delivery.e2e-spec.ts`; depends on T068, T078, and T080. Cover:
   - every evaluator-created alert carries the ALERT-001 fields (type, severity, target, condition key, window, threshold, observed value, trigger time, sanitized explanation);
   - no evaluator ever emits `CATEGORY_SHIFT` or `PARSER_ISSUE` (ALERT-008 exclusions);
   - read versus status;
@@ -766,6 +1051,25 @@ These were found while implementing and reviewing US6 (T058–T063) and delibera
 
 **Purpose**: Standardize errors and logging, complete frontend and E2E evidence, and prove runtime behavior across all stories.
 
+  **As built:** `alerts-lifecycle-delivery.e2e-spec.ts`, 20 tests, with the in-memory transport and delivery options of 200 ms per attempt and 2 s in total. It covers:
+  - the ALERT-001 fields on budget, large-transaction, and cashflow alerts;
+  - no CATEGORY_SHIFT or PARSER_ISSUE;
+  - read versus status, and resolution keeping the read state;
+  - read-all changing no status, and the unread count;
+  - the status and `isRead` filters (`"false"`), with 400 for invalid values;
+  - dismiss: read, idempotent, blocking re-alerting at +49h, and resolving from DISMISSED with `dismissedAt` kept;
+  - 409 for a resolved alert;
+  - owner-safe 404;
+  - POST and legacy null-key rows untouched, with no delivery;
+  - settings defaults, the email-needs-in-app 400, and thresholds of 0 or below rejected with 400;
+  - the skip matrix (`TRANSPORT_DISABLED` is in T085);
+  - sent on the third attempt;
+  - three hung attempts: FAILED/TIMEOUT within the budget, with the trigger still 201;
+  - REJECTED and AUTH not retried;
+  - an interrupted PENDING row set to FAILED/INTERRUPTED on read and never resent;
+  - the exact email text;
+  - five concurrent triggers leaving one open row and one email;
+  - a racing insert on the partial index being a no-op.
 - [ ] T092 [P] [ERR-001, ERR-002, ERR-004, ERR-006] Add failing API error and envelope contract tests in `apps/api/test/error-contract.e2e-spec.ts`; depends on T030. Verify:
   - errors carry a stable code, message, fields, and `correlationId`, with no stack or secret leakage;
   - success responses, including sync and goal simulation, carry `{success, data, message, timestamp}`.

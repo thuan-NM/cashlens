@@ -2,6 +2,7 @@
 import { useCustom, useCustomMutation } from "@refinedev/core";
 import { Card } from "@/components/ui/Card";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { AlertSettingsCard } from "./AlertSettingsCard";
 import { useThemeStore } from "@/stores/themeStore";
 
 export function SettingsPage() {
@@ -24,6 +25,7 @@ export function SettingsPage() {
       <Card><SectionHeading title="Tự động hóa" description="Kiểm soát cách hệ thống xử lý dữ liệu" /><div className="divide-y divide-[var(--border)]">{[["autoClassificationEnabled", "Phân loại tự động", "Áp dụng rule của bạn và rule hệ thống cho giao dịch mới"], ["allowAiInsights", "AI insight", "Phân tích dữ liệu đã tổng hợp"], ["notificationEnabled", "Thông báo", "Nhận cảnh báo trong ứng dụng"]].map(([key, title, desc]) => <div key={key} className="flex items-center justify-between py-3"><div><div className="text-[11.5px] font-medium">{title}</div><div className="text-[10px] text-[var(--faint)]">{desc}</div></div><Switch checked={Boolean(settings[key])} onChange={(checked) => updateSetting({ [key]: checked })} /></div>)}
         {/* DATA-001: raw email bodies are never retained in this release, whatever value is stored. */}
         <div className="flex items-center justify-between py-3" data-testid="raw-email-body-setting"><div><div className="text-[11.5px] font-medium">Lưu email gốc</div><div className="text-[10px] text-[var(--faint)]">Không khả dụng trong phiên bản này (Unavailable in this release)</div></div><Switch checked={false} disabled aria-label="Lưu email gốc: không khả dụng trong phiên bản này" /></div></div></Card>
+      <AlertSettingsCard />
       <Card><SectionHeading title="Quyền riêng tư" description="OAuth chỉ đọc, dữ liệu tối thiểu" /><div className="space-y-3 text-[11.5px] leading-relaxed text-[var(--muted)]"><div className="rounded-xl bg-[var(--surface-2)] p-4"><b className="text-[var(--text)]">Không lưu mật khẩu ngân hàng.</b><br />CashLens chỉ nhận quyền đọc email qua OAuth và không thể gửi, sửa hoặc xóa email.</div><div className="rounded-xl bg-[var(--surface-2)] p-4"><b className="text-[var(--text)]">Email gốc không bao giờ được lưu.</b><br />Nội dung email chỉ được đọc tạm thời khi bóc tách; chỉ dữ liệu giao dịch đã bóc tách được giữ lại để tổng hợp tài chính.</div></div></Card>
     </div>
   );

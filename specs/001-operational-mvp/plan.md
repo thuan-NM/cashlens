@@ -124,6 +124,15 @@ EmailConnectionsModule┘
   - `AlertsModule` currently has no `imports`.
   - No feature module imports `AlertsModule` today.
 - **Verified by T079.** The `alerts.module.ts` imports list contains no feature module, and the app boots with no circular-dependency warning.
+- **As built (T079–T083).**
+  - `ParserModule` also imports `AlertsModule`: `POST /email-messages/:id/parse` can create an imported transaction, which must be evaluated like any other.
+  - The shared budget threshold rule is `common/finance/budget-threshold.policy.ts`. `budgets/budget-threshold.policy.ts` only re-exports it, so the alert code and the dashboard never import the budgets feature.
+  - `alerts.architecture.spec.ts` asserts:
+    - no module `imports`;
+    - no `forwardRef(`;
+    - no feature import other than `goals/goal-feasibility`;
+    - that `goal-feasibility` itself imports no Nest code and no feature.
+  - `AlertsModule` provides its own `Clock`. The e2e suites override it for every module at once.
 
 ### TLS boundary and same-origin routing (OPS-009, AUTH-003)
 

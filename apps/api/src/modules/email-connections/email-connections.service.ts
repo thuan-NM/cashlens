@@ -8,6 +8,7 @@ import {
 import { AuditActorType } from '@prisma/client';
 import { RequestUser } from '../../common/types/request-user.type';
 import { TokenEncryptionService } from '../../common/security/token-encryption.service';
+import { AlertEvaluationService } from '../alerts/alert-evaluation.service';
 import { SYNC_POLICY } from '../email-ingestion/sync-policy';
 import { UsersRepository } from '../users/users.repository';
 import { EmailConnectionsRepository } from './email-connections.repository';
@@ -42,6 +43,7 @@ export class EmailConnectionsService {
     private readonly gmail: GmailOAuthService,
     private readonly encryption: TokenEncryptionService,
     private readonly users: UsersRepository,
+    private readonly alerts: AlertEvaluationService,
   ) {}
 
   /** Starts a flow bound to the calling browser through the returned nonce. */
@@ -93,6 +95,8 @@ export class EmailConnectionsService {
       resourceId: connection.id,
       metadata: { provider: 'GMAIL' },
     });
+    // A (re)connect resolves reconnect-required (ALERT-009).
+    await this.alerts.onConnectionStatusChanged(userId);
 
     return toEmailConnectionResponse(connection);
   }
@@ -138,6 +142,8 @@ export class EmailConnectionsService {
     } catch (error) {
       if (error instanceof GmailReconnectRequiredError) {
         await this.repository.markReconnectRequired(connection.id);
+        // A provider-auth failure: reconnect-required (ALERT-009).
+        await this.alerts.onConnectionStatusChanged(userId);
         throw reconnectRequired();
       }
       throw error;
@@ -191,6 +197,8 @@ export class EmailConnectionsService {
       resourceType: 'email_connection',
       resourceId: id,
     });
+    // A user disconnect never alerts; it resolves the connection's alerts.
+    await this.alerts.onConnectionStatusChanged(user.id);
     return { id };
   }
 

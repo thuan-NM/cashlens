@@ -107,6 +107,21 @@ function call(
   return body ? pending.send(body) : pending;
 }
 
+/**
+ * Alice's two user-authored alerts stay unread, and so does every alert the
+ * evaluators opened for her since US5 (her 90% budget opens a WARNING while
+ * its month is current): no caller's read ever reaches them. The number of
+ * evaluator alerts depends on the real month, so it is not asserted.
+ */
+const expectAliceAlertsUnread = (
+  alerts: { isRead: boolean; conditionKey: string | null }[],
+) => {
+  expect(
+    alerts.filter((alert) => alert.conditionKey === null && !alert.isRead),
+  ).toHaveLength(2);
+  expect(alerts.every((alert) => !alert.isRead)).toBe(true);
+};
+
 describe('Ownership matrix: planning and alerts (T015)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
@@ -739,7 +754,7 @@ describe('Ownership matrix: planning and alerts (T015)', () => {
           })
           .expect(201);
         const before = await aliceState();
-        expect(before.alerts.filter((alert) => !alert.isRead)).toHaveLength(2);
+        expectAliceAlertsUnread(before.alerts);
         await user.agent.patch('/api/alerts/read-all').expect(200);
         expect(
           await prisma.alert.count({
@@ -904,7 +919,7 @@ describe('Ownership matrix: planning and alerts (T015)', () => {
       expect(goal?.deletedAt).toBeNull();
       expect(goal?.name).toBe(`E2E ${ALICE_MARK} goal`);
       expect(Number(goal?.savedAmount.toString())).toBe(1_000_000);
-      expect(state.alerts.filter((alert) => !alert.isRead)).toHaveLength(2);
+      expectAliceAlertsUnread(state.alerts);
       const large = state.alertSettings.find(
         (setting) => setting.type === 'LARGE_TRANSACTION',
       );

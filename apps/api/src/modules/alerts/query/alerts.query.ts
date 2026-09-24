@@ -7,5 +7,6 @@ export const buildAlertWhere = (
 ): Prisma.AlertWhereInput => ({
   userId,
   severity: query.severity,
-  isRead: query.read,
+  status: query.status,
+  isRead: query.isRead ?? query.read,
 });

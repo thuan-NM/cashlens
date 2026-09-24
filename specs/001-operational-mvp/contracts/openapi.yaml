@@ -187,6 +187,17 @@ components:
         criticalThresholdPercent: { type: integer, const: 100 }
         alertsSupported: { type: boolean, description: 'Additive (BUDGET-005); true only for period = MONTHLY' }
         usageBasis: { enum: [PERIOD_INSTANCE, CALENDAR_MONTH_APPROXIMATION], description: 'Additive; MONTHLY budgets use the user-month period instance; other period types keep the existing calendar-month projection' }
+        usage:
+          type: object
+          description: 'Existing usage object. As built (T070): spent is eligible expense in the budget currency and category (all expense categories except excludeFromBudget ones, uncategorized included, when categoryId is null); percentUsed is rounded for display while isNearThreshold uses the exact shared threshold rule; periodStart/periodEnd are additive and give the counted range (null when a MONTHLY budget has no instance in the requested month).'
+          properties:
+            spent: { type: number }
+            remaining: { type: number }
+            percentUsed: { type: integer }
+            isOverLimit: { type: boolean }
+            isNearThreshold: { type: boolean }
+            periodStart: { type: [string, 'null'], format: date-time }
+            periodEnd: { type: [string, 'null'], format: date-time }
 
     Alert:
       description: Existing alert fields plus DB-M4 lifecycle; read state (isRead/readAt) is independent of status.
@@ -233,7 +244,7 @@ components:
         type: { enum: [BUDGET_THRESHOLD, LARGE_TRANSACTION, CATEGORY_SHIFT, GOAL_RISK, CASHFLOW_RISK, PARSER_ISSUE, SYSTEM] }
         inAppEnabled: { type: boolean, default: true }
         emailEnabled: { type: boolean, default: false }
-        threshold: { type: [number, 'null'], exclusiveMinimum: 0, description: 'LARGE_TRANSACTION amount in user base currency; null = default 5,000,000 when base currency is VND, otherwise inactive' }
+        threshold: { type: [number, 'null'], exclusiveMinimum: 0, description: 'LARGE_TRANSACTION amount in user base currency; null = default 5,000,000 when base currency is VND, otherwise inactive. As built: a write of 0 or less returns 400 for every type; null on PATCH clears it; a change never re-evaluates existing transactions.' }
         emailAvailable: { type: boolean, description: Additive; false when EMAIL_TRANSPORT=disabled }
 
     UserSettingsWrite:
@@ -1038,13 +1049,15 @@ paths:
       - { in: path, name: id, required: true, schema: { type: string } }
     post:
       responses:
-        '200': { description: Current usage and alert condition changes (enveloped), content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } } }
+        '200':
+          description: 'Current usage and alert condition changes (enveloped). As built (T081): data is { budget: <budget response with BudgetThresholdView fields>, alertChanges: { evaluated: boolean, created: integer, resolved: integer } }; the whole budget family of the owner is re-evaluated.'
+          content: { application/json: { schema: { $ref: '#/components/schemas/Envelope' } } }
         '404': { $ref: '#/components/responses/OwnerSafeNotFound' }
   /alerts:
     get:
       parameters:
         - { in: query, name: status, schema: { enum: [ACTIVE, DISMISSED, RESOLVED] } }
-        - { in: query, name: isRead, schema: { type: boolean } }
+        - { in: query, name: isRead, schema: { type: boolean }, description: 'Only "true" and "false" are accepted (400 otherwise). The existing `read` name is still accepted (as built, T068).' }
       responses:
         '200':
           description: Owner alerts (enveloped; existing pagination fields retained)
@@ -1086,7 +1099,7 @@ paths:
     parameters:
       - { in: path, name: id, required: true, schema: { type: string } }
     patch:
-      summary: ACTIVE -> DISMISSED; sets dismissedAt and marks read; RESOLVED alerts return 409
+      summary: ACTIVE -> DISMISSED; sets dismissedAt and marks read (an earlier readAt is kept); dismissing a DISMISSED alert returns it unchanged; RESOLVED alerts return 409 with code ALERT_RESOLVED
       responses:
         '200':
           description: Owned alert dismissed (enveloped)

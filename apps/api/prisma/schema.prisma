@@ -159,6 +159,27 @@ enum AlertSeverity {
   CRITICAL
 }
 
+/// Condition lifecycle (ALERT-010); independent of the read state.
+enum AlertStatus {
+  ACTIVE
+  DISMISSED
+  RESOLVED
+}
+
+/// Delivery channel of an alert outcome; only EMAIL rows are written in the
+/// MVP (the alert itself is the in-app delivery). IN_APP is reserved.
+enum AlertDeliveryChannel {
+  EMAIL
+  IN_APP
+}
+
+enum AlertDeliveryStatus {
+  PENDING
+  SENT
+  SKIPPED
+  FAILED
+}
+
 enum AlertType {
   BUDGET_THRESHOLD
   LARGE_TRANSACTION
@@ -264,6 +285,7 @@ model User {
   goals            Goal[]
   alerts           Alert[]
   alertSettings    AlertSetting[]
+  alertDeliveries  AlertDelivery[]
   merchantRules    MerchantRule[]
   categoryEvents   TransactionCategoryEvent[]
   emailConnections EmailConnection[]
@@ -554,11 +576,57 @@ model Alert {
   metadata     Json?
   createdAt    DateTime      @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Lifecycle (DB-M4). A partial unique index, created in SQL only, allows
+  /// one open (ACTIVE or DISMISSED) row per (userId, conditionKey).
+  status           AlertStatus @default(ACTIVE)
+  /// Stable condition identity; null for legacy and user-authored alerts.
+  conditionKey     String?
+  thresholdValue   Decimal?    @db.Decimal(18, 4)
+  observedValue    Decimal?    @db.Decimal(18, 4)
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  triggeredAt      DateTime    @default(now())
+  resolvedAt       DateTime?
+  resolutionReason String?
+  dismissedAt      DateTime?
+
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries AlertDelivery[]
 
   @@index([userId, isRead, createdAt])
   @@index([userId, severity, createdAt])
   @@index([resourceType, resourceId])
+  @@index([userId, status, triggeredAt])
+  @@index([userId, conditionKey, triggeredAt(sort: Desc)])
+}
+
+/// The single email outcome of an evaluator-created alert (DB-M5, ALERT-005,
+/// ALERT-006). Legacy and user-authored alerts have none. A CHECK constraint,
+/// created in SQL only, keeps attemptCount between 0 and 3.
+model AlertDelivery {
+  id             String               @id @default(cuid())
+  alertId        String
+  userId         String
+  channel        AlertDeliveryChannel @default(EMAIL)
+  /// smtp, log, or none
+  provider       String
+  status         AlertDeliveryStatus
+  /// NOT_CRITICAL, EMAIL_DISABLED, NOTIFICATIONS_DISABLED, TRANSPORT_DISABLED
+  skipReason     String?
+  attemptCount   Int                  @default(0)
+  lastAttemptAt  DateTime?
+  sentAt         DateTime?
+  /// Sanitized: TIMEOUT, CONNECTION, REJECTED, AUTH, INTERRUPTED, ...
+  failureCode    String?
+  failureMessage String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([alertId, channel])
+  @@index([userId, status])
 }
 
 model AlertSetting {
