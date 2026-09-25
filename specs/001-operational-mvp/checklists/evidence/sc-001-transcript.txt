@@ -1,0 +1,507 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20260925090457
+Username: THUANNM\thuan
+RunAs User: THUANNM\thuan
+Configuration Name: 
+Machine: THUANNM (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $__claudeCodeScript = $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT; $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT = $null; Invoke-Expression -Command $__claudeCodeScript
+Process ID: 6948
+PSVersion: 5.1.26100.9444
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9444
+BuildVersion: 10.0.26100.9444
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+SC-001 START (git clone) 2026-09-25T09:04:57.9799031+07:00
+
+
+--- DEVIATION (not in docs): apply the uncommitted Phase 9 documentation overlay
+
+
+
+--- Section 1
+
+Wrote C:\Users\thuan\sc001\cashlens-sc001\apps\api\.env (development profile).
+Generated random values for: JWT_SECRET, EMAIL_TOKEN_ENCRYPTION_KEY, GMAIL_OAUTH_STATE_SECRET. Values are not shown.
+
+--- Section 2
+
+elapsed so far: 2.15 min
+**********************
+Windows PowerShell transcript end
+End time: 20260925090706
+**********************
+**********************
+Windows PowerShell transcript start
+Start time: 20260925090719
+Username: THUANNM\thuan
+RunAs User: THUANNM\thuan
+Configuration Name: 
+Machine: THUANNM (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $__claudeCodeScript = $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT; $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT = $null; Invoke-Expression -Command $__claudeCodeScript
+Process ID: 25468
+PSVersion: 5.1.26100.9444
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9444
+BuildVersion: 10.0.26100.9444
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+--- Smoke flow step 1: services ready
+
+{"success":true,"data":{"status":"ready","database":"up"},"message":"Success","timestamp":"2026-09-25T02:07:52.624Z","correlationId":"3aeb6dad-0e6a-4b4a-bb53-9452d2658b78"}
+--- Smoke flow step 2: register and sign in (UI, automated with the documented labels)
+
+elapsed so far: 3.1 min
+**********************
+Windows PowerShell transcript end
+End time: 20260925090803
+**********************
+**********************
+Windows PowerShell transcript start
+Start time: 20260925090817
+Username: THUANNM\thuan
+RunAs User: THUANNM\thuan
+Configuration Name: 
+Machine: THUANNM (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $__claudeCodeScript = $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT; $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT = $null; Invoke-Expression -Command $__claudeCodeScript
+Process ID: 9008
+PSVersion: 5.1.26100.9444
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9444
+BuildVersion: 10.0.26100.9444
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+--- DEVIATION (tooling): the step-2 password was held only in the previous process; repeating step 2 with a second synthetic account
+
+--- Smoke flow step 3: promote the first administrator
+
+exit code: 0
+--- Smoke flow steps 4-5: create one transaction; the dashboard shows it for the current month
+
+SC-001 STOP (dashboard shows the transaction) 2026-09-25T09:08:33.4192002+07:00
+ELAPSED: 3.59 min
+**********************
+Windows PowerShell transcript end
+End time: 20260925090833
+**********************
+**********************
+Windows PowerShell transcript start
+Start time: 20260925090855
+Username: THUANNM\thuan
+RunAs User: THUANNM\thuan
+Configuration Name: 
+Machine: THUANNM (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $__claudeCodeScript = $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT; $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT = $null; Invoke-Expression -Command $__claudeCodeScript
+Process ID: 4168
+PSVersion: 5.1.26100.9444
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9444
+BuildVersion: 10.0.26100.9444
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+=== POST-TIMING VERIFICATION of the remaining documented commands (not part of SC-001 time)
+--- Section 3: manual migrate (repeatable)
+
+No pending migrations to apply.
+--- Section 5: load the parser template as administrator
+PS>TerminatingError(Invoke-RestMethod): "{"statusCode":400,"message":["password must be a string"],"error":"Bad Request","code":"VALIDATION_FAILED","correlationId":"92ca6c7e-ba26-4c7d-bd8b-a87e29d5249d","fields":{"password":["password must be a string"]}}"
+Invoke-RestMethod : {"statusCode":400,"message":["password must be a string"],"error":"Bad Request","code":"VALIDATION_F
+AILED","correlationId":"92ca6c7e-ba26-4c7d-bd8b-a87e29d5249d","fields":{"password":["password must be a string"]}}
+At line:10 char:1
++ Invoke-RestMethod -Method Post http://localhost:3000/api/auth/login - ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-RestMethod], 
+WebException
+    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeRestMethodCommand
+Invoke-RestMethod : {"statusCode":400,"message":["password must be a string"],"error":"Bad Request","code":"VALIDATION_
+FAILED","correlationId":"92ca6c7e-ba26-4c7d-bd8b-a87e29d5249d","fields":{"password":["password must be a string"]}}
+At line:10 char:1
++ Invoke-RestMethod -Method Post http://localhost:3000/api/auth/login - ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-RestMethod], WebExc
+   eption
+    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeRestMethodCommand
+>> TerminatingError(Invoke-RestMethod): "{"statusCode":401,"message":"Unauthorized","error":"Unauthorized","code":"UNAUTHORIZED","correlationId":"cb394534-340e-4bf4-9864-2c8d8c398e30"}"
+Invoke-RestMethod : {"statusCode":401,"message":"Unauthorized","error":"Unauthorized","code":"UNAUTHORIZED","correlation
+Id":"cb394534-340e-4bf4-9864-2c8d8c398e30"}
+At line:11 char:6
++ $t = Invoke-RestMethod -Method Post http://localhost:3000/api/parser- ...
++      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-RestMethod], 
+WebException
+    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeRestMethodCommand
+Invoke-RestMethod : {"statusCode":401,"message":"Unauthorized","error":"Unauthorized","code":"UNAUTHORIZED","correlatio
+nId":"cb394534-340e-4bf4-9864-2c8d8c398e30"}
+At line:11 char:6
++ $t = Invoke-RestMethod -Method Post http://localhost:3000/api/parser- ...
++      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-RestMethod], WebExc
+   eption
+    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeRestMethodCommand
+template created:  v
+--- Section 4: list administrators
+Administrators: 1
+cmugbn9io0005bhpo7m1v9blp  sc001-walkthrough-2@example.test  ACTIVE  created 2026-09-25T02:08:20.208Z  last login 2026-09-25T02:08:30.678Z
+--- Section 2: restart the API; data kept
+ Container cashlens-api Started
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+PS>TerminatingError(Invoke-RestMethod): "The underlying connection was closed: The connection was closed unexpectedly."
+ready after restart: ready
+**********************
+Windows PowerShell transcript end
+End time: 20260925090954
+**********************
+**********************
+Windows PowerShell transcript start
+Start time: 20260925091019
+Username: THUANNM\thuan
+RunAs User: THUANNM\thuan
+Configuration Name: 
+Machine: THUANNM (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $__claudeCodeScript = $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT; $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT = $null; Invoke-Expression -Command $__claudeCodeScript
+Process ID: 8276
+PSVersion: 5.1.26100.9444
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9444
+BuildVersion: 10.0.26100.9444
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+--- Section 5 (retry; the walkthrough scaffolding read the password with Get-Content, whose extra properties broke the JSON body)
+template created: VCB balance change email (synthetic format) v1
+**********************
+Windows PowerShell transcript end
+End time: 20260925091020
+**********************
+**********************
+Windows PowerShell transcript start
+Start time: 20260925091034
+Username: THUANNM\thuan
+RunAs User: THUANNM\thuan
+Configuration Name: 
+Machine: THUANNM (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $__claudeCodeScript = $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT; $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT = $null; Invoke-Expression -Command $__claudeCodeScript
+Process ID: 9168
+PSVersion: 5.1.26100.9444
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9444
+BuildVersion: 10.0.26100.9444
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+--- Section 6: host install
+
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the 
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:5 char:18
++ corepack enable; yarn install --immutable 2>&1 | Select-Object -Last  ...
++                  ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check
+the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:5 char:18
++ corepack enable; yarn install --immutable 2>&1 | Select-Object -Last  ...
++                  ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+--- API unit tests
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the 
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:7 char:1
++ yarn workspace api test 2>&1 | Select-String -Pattern '^(Tests|Test S ...
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check
+the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:7 char:1
++ yarn workspace api test 2>&1 | Select-String -Pattern '^(Tests|Test S ...
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+--- API integration tests (two suites, documented E2E_DATABASE_URL)
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the 
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:10 char:1
++ yarn workspace api test:e2e test/health.e2e-spec.ts test/error-contra ...
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check
+the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:10 char:1
++ yarn workspace api test:e2e test/health.e2e-spec.ts test/error-contra ...
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+--- Web tests, lint, builds
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the 
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:12 char:1
++ yarn workspace web test 2>&1 | Select-String -Pattern 'Test Files|Tes ...
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check
+the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:12 char:1
++ yarn workspace web test 2>&1 | Select-String -Pattern 'Test Files|Tes ...
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the 
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:13 char:1
++ yarn workspace web lint; "web lint exit $LASTEXITCODE"
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check
+the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:13 char:1
++ yarn workspace web lint; "web lint exit $LASTEXITCODE"
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+web lint exit 1
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the 
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:14 char:1
++ yarn workspace api build 2>&1 | Select-Object -Last 1; "api build exi ...
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check
+the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:14 char:1
++ yarn workspace api build 2>&1 | Select-Object -Last 1; "api build exi ...
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+api build exit 1; main: True
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the 
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:15 char:1
++ yarn workspace web build 2>&1 | Select-String 'built in'
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check
+the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:15 char:1
++ yarn workspace web build 2>&1 | Select-String 'built in'
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+--- Browser tests (default URLs)
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the 
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:17 char:1
++ yarn workspace web test:e2e:install 2>&1 | Select-Object -Last 1
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check
+the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:17 char:1
++ yarn workspace web test:e2e:install 2>&1 | Select-Object -Last 1
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the 
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:18 char:1
++ yarn workspace web test:e2e 2>&1 | Select-String -Pattern 'passed|fai ...
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+yarn : The term 'yarn' is not recognized as the name of a cmdlet, function, script file, or operable program. Check
+the spelling of the name, or if a path was included, verify that the path is correct and try again.
+At line:18 char:1
++ yarn workspace web test:e2e 2>&1 | Select-String -Pattern 'passed|fai ...
++ ~~~~
+    + CategoryInfo          : ObjectNotFound: (yarn:String) [], CommandNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException
+
+--- Secret scan and migration matrix
+Secret scan: gitleaks v8.30.1 (pinned digest), config .gitleaks.toml
+Reviewed history exceptions (.gitleaksignore): 2
+Working tree: 523 files (tracked + untracked, not ignored): clean
+History: 80f3e0d..a93370c (13 commits): clean
+scan exit 0
+node.exe : node:internal/modules/cjs/loader:1433
+At C:\Users\thuan\sc001\cashlens-sc001\apps\api\test\scripts\verify-migrations.ps1:217 char:24
++ ... rismaCli = (& node -p "require.resolve('prisma/build/index.js',{paths ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (node:internal/modules/cjs/loader:1433:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+  throw err;
+  ^
+
+Error: Cannot find module 'prisma/build/index.js'
+Require stack:
+- C:\Users\thuan\sc001\cashlens-sc001\[eval]
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1430:15)
+    at Function.resolve (node:internal/modules/helpers:157:19)
+    at [eval]:1:9
+    at runScriptInThisContext (node:internal/vm:209:10)
+    at node:internal/process/execution:446:12
+    at [eval]-wrapper:6:24
+    at runScriptInContext (node:internal/process/execution:444:60)
+    at evalFunction (node:internal/process/execution:279:30)
+    at evalTypeScript (node:internal/process/execution:291:3)
+    at node:internal/main/eval_string:74:3 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'C:\\Users\\thuan\\sc001\\cashlens-sc001\\[eval]' ]
+}
+
+Node.js v22.23.1
+PREREQUISITE: Prisma CLI not found; run yarn install
+migration checks listed: 0
+verify-migrations exit 2
+**********************
+Windows PowerShell transcript end
+End time: 20260925091048
+**********************
+**********************
+Windows PowerShell transcript start
+Start time: 20260925091129
+Username: THUANNM\thuan
+RunAs User: THUANNM\thuan
+Configuration Name: 
+Machine: THUANNM (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $__claudeCodeScript = $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT; $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT = $null; Invoke-Expression -Command $__claudeCodeScript
+Process ID: 11828
+PSVersion: 5.1.26100.9444
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9444
+BuildVersion: 10.0.26100.9444
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+--- Section 6 rerun with the documented fallback: corepack enable fails with EPERM on this host (nvm-windows), so 'corepack yarn' replaces 'yarn'
+➤ YN0000: · Done with warnings in 2m 8s
+--- API unit tests
+
+Test Suites: 20 failed, 8 passed, 28 total
+Tests:       203 passed, 203 total
+--- API integration tests (two suites, documented E2E_DATABASE_URL)
+Test Suites: 2 failed, 2 total
+Tests:       0 total
+--- Web tests, lint, builds
+ Test Files  11 passed (11)
+      Tests  47 passed (47)
+   Duration  42.19s (transform 1.87s, setup 11.99s, collect 91.88s, tests 71.28s, environment 17.53s, prepare 3.06s)
+
+web lint exit 0
+
+api build exit 1; main: True
+✓ built in 14.87s
+--- Browser tests (default URLs)
+Error: admin:bootstrap --email failed (exit 3). Is the development compose stack running (docker compose up)?
+  51 |       `admin:bootstrap ${args[0]} failed (exit ${result.status}). Is the development compose stack running
+(docker compose up)?\n${(result.stderr || result.stdout || "").slice(-1500)}`,
+--- Secret scan and migration matrix
+Secret scan: gitleaks v8.30.1 (pinned digest), config .gitleaks.toml
+Reviewed history exceptions (.gitleaksignore): 2
+Working tree: 523 files (tracked + untracked, not ignored): clean
+History: 80f3e0d..a93370c (13 commits): clean
+scan exit 0
+Migration verification against postgresql://cashlens:***@localhost:5432/postgres
+
+Check                                                               Result Detail                                       
+-----                                                               ------ ------                                       
+history: pre-existing migrations unmodified                         PASS   base a0230295c470 (0 migrations at base)     
+history: migrations up to baseline unmodified                       PASS   pinned 80f3e0d78892 (10 folders)             
+history: new migrations sort after baseline                         PASS                                                
+empty database: migrate deploy applies                              PASS                                                
+empty database: no drift between migrations and schema              PASS   database matches schema                      
+empty database: repeated deploy is a no-op                          PASS                                                
+upgrade: baseline (10 of 15 migrations) applies                     PASS   20260627090000_budgets_goals_alerts_dashboard
+upgrade from current schema: migrate deploy applies                 PASS                                                
+upgrade from current schema: no drift between migrations and schema PASS   database matches schema                      
+upgrade from current schema: repeated deploy is a no-op             PASS
+migration checks listed: 0
+verify-migrations exit 0
+**********************
+Windows PowerShell transcript end
+End time: 20260925091651
+**********************
+**********************
+Windows PowerShell transcript start
+Start time: 20260925091751
+Username: THUANNM\thuan
+RunAs User: THUANNM\thuan
+Configuration Name: 
+Machine: THUANNM (Microsoft Windows NT 10.0.26200.0)
+Host Application: C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $__claudeCodeScript = $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT; $env:CLAUDE_CODE_SHELL_LAUNCHER_SCRIPT = $null; Invoke-Expression -Command $__claudeCodeScript
+Process ID: 3372
+PSVersion: 5.1.26100.9444
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.26100.9444
+BuildVersion: 10.0.26100.9444
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+--- DOC FIX VERIFIED: a host install also needs the Prisma client generated
+
+✔ Generated Prisma Client (v7.7.0) to .\node_modules\@prisma\client in 543ms
+--- API unit tests
+Test Suites: 28 passed, 28 total
+Tests:       669 passed, 669 total
+--- API integration tests (two suites)
+Test Suites: 2 passed, 2 total
+Tests:       23 passed, 23 total
+--- API build
+api build exit 0
+--- Browser tests: revoke the smoke-flow administrator first (only one administrator may exist)
+Administrator role removed; audit record written.
+  2 passed (35.0s)
+**********************
+Windows PowerShell transcript end
+End time: 20260925091914
+**********************

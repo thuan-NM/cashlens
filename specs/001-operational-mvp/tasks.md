@@ -1373,8 +1373,19 @@ These were found while implementing and reviewing US5 (T064–T091) and delibera
 
 **Independent Test**: A fresh operator follows the documentation, reaches healthy services, provisions the first administrator, runs migrations/tests and one smoke flow, restarts safely, and diagnoses a simulated dependency failure — timed and recorded.
 
-- [ ] T102 [P] [US7] [DOC-001, DOC-002, SC-014] Replace the generic Turborepo landing page in `README.md` with CashLens purpose, supported MVP journeys, scope boundaries (including post-MVP SC-012 and deferred alert types), monorepo map, architecture, and principal data flow; depends on T101. Verify every command and link targets an existing file or package script.
-- [ ] T103 [P] [US7] [DOC-002, OPS-001, OPS-003, SEC-009, CFG-006, SC-001, SC-014] Document local development in `docs/operations/local-development.md`; depends on T100. Cover:
+- [X] T102 [P] [US7] [DOC-001, DOC-002, SC-014] Replace the generic Turborepo landing page in `README.md` with CashLens purpose, supported MVP journeys, scope boundaries (including post-MVP SC-012 and deferred alert types), monorepo map, architecture, and principal data flow; depends on T101. Verify every command and link targets an existing file or package script.
+  **As built:** `README.md` now describes CashLens:
+  - purpose and release status;
+  - the supported MVP journeys;
+  - scope boundaries, including scheduled sync, the deferred alert types, SC-012, and account export/deletion as post-MVP;
+  - the architecture and principal data flow, the monorepo map, a documentation index, and a development quick start.
+
+  The starter READMEs in `apps/api` and `apps/web` became short CashLens pointers.
+
+  **Checks:** a script checked every relative link, anchor, repository path, and `yarn workspace` script in the seven documents. The only paths it could not find are files that setup creates (`apps/api/.env`, `apps/web/test-results`). Documentation verification also found two helper scripts that do not work, and no document uses them; both are recorded in release evidence:
+  - `start:prod` points to `dist/main`;
+  - the root `check-types` does nothing.
+- [X] T103 [P] [US7] [DOC-002, OPS-001, OPS-003, SEC-009, CFG-006, SC-001, SC-014] Document local development in `docs/operations/local-development.md`; depends on T100. Cover:
   - prerequisites (Node 22 with Corepack, Docker, Git, PowerShell 7), environment setup via `scripts/init-local-env.ps1`, which writes random secrets into the ignored `apps/api/.env` without printing them and is checked with `git check-ignore`, and Docker startup/shutdown;
   - migrations in the DB-M1 to DB-M5 order;
   - development admin bootstrap and `EMAIL_TRANSPORT=disabled`;
@@ -1384,8 +1395,32 @@ These were found while implementing and reviewing US5 (T064–T091) and delibera
   - a numbered **Smoke flow** section that SC-001 times: services ready, register, `admin:bootstrap`, create one transaction, and the dashboard shows it for the current month. Its last step is the SC-001 stop point.
 
   Verify the steps on a clean checkout.
-- [ ] T104 [P] [US7] [DOC-003, EMAIL-001–EMAIL-013, DATA-001, DATA-002] Document Gmail in `docs/operations/gmail-oauth.md`: read-only consent, callback/test-account setup, listen rules, bounded manual sync, continuation, reconnect-required, rate limits, retention, the supported-parsers link, and common safe errors; depends on T049. Verify no usable credential or raw message appears.
-- [ ] T105 [P] [US7] [DOC-004, CFG-001–CFG-007, OPS-002–OPS-009, SEC-009, ALERT-005, DATA-001, SC-014] Document deployment in `docs/operations/deployment.md`; depends on T007, T095, and T100. Cover:
+  **As built:** `docs/operations/local-development.md` covers:
+  - **Setup:** prerequisites (Node 22 with Corepack, and the `EPERM` fallback to `corepack yarn`; Docker; Git; PowerShell 7), then `init-local-env.ps1` and its `git check-ignore` check.
+  - **Running the stack:** port overrides; `docker compose --env-file apps/api/.env up -d` with startup order and health; service endpoints; stop, restart, and `down -v`.
+  - **Database and administrator:** migrations with the DB-M1–DB-M5 order; migration-seeded providers and categories; the development admin bootstrap.
+  - **Email and parsers:** `EMAIL_TRANSPORT=disabled`/`log`, and loading parser templates.
+  - **Tests and builds:** host install plus `prisma generate`, the test and build commands, `E2E_DATABASE_URL`, and the Playwright install and single-administrator note.
+  - **Checks:** the secret scan and the migration matrix.
+  - **Smoke flow:** the numbered SC-001 steps.
+
+  **Verified on a fresh clone** (see T107): every section was run. The walkthrough found five gaps, all fixed in the guide:
+  - `prisma generate` was missing;
+  - the `corepack enable` `EPERM` fallback was missing;
+  - the Playwright administrator conflict was not explained;
+  - the guide claimed a graceful shutdown in development;
+  - the expense sign in the Smoke flow was wrong.
+- [X] T104 [P] [US7] [DOC-003, EMAIL-001–EMAIL-013, DATA-001, DATA-002] Document Gmail in `docs/operations/gmail-oauth.md`: read-only consent, callback/test-account setup, listen rules, bounded manual sync, continuation, reconnect-required, rate limits, retention, the supported-parsers link, and common safe errors; depends on T049. Verify no usable credential or raw message appears.
+  **As built:** `docs/operations/gmail-oauth.md` covers:
+  - **Access:** the read-only scope and offline access; Google Cloud setup, including the redirect URIs per environment; test users and the 7-day refresh-token expiry in Testing status.
+  - **Connecting:** the connect and callback flow, including that the callback answers with JSON and does not redirect; disconnect through the API.
+  - **Listen rules:** the rule fields.
+  - **Manual sync:** its bounds (30-day backfill, 50 messages, about 25 s per run); continuation; one run per connection; run and connection states with recovery; rate-limit retries.
+  - **Parsing and storage:** parse codes and deduplication; what is stored and retention; the raw-body lock.
+  - **Common errors**, each with its code and action.
+
+  Every fact was taken from the code with citations and checked against it. The document has no credentials and no raw message; the only sample is the synthetic example in supported-parsers.md, which it links to.
+- [X] T105 [P] [US7] [DOC-004, CFG-001–CFG-007, OPS-002–OPS-009, SEC-009, ALERT-005, DATA-001, SC-014] Document deployment in `docs/operations/deployment.md`; depends on T007, T095, and T100. Cover:
   - the single-host **TLS boundary and same-origin routing**:
     - the operator-provided proxy or load balancer terminates TLS on **one public origin**;
     - required proxy routing: `/api/` → `http://127.0.0.1:3000` with the path preserved, and `/` → `http://127.0.0.1:8080`;
@@ -1404,7 +1439,18 @@ These were found while implementing and reviewing US5 (T064–T091) and delibera
   - log redaction and secret scanning.
 
   Verify against the production compose configuration.
-- [ ] T106 [P] [US7] [DOC-005, ERR-003, ERR-004, DATA-003, DATA-004, OPS-003, OPS-009] Document troubleshooting in `docs/operations/troubleshooting.md`; depends on T093, T095, and T100. Cover:
+  **As built:** `docs/operations/deployment.md` covers:
+  - **The TLS boundary:** one origin; `/api/` and `/` routing with the path preserved; X-Forwarded-Proto and Host; the redirect and HSTS; a 90 s read timeout on the sync route; loopback-only ports; Swagger exposure.
+  - **Configuration:** the `TRUST_PROXY` procedure with `verify-release.ps1`; `--env-file` configuration outside the repository, with the variable table; SMTP versus disabled.
+  - **Release verification:** the reference release host and the release-test profile.
+  - **First deployment:** build, `run --rm migrate`, `up -d`, and health checks; first-administrator provisioning and break-glass use.
+  - **Upgrades:** the upgrade notes (administrator review, preserved `emailEnabled`, the raw-body preference, the migration list).
+  - **Operations:** backup and restore, release verification and rollback, key rotation, logs, redaction, and the secret scan.
+
+  **Real defect fixed:** the reference proxy had a 60 s read timeout, while research.md requires at least 90 s on `POST /api/email-connections/{id}/sync`. It now has a dedicated 90 s location, and `nginx -t` passes on 1.24 and on stable.
+
+  **Checked against the running stacks:** the backup and restore commands (dump written in the container, then `docker compose cp`, which is safe in any shell) and the key-rotation SQL were run against the release-check database.
+- [X] T106 [P] [US7] [DOC-005, ERR-003, ERR-004, DATA-003, DATA-004, OPS-003, OPS-009] Document troubleshooting in `docs/operations/troubleshooting.md`; depends on T093, T095, and T100. Cover:
   - database, Gmail, parser, and sync failures;
   - bootstrap exit codes;
   - **`TRUST_PROXY` misconfiguration**:
@@ -1421,6 +1467,20 @@ These were found while implementing and reviewing US5 (T064–T091) and delibera
   - correlation-ID diagnosis.
 
   Verify each recovery action corresponds to an observable state.
+  **As built:** `docs/operations/troubleshooting.md` covers:
+  - correlation-ID diagnosis;
+  - startup and configuration validation, and port conflicts;
+  - database readiness and outage;
+  - migration-service failure in production and development;
+  - authentication, sessions, and `TRUST_PROXY` misconfiguration (symptom, diagnosis, fix);
+  - the admin bootstrap exit codes (all 0/1/2/3 outputs);
+  - Gmail and OAuth failures;
+  - sync and stale sync state;
+  - parser failures;
+  - no-scheduler alert timing, and email delivery `SKIPPED`/`SENT`/`FAILED` including `INTERRUPTED`;
+  - retention and deletion.
+
+  Each recovery names an observable state: a status, code, event, or log line from the implementation.
 - [ ] T107 [US7] [DOC-001–DOC-006, DATA-003, OPS-007, TEST-007, SC-001, SC-012, SC-014] Execute the **timed** US7 walkthrough per SC-001; depends on T102–T106.
   - **Performer:** an independent developer if available; otherwise the documentation author.
   - **Clean environment:** a fresh VM, OS account, or machine with no prior clone, empty Docker image and Yarn caches, and only the documented prerequisites.
@@ -1433,6 +1493,15 @@ These were found while implementing and reviewing US5 (T064–T091) and delibera
   - the synthetic-fixture attestation.
 
   Verify all links and commands, critical checks, and explicit post-MVP exclusions.
+  **Status: executed informatively; NOT complete.**
+  - **Run:** the walkthrough ran on 2026-09-25 and reached the Smoke-flow stop point **3.59 minutes** after `git clone`.
+  - **Records:** the transcript is in `checklists/evidence/sc-001-transcript.txt` (secret scan clean), and the performer, host, deviations, SC-012 disposition, and synthetic-fixture attestation are in `release-evidence.md`.
+  - **Why it is not complete:** the run does not meet this task's clean-environment rules:
+    - the same machine and account, with warm Docker image and Yarn caches;
+    - the documentation author as performer, with the UI driven by a script;
+    - uncommitted docs applied as a patch;
+    - Windows PowerShell 5.1.
+  - **To complete it:** repeat the walkthrough in a clean environment from the committed documentation.
 
 **Checkpoint**: US7 and the Operational MVP release package are complete.
 

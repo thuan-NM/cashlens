@@ -1,50 +1,18 @@
-# web
+# CashLens web (`apps/web`)
 
-<div align="center" style="margin: 30px;">
-    <a href="https://refine.dev">
-    <img alt="refine logo" src="https://refine.ams3.cdn.digitaloceanspaces.com/readme/refine-readme-banner.png">
-    </a>
-</div>
-<br/>
+This is the React 19 + refine + antd web app of CashLens, built with Vite. Setup and running are documented at the repository level:
 
-This [Refine](https://github.com/refinedev/refine) project was generated with [create refine-app](https://github.com/refinedev/refine/tree/master/packages/create-refine-app).
+- [Repository overview](../../README.md)
+- [Local development](../../docs/operations/local-development.md)
 
-## Getting Started
+Frequently used commands, run from the repository root:
 
-A React Framework for building internal tools, admin panels, dashboards & B2B apps with unmatched flexibility ✨
+| Command | Purpose |
+|---|---|
+| `yarn workspace web test` | Component tests (Vitest, `src/**/*.test.tsx`) |
+| `yarn workspace web lint` | ESLint |
+| `yarn workspace web build` | Type-check and build to `dist/` |
+| `yarn workspace web test:e2e:install` | Install the Playwright Chromium browser (once) |
+| `yarn workspace web test:e2e` | Playwright browser tests (`e2e/`) against the running development stack |
 
-Refine's hooks and components simplifies the development process and eliminates the repetitive tasks by providing industry-standard solutions for crucial aspects of a project, including authentication, access control, routing, networking, state management, and i18n.
-
-## Available Scripts
-
-### Running the development server.
-
-```bash
-    yarn dev
-```
-
-### Building for production.
-
-```bash
-    yarn build
-```
-
-### Running the production server.
-
-```bash
-    yarn start
-```
-
-## Learn More
-
-To learn more about **Refine**, please check out the [Documentation](https://refine.dev/docs)
-
-- **REST Data Provider** [Docs](https://refine.dev/docs/core/providers/data-provider/#overview)
-- **Ant Design** [Docs](https://refine.dev/docs/ui-frameworks/antd/tutorial/)
-- **React Router** [Docs](https://refine.dev/docs/core/providers/router-provider/)
-- **Auth0 Auth Providder** [Docs](https://refine.dev/docs/guides-and-concepts/auth/auth0/)
-
-
-## License
-
-MIT
+The API base URL comes from `VITE_API_BASE_URL`, which defaults to `http://localhost:3000/api` in development. The release image is always built with the relative `/api`.
