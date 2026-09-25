@@ -57,7 +57,9 @@ api ──► SMTP relay (optional, for critical alert emails)
   - logs are structured and redacted pino logs.
 - **Web** (`apps/web`): React 19, refine, antd, and Vite. It calls the API at the relative `/api` in production.
 - **Database schema:** `apps/api/prisma/schema.prisma` and `apps/api/prisma/migrations`.
-- **Contract:** `specs/001-operational-mvp/contracts/openapi.yaml`; the generated document is `apps/api/docs/swagger.json` (`yarn workspace api swagger:generate`).
+- **API contracts:** two OpenAPI artifacts with different roles (see "API contract flow" below):
+  - `apps/api/docs/swagger.json` is generated from the running code. It is the source of the `@repo/api-contract` types that the web app uses.
+  - `specs/001-operational-mvp/contracts/openapi.yaml` is the feature's specification contract. Requirements and release evidence are compared against it; it is written by hand and never generated.
 
 ### Principal data flow
 
@@ -73,7 +75,9 @@ api ──► SMTP relay (optional, for critical alert emails)
 
 ### Extension seams for post-MVP AI (not implemented)
 
-AI Financial Insight and ML classification are **not** part of this release, and no code exists for them. When they are separately specified, they belong in one new API module (`apps/api/src/modules/ai/`, with `insights/` and `classification/`), not in a separate service. They read through the same owner-scoped repositories and financial period policy as the dashboard. Until then, classification stays exactly: manual lock → user rules → system rules → deterministic fallback.
+AI Financial Insight and ML classification are **not** part of this release, and no code exists for them. When they are separately specified, they stay inside this modular monolith, not in a separate service:
+- **Classification.** The existing classification domain keeps owning the policy and its orchestration (`apps/api/src/modules/transactions/classification.service.ts` and its rule model). ML would plug in as one more classification strategy behind a port in that domain, never as a second, parallel classification flow. Until then, classification stays exactly: manual lock → user rules → system rules → deterministic fallback.
+- **AI Financial Insight.** A new `apps/api/src/modules/ai/` module (for example `insights/` plus `providers/` for model clients). It reads through the same owner-scoped repositories and financial period policy as the dashboard. It is distinct from today's deterministic, rule-based dashboard insights (`GET /api/dashboard/insights`, the contract's `DashboardInsight`).
 
 ## Monorepo map
 
@@ -103,20 +107,43 @@ Yarn 4 workspaces (`apps/*`, `packages/*`) are orchestrated by Turborepo. Busine
 | `yarn lint` | `lint`: check only; `yarn workspace api lint:fix` is the explicit auto-fix |
 | `yarn check-types` | `check-types`: API sources and tests, web app/Vite config/Playwright specs, and the API contract (including its staleness check) |
 | `yarn test` | `test`: API unit tests (Jest) and web component tests (Vitest) |
+| `yarn contract:check` | The API contract chain (below); not cached, because it needs a full `nest build` |
+| `yarn quality` | **The official local quality gate:** `lint`, `check-types`, `build`, `test`, then `contract:check`. Run it before every commit or merge. |
 
-**API contract flow.** After changing a response DTO or controller in the API:
+**API contract flow.** There are two OpenAPI artifacts, and only one of them feeds code:
 
-```powershell
-yarn workspace api swagger:generate          # apps/api/docs/swagger.json, from code
-yarn workspace @repo/api-contract generate   # packages/api-contract/src/generated/openapi.ts
+```text
+Nest controllers + response DTOs (each mapper/service declares its DTO as return type)
+  → apps/api/docs/swagger.json                      yarn workspace api swagger:generate
+  → packages/api-contract/src/generated/openapi.ts  yarn workspace @repo/api-contract generate
+  → apps/web                                        import type { … } from "@repo/api-contract"
+
+specs/001-operational-mvp/contracts/openapi.yaml    the specification contract: written by hand,
+                                                    compared against swagger.json (paths, schemas)
+                                                    for requirement verification; never generated
 ```
 
-Both outputs are committed. `yarn contract:check` verifies the whole chain: `swagger:check` rebuilds the document from code and fails when the committed `swagger.json` differs, then the contract check fails when the generated types differ from it. Run it in CI; it is not cached, because it needs a full `nest build`. `yarn check-types` also runs the second check, and `apps/api/src/swagger.spec.ts` fails if a contract response schema disappears. Each documented response DTO is its mapper's declared return type, so it cannot drift from the runtime shape. See [`packages/api-contract/README.md`](packages/api-contract/README.md).
+- **Generated outputs:** both are committed.
+- **Staleness gate:** `yarn contract:check` fails when either generated link is stale.
+  - `swagger:check` rebuilds the document from code and compares it with `swagger.json`.
+  - The contract check compares the generated types with `swagger.json`.
+- **Where it runs:** it is part of `yarn quality`, and `scripts/verify-release.ps1` runs it as a failing release check.
+- **Other guards:**
+  - `apps/api/src/swagger.spec.ts` fails if a contract response schema disappears.
+  - Each response DTO is its mapper's (or service method's) declared return type, so the documentation cannot drift from the runtime shape.
+
+See [`packages/api-contract/README.md`](packages/api-contract/README.md).
 
 **Turbo cache.**
 - `build`, `lint`, `check-types`, and `test` are cached locally (`.turbo/`). Their inputs are the workspace files plus, through the `transit` task, the files of the workspaces they depend on. A web-only change therefore reuses the API results, and a change to `@repo/api-contract` or `@repo/typescript-config` re-runs its dependents.
-- Declared extra inputs: the web `build` hashes `VITE_API_BASE_URL`; the API `test` hashes `apps/web/src/features/goals/components/GoalsPage.tsx`, which one API test reads; the contract `check-types` hashes `apps/api/docs/swagger.json`.
-- Env files are never hashed or cached.
+- Declared extra inputs:
+  - the API `test` hashes `apps/web/src/features/goals/components/GoalsPage.tsx`, which one API test reads;
+  - the contract `check-types` hashes `apps/api/docs/swagger.json`.
+- **Environment and env files:**
+  - Root env files (such as `.env.release-test`) are **not** inputs of any task, so they never invalidate or enter the cache. `apps/api/.env` is git-ignored, so the API's default inputs skip it as well.
+  - The web `build` is the one task that hashes env input: its own `apps/web/.env*` files (Vite reads them at build time) and the `VITE_API_BASE_URL` variable. Changing either rebuilds the web bundle.
+  - Turbo runs in strict env mode: a task sees only the variables it declares, plus pass-through variables for `test:e2e`.
+  - Only `dist/**` build outputs are cached and restored. Env files are never cache outputs, and no secret is stored as a build artifact.
 - Deliberately **not** cached, and usually run directly with `yarn workspace …`: integration and browser tests (`test:e2e`, which need PostgreSQL or the running stack; Turbo defines them with `cache: false`), `dev`, `swagger:generate`, migrations, the migration matrix, the secret scan, and release verification.
 - No remote cache is configured. It can be added later for CI (`turbo login`/`turbo link`) without changing the task graph.
 

@@ -182,7 +182,7 @@ Keep the dump together with the env file that belongs to it. Stored Gmail tokens
 ## 7. Release verification and rollback
 
 `./scripts/verify-release.ps1` checks a clean checkout end to end with the release-test profile:
-- the secret scan and the migration matrix;
+- the secret scan, the migration matrix, and the API contract chain (`yarn contract:check`);
 - the compose configuration and the build;
 - migrate before the API starts, and rejection of an `http://` origin;
 - through the proxy: the web app and bundle, health, `Secure` cookies, and `TRUST_PROXY`;

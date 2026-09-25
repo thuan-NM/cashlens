@@ -13,11 +13,16 @@ import {
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import type { RequestUser } from '../../common/types/request-user.type';
+import { ApiEnvelopedResponse } from '../../common/swagger/api-envelope';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { ListTransactionsDto } from './dto/list-transactions.dto';
 import { MarkDuplicateDto } from './dto/mark-duplicate.dto';
 import { ReclassifyTransactionDto } from './dto/reclassify-transaction.dto';
 import { UpdateTransactionCategoryDto } from './dto/update-transaction-category.dto';
+import {
+  TransactionListResponseDto,
+  TransactionResponseDto,
+} from './dto/transaction.response';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 import { TransactionsService } from './transactions.service';
 
@@ -27,21 +32,33 @@ export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
   @Get()
+  @ApiEnvelopedResponse(200, 'One page plus the matching eligible totals', {
+    model: TransactionListResponseDto,
+  })
   list(@CurrentUser() user: RequestUser, @Query() query: ListTransactionsDto) {
     return this.transactionsService.list(user, query);
   }
 
   @Post()
+  @ApiEnvelopedResponse(201, 'Created transaction', {
+    model: TransactionResponseDto,
+  })
   create(@CurrentUser() user: RequestUser, @Body() dto: CreateTransactionDto) {
     return this.transactionsService.create(user, dto);
   }
 
   @Get(':id')
+  @ApiEnvelopedResponse(200, 'Owned transaction', {
+    model: TransactionResponseDto,
+  })
   findById(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     return this.transactionsService.findById(user, id);
   }
 
   @Patch(':id')
+  @ApiEnvelopedResponse(200, 'Updated transaction', {
+    model: TransactionResponseDto,
+  })
   update(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
@@ -81,6 +98,9 @@ export class TransactionsController {
   }
 
   @Patch(':id/duplicate')
+  @ApiEnvelopedResponse(200, 'Transaction with its duplicate state', {
+    model: TransactionResponseDto,
+  })
   markDuplicate(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
@@ -90,6 +110,9 @@ export class TransactionsController {
   }
 
   @Patch(':id/ignore')
+  @ApiEnvelopedResponse(200, 'Ignored transaction', {
+    model: TransactionResponseDto,
+  })
   ignore(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     return this.transactionsService.ignore(user, id);
   }

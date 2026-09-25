@@ -1,12 +1,13 @@
 import { Prisma, TransactionCategory } from '@prisma/client';
 import { CreateTransactionCategoryDto } from './dto/create-transaction-category.dto';
+import { TransactionCategoryResponseDto } from './dto/transaction-category.response';
 import { UpdateTransactionCategoryDto } from './dto/update-transaction-category.dto';
 
 const dateToIso = (value: Date) => value.toISOString();
 
 export const toTransactionCategoryResponse = (
   category: TransactionCategory,
-) => ({
+): TransactionCategoryResponseDto => ({
   id: category.id,
   userId: category.userId,
   parentId: category.parentId,

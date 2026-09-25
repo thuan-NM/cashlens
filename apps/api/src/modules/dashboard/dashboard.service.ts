@@ -20,6 +20,14 @@ import {
 } from './dto/dashboard-query.dto';
 import { dashboardMonth, formatAmount } from './dashboard.mapper';
 import { DashboardRepository } from './dashboard.repository';
+import {
+  CashflowMonthResponseDto,
+  CategoryBreakdownRowResponseDto,
+  DashboardInsightResponseDto,
+  DashboardOverviewResponseDto,
+  HotBudgetResponseDto,
+} from './dto/dashboard.response';
+import type { TransactionResponseDto } from '../transactions/dto/transaction.response';
 
 /**
  * Monthly dashboard over the user's persisted eligible records (DASH-001).
@@ -30,7 +38,10 @@ import { DashboardRepository } from './dashboard.repository';
 export class DashboardService {
   constructor(private readonly dashboardRepository: DashboardRepository) {}
 
-  async overview(user: RequestUser, query: DashboardMonthQueryDto) {
+  async overview(
+    user: RequestUser,
+    query: DashboardMonthQueryDto,
+  ): Promise<DashboardOverviewResponseDto> {
     const context = await this.dashboardRepository.financialContext(user.id);
     const month = dashboardMonth(context.settings, query.month);
     const [totals, unreadAlerts] = await Promise.all([
@@ -55,7 +66,10 @@ export class DashboardService {
   }
 
   /** One entry per user month, oldest first, including months with no data. */
-  async cashflow(user: RequestUser, query: DashboardCashflowQueryDto) {
+  async cashflow(
+    user: RequestUser,
+    query: DashboardCashflowQueryDto,
+  ): Promise<CashflowMonthResponseDto[]> {
     const context = await this.dashboardRepository.financialContext(user.id);
     const last = dashboardMonth(context.settings, query.month);
     const months = userMonthsEndingAt(
@@ -80,7 +94,10 @@ export class DashboardService {
    * Categories flagged `excludeFromAnalytics` never appear, so the rows add up
    * to the overview expense minus those categories' spending.
    */
-  async categoryBreakdown(user: RequestUser, query: DashboardMonthQueryDto) {
+  async categoryBreakdown(
+    user: RequestUser,
+    query: DashboardMonthQueryDto,
+  ): Promise<CategoryBreakdownRowResponseDto[]> {
     const context = await this.dashboardRepository.financialContext(user.id);
     const month = dashboardMonth(context.settings, query.month);
     const rows = (
@@ -105,7 +122,10 @@ export class DashboardService {
     }));
   }
 
-  async recentTransactions(user: RequestUser, query: DashboardMonthQueryDto) {
+  async recentTransactions(
+    user: RequestUser,
+    query: DashboardMonthQueryDto,
+  ): Promise<TransactionResponseDto[]> {
     const context = await this.dashboardRepository.financialContext(user.id);
     const month = dashboardMonth(context.settings, query.month);
     const transactions = await this.dashboardRepository.recentTransactions(
@@ -122,7 +142,10 @@ export class DashboardService {
    * currency. A MONTHLY budget counts its period instance in that month; the
    * other periods count the whole month. Read-only: no alert is written.
    */
-  async hotBudgets(user: RequestUser, query: DashboardMonthQueryDto) {
+  async hotBudgets(
+    user: RequestUser,
+    query: DashboardMonthQueryDto,
+  ): Promise<HotBudgetResponseDto[]> {
     const context = await this.dashboardRepository.financialContext(user.id);
     const month = dashboardMonth(context.settings, query.month);
     const budgets = await this.dashboardRepository.activeBudgets(
@@ -189,7 +212,10 @@ export class DashboardService {
       .slice(0, 5);
   }
 
-  async insights(user: RequestUser, query: DashboardMonthQueryDto) {
+  async insights(
+    user: RequestUser,
+    query: DashboardMonthQueryDto,
+  ): Promise<DashboardInsightResponseDto[]> {
     // Resolve the month once, so both parts describe the same user month
     // even when the request crosses a month boundary (DASH-003).
     const context = await this.dashboardRepository.financialContext(user.id);
@@ -199,12 +225,7 @@ export class DashboardService {
       this.hotBudgets(user, month),
     ]);
 
-    const insights: Array<{
-      type: string;
-      severity: string;
-      title: string;
-      message: string;
-    }> = [];
+    const insights: DashboardInsightResponseDto[] = [];
 
     if (overview.netCashflow >= 0) {
       insights.push({

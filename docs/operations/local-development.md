@@ -182,6 +182,7 @@ yarn workspace api prisma generate
 | API unit tests | `yarn workspace api test` | nothing else |
 | API integration tests | `yarn workspace api test:e2e` | `E2E_DATABASE_URL` (below) and the database container |
 | Web component tests (Vitest) | `yarn workspace web test` | nothing else |
+| **Everything above, in one gate** | `yarn quality` runs lint, type checks, build, unit/component tests, and `yarn contract:check` (the API contract chain). Run it before every commit. | `prisma generate` done |
 | Lint (check only) | `yarn workspace api lint` and `yarn workspace web lint`; `yarn workspace api lint:fix` applies automatic fixes | nothing else |
 | Browser tests (Playwright, Chromium) | `yarn workspace web test:e2e:install` once, then `yarn workspace web test:e2e` | the running development stack |
 | API build | `yarn workspace api build` | output `apps/api/dist/src/main.js` |

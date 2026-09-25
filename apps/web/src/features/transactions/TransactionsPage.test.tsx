@@ -1,30 +1,68 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import type { TransactionCategory } from "@repo/api-contract";
 import type { TransactionPayload } from "@/api/mappers";
 import { deferred, fail, mockApi, ok, type Reply } from "@/test/api";
 import { renderWithProviders, settle } from "@/test/render";
 import { TransactionsPage } from "./components/TransactionsPage";
 
-const categories = [
-  { id: "food", name: "Ăn uống", type: "EXPENSE", color: "#d97757" },
-  { id: "fun", name: "Giải trí", type: "EXPENSE", color: "#5b8def" },
-];
+const category = (id: string, name: string, color: string): TransactionCategory => ({
+  id,
+  userId: null,
+  parentId: null,
+  name,
+  slug: id,
+  type: "EXPENSE",
+  icon: null,
+  color,
+  isSystem: true,
+  excludeFromBudget: false,
+  excludeFromAnalytics: false,
+  sortOrder: 100,
+  status: "ACTIVE",
+  createdAt: "2026-06-01T00:00:00.000Z",
+  updatedAt: "2026-06-01T00:00:00.000Z",
+});
+
+const categories = [category("food", "Ăn uống", "#d97757"), category("fun", "Giải trí", "#5b8def")];
 
 const tx = (id: string, overrides: Partial<TransactionPayload> = {}): TransactionPayload => ({
   id,
+  userId: "u1",
+  rawEmailId: null,
+  emailMessageId: null,
+  categoryId: "food",
+  financialAccountId: null,
+  bankProviderId: null,
+  bankName: null,
+  merchantName: "Quán",
+  counterpartyName: null,
+  sourceType: "MANUAL",
+  sourceId: null,
+  externalTransactionId: null,
+  transactionCode: null,
   amount: 45_000,
   currency: "VND",
   direction: "EXPENSE",
+  transactionTime: "2026-09-20T05:00:00.000Z",
+  postedDate: null,
+  description: `Giao dịch ${id}`,
+  normalizedDescription: null,
+  balanceAfter: null,
+  feeAmount: null,
   status: "POSTED",
   isDuplicate: false,
-  categoryId: "food",
-  category: { name: "Ăn uống", color: "#d97757" },
+  duplicateOfTransactionId: null,
   classificationSource: "SYSTEM_RULE",
-  transactionTime: "2026-09-20T05:00:00.000Z",
+  classificationConfidence: null,
+  classificationRuleId: null,
+  classifiedAt: null,
   userNote: "",
-  description: `Giao dịch ${id}`,
-  merchantName: "Quán",
-  sourceType: "MANUAL",
+  metadata: null,
+  account: null,
+  category: categories[0],
+  createdAt: "2026-09-20T05:00:00.000Z",
+  updatedAt: "2026-09-20T05:00:00.000Z",
   ...overrides,
 });
 

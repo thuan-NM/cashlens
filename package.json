@@ -8,7 +8,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "test": "turbo run test",
-    "contract:check": "yarn workspace api swagger:check && yarn workspace @repo/api-contract check-types"
+    "contract:check": "yarn workspace api swagger:check && yarn workspace @repo/api-contract check-types",
+    "quality": "yarn lint && yarn check-types && yarn build && yarn test && yarn contract:check"
   },
   "devDependencies": {
     "prettier": "^3.7.4",

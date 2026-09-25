@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+import { TransactionResponseDto } from './dto/transaction.response';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
 
 export const transactionInclude = {
@@ -16,9 +17,13 @@ const decimalToNumber = (value: Prisma.Decimal | null) =>
 
 const dateToIso = (value: Date | null) => value?.toISOString() ?? null;
 
+/** A required money column: never null, so typed as a plain number. */
+const requiredDecimalToNumber = (value: Prisma.Decimal) =>
+  Number(value.toString());
+
 export const toTransactionResponse = (
   transaction: TransactionWithRelations,
-) => ({
+): TransactionResponseDto => ({
   id: transaction.id,
   userId: transaction.userId,
   rawEmailId: transaction.rawEmailId,
@@ -33,7 +38,7 @@ export const toTransactionResponse = (
   sourceId: transaction.sourceId,
   externalTransactionId: transaction.externalTransactionId,
   transactionCode: transaction.transactionCode,
-  amount: decimalToNumber(transaction.amount),
+  amount: requiredDecimalToNumber(transaction.amount),
   currency: transaction.currency,
   direction: transaction.direction,
   transactionTime: transaction.transactionTime.toISOString(),
