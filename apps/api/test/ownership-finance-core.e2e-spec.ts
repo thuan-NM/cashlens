@@ -147,6 +147,7 @@ function call(
 function errorBody(res: request.Response): Record<string, unknown> {
   const body = { ...(res.body as Record<string, unknown>) };
   delete body.timestamp;
+  delete body.correlationId; // per request (T093)
   delete body.path;
   return body;
 }

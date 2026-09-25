@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { apiRequest } from "@/api/client";
+import type { ApiUser } from "@/types/user";
 
 export interface AuthUser {
   id?: string;
@@ -19,7 +20,13 @@ interface AuthStore {
   setUser: (user: AuthUser | null) => void;
 }
 
-const toAuthUser = (value: any): AuthUser => ({
+/** The user fields the client reads; `name` is a legacy fallback the current API does not send. */
+type ApiAuthUser = ApiUser & { name?: string | null };
+
+/** `POST /auth/login` answers `{ user }`; a bare user is still accepted. */
+type LoginResponse = ApiAuthUser & { user?: ApiAuthUser };
+
+const toAuthUser = (value: ApiAuthUser): AuthUser => ({
   id: value?.id,
   name: value?.fullName ?? value?.name ?? value?.email ?? "User",
   fullName: value?.fullName,
@@ -36,7 +43,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   hydrate: async () => {
     set({ isLoading: true });
     try {
-      const user = await apiRequest<any>("/auth/me");
+      const user = await apiRequest<ApiAuthUser>("/auth/me");
       set({ isAuthed: true, user: toAuthUser(user), isLoading: false });
     } catch {
       set({ isAuthed: false, user: null, isLoading: false });
@@ -44,7 +51,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   login: async (values) => {
-    const result = await apiRequest<any>("/auth/login", {
+    const result = await apiRequest<LoginResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(values),
     });
@@ -54,7 +61,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   },
 
   register: async (values) => {
-    const user = await apiRequest<any>("/auth/register", {
+    const user = await apiRequest<ApiAuthUser>("/auth/register", {
       method: "POST",
       body: JSON.stringify(values),
     });

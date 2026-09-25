@@ -14,9 +14,12 @@ export class LogEmailTransport implements EmailTransport {
   send(message: OutgoingEmail) {
     const domain = message.to.split('@')[1] ?? 'unknown';
     this.sequence += 1;
-    this.logger.log(
-      `Email (log transport) to a recipient at ${domain}: "${message.subject}"`,
-    );
+    // Recipient domain only; the subject is fixed text and the body is never logged.
+    this.logger.log({
+      event: 'alert.delivery.logged',
+      recipientDomain: domain,
+      messageId: `log-${this.sequence}`,
+    });
     return Promise.resolve({ messageId: `log-${this.sequence}` });
   }
 }

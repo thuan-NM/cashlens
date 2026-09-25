@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import type {
@@ -321,6 +322,8 @@ const ruleNotFound = () =>
  */
 @Injectable()
 export class ClassificationService {
+  private readonly logger = new Logger(ClassificationService.name);
+
   constructor(
     private readonly repository: ClassificationRepository,
     private readonly prisma: PrismaService,
@@ -391,7 +394,7 @@ export class ClassificationService {
   }
 
   /** Appends the event of one applied decision (CLASS-005). */
-  record(
+  async record(
     tx: Prisma.TransactionClient,
     input: {
       transactionId: string;
@@ -402,7 +405,7 @@ export class ClassificationService {
       actor: DecisionActor;
     },
   ) {
-    return this.repository.appendEvent(tx, {
+    const event = await this.repository.appendEvent(tx, {
       transactionId: input.transactionId,
       userId: input.userId,
       previousCategoryId: input.previousCategoryId,
@@ -415,6 +418,21 @@ export class ClassificationService {
       actorUserId: input.actor.type === 'USER' ? input.actor.userId : null,
       explanation: input.decision.explanation,
     });
+    // Ids and enums only (no description or merchant). Written inside the
+    // caller's transaction: a rolled-back write leaves this line behind.
+    this.logger.log({
+      event: 'classification.decision_recorded',
+      userId: input.userId,
+      transactionId: input.transactionId,
+      categoryEventId: event.id,
+      categoryId: input.decision.categoryId,
+      ruleId: input.decision.ruleId,
+      source: input.decision.source,
+      trigger: input.trigger,
+      reason: input.decision.reason,
+      inTransaction: true, // may still roll back with the caller's write
+    });
+    return event;
   }
 
   lock(tx: Prisma.TransactionClient, userId: string, id: string) {

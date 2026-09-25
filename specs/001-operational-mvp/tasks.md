@@ -1042,15 +1042,6 @@ These were found while implementing and reviewing US5 (T064–T091) and delibera
   - legacy and `POST /alerts` null-key rows;
   - the email skip matrix;
   - three attempts, interrupted delivery, and privacy, using the fake transport.
-
-**Checkpoint**: US5 provides every approved P1 alert type with deterministic, independently verified evaluators and no generalized event infrastructure.
-
----
-
-## Phase 8: P2 — Cross-Cutting Quality and Operability
-
-**Purpose**: Standardize errors and logging, complete frontend and E2E evidence, and prove runtime behavior across all stories.
-
   **As built:** `alerts-lifecycle-delivery.e2e-spec.ts`, 20 tests, with the in-memory transport and delivery options of 200 ms per attempt and 2 s in total. It covers:
   - the ALERT-001 fields on budget, large-transaction, and cashflow alerts;
   - no CATEGORY_SHIFT or PARSER_ISSUE;
@@ -1070,23 +1061,176 @@ These were found while implementing and reviewing US5 (T064–T091) and delibera
   - the exact email text;
   - five concurrent triggers leaving one open row and one email;
   - a racing insert on the partial index being a no-op.
-- [ ] T092 [P] [ERR-001, ERR-002, ERR-004, ERR-006] Add failing API error and envelope contract tests in `apps/api/test/error-contract.e2e-spec.ts`; depends on T030. Verify:
+
+**Checkpoint**: US5 provides every approved P1 alert type with deterministic, independently verified evaluators and no generalized event infrastructure.
+
+---
+
+## Phase 8: P2 — Cross-Cutting Quality and Operability
+
+**Purpose**: Standardize errors and logging, complete frontend and E2E evidence, and prove runtime behavior across all stories.
+
+- [X] T092 [P] [ERR-001, ERR-002, ERR-004, ERR-006] Add failing API error and envelope contract tests in `apps/api/test/error-contract.e2e-spec.ts`; depends on T030. Verify:
   - errors carry a stable code, message, fields, and `correlationId`, with no stack or secret leakage;
   - success responses, including sync and goal simulation, carry `{success, data, message, timestamp}`.
-- [ ] T093 [ERR-001–ERR-006] Implement a global safe exception filter and request correlation context in `apps/api/src/common/filters/api-exception.filter.ts`, `apps/api/src/common/interceptors/base-response.interceptor.ts`, `apps/api/src/common/dto/base-response.dto.ts`, and `apps/api/src/main.ts`; depends on T005 and T092. Verify the existing success envelope remains compatible, with `correlationId` additive.
-- [ ] T094 [P] [OPS-008, EMAIL-002, ALERT-007] Add failing log-redaction assertions in `apps/api/src/common/logging/logger.spec.ts` for cookies, tokens, encryption keys, SMTP password, raw bodies, parser payloads, and notification content; depends on T002. Verify correlation and resource/run IDs remain searchable.
-- [ ] T095 [OPS-008, ERR-006] Configure structured Pino redaction in `apps/api/src/common/logging/*` and add contextual auth/sync/parser/classification/alert/delivery/startup events; depends on T029, T045, T079–T083, T093, and T094. The events are emitted from the same service files as T029, T045, and T080–T083, so it runs after them. Verify T094 passes without logging sensitive values.
-- [ ] T096 [P] [TEST-006, ERR-005] Add the only component test runner: Vitest with `@testing-library/react` and jsdom, plus the `test` script. Files: `apps/web/package.json`, `apps/web/vite.config.ts`, `apps/web/src/test/setup.ts`. Depends on the stable P1 frontend tasks T045b, T047, T056, T062, and T084. Verify one existing page renders in headless mode.
-- [ ] T096a [TEST-005, TEST-006, OPS-007] Add the only browser E2E runner: Playwright (`@playwright/test`) with headless Chromium only, as research.md "Browser E2E runner" describes; depends on T028, T046, and T096.
+  **As built:** `apps/api/test/error-contract.e2e-spec.ts`.
+  - **Red baseline.** Against the previous code, all 20 tests failed on assertions, because no response carried `code` or `correlationId`.
+  - **Error cases.** Every error must carry `statusCode`, `message`, `error`, `code`, a UUID `correlationId` (equal to the `x-correlation-id` header), and optional `fields`, and no other key. No stack frame, `Prisma`, SQL, `node_modules`, `.ts:line`, or planted secret may appear. The cases:
+    - 400 `VALIDATION_FAILED` with per-field messages that match the flat list, including an unknown field;
+    - 400 for a body that is not valid JSON;
+    - 400 `RAW_EMAIL_BODY_UNAVAILABLE` kept;
+    - 401 without a session and with a forged token (not echoed);
+    - 403 for a non-admin;
+    - owner-safe 404 identical for a foreign and an absent id apart from the correlation id;
+    - unknown-route and `%00` 404;
+    - 409 `ALERT_RESOLVED` kept;
+    - 503 `RECONNECT_REQUIRED` kept;
+    - 503 `SERVICE_UNAVAILABLE` for a database outage;
+    - 500 `INTERNAL_ERROR` for an unexpected `Error` and for an unexpected Prisma P2002, with a fixed message.
+  - **Correlation ids.** They are generated per request, never taken from `x-correlation-id` or `x-request-id`, and present on health responses.
+  - **Success envelope.** Exactly `{success, data, message, timestamp, correlationId}`, checked for transaction create and read, a Gmail sync run, goal feasibility, and the alert list, unread count, and settings.
+  - **Review additions.** A JSON body that is not quoted back, and an unknown-route query string not echoed. The suite now has 20 tests.
+- [X] T093 [ERR-001–ERR-006] Implement a global safe exception filter and request correlation context in `apps/api/src/common/filters/api-exception.filter.ts`, `apps/api/src/common/interceptors/base-response.interceptor.ts`, `apps/api/src/common/dto/base-response.dto.ts`, and `apps/api/src/main.ts`; depends on T005 and T092. Verify the existing success envelope remains compatible, with `correlationId` additive.
+  **As built:**
+  - **Correlation.** `common/http/correlation.ts` holds the `assignCorrelationId` middleware. It is the first in `app.setup.ts`, overwrites anything a client sends (the spec allows no client-supplied id), and sets `x-correlation-id`. pino-http uses the same id (`genReqId`), and `main.ts` exposes the header through CORS.
+  - **Filter.** `common/filters/api-exception.filter.ts` is a global `@Catch()` registered in `configureApp`, so `main.ts` and the e2e harness share it. Its body is `{statusCode, message, error, code, correlationId, fields?}`, copying only those keys.
+    - An `HttpException` keeps its status, message, and reason, plus its own application code; otherwise the code comes from the status.
+    - **Database outage → 503 `SERVICE_UNAVAILABLE`, fixed message.** Detected from Prisma codes P1001/P1002/P1008/P1017/P2024/P2037, the pg adapter kinds DatabaseNotReachable/TooManyConnections/SocketTimeout/ConnectionClosed, SQLSTATE 08xxx/57P01–57P03/53300, socket codes, and pg's "Connection terminated".
+    - **Anything else → 500 `INTERNAL_ERROR`, "Internal server error".** An `InternalServerErrorException`'s own text is also replaced.
+    - **Operator log.** The 500 line records only the class, Prisma code, route pattern, and stack frames, never the message. A request that never reached the request logger gets a `request.rejected` line.
+  - **Validation.** `common/pipes/field-validation.pipe.ts` returns exactly the stock pipe's flat `message` list, plus `code: VALIDATION_FAILED` and `fields` grouped by top-level property.
+  - **Envelope.** `BaseResponseDto` and `BaseResponseInterceptor` add `correlationId` additively (contract `Envelope`).
+  - **Unchanged.** The 401, 403, and 404 wording and statuses, the production `HTTPS_REQUIRED` 403, and the health 503.
+  - **Tests.**
+    - Unit `api-exception.filter.spec.ts`: 39 tests, including the pipe.
+    - T092 passes 20/20. The full e2e run passes 833/833.
+    - Two per-request comparison helpers (`ownership-finance-core`, `goals`) now also drop the volatile `correlationId`. The goals envelope assertion lists it.
+  - **Independent review.** It found no HIGH defect. Fixed, each with a regression test:
+    - MEDIUM: pg-adapter outages (P2037, 57P0x, "Connection terminated") returned 500;
+    - body-parser text quoted in a 400;
+    - wrong reason on 413/415;
+    - no `response.end()` when headers were already sent;
+    - a 500 `HttpException` message passed through;
+    - the browser could not read the header;
+    - the unknown-route 404 echoed the query string;
+    - 500s had no stack frames.
+
+    Kept, and already there before this change: the Gmail "X is not configured" 503 names an environment variable, not its value.
+- [X] T094 [P] [OPS-008, EMAIL-002, ALERT-007] Add failing log-redaction assertions in `apps/api/src/common/logging/logger.spec.ts` for cookies, tokens, encryption keys, SMTP password, raw bodies, parser payloads, and notification content; depends on T002. Verify correlation and resource/run IDs remain searchable.
+  **As built:** `apps/api/src/common/logging/logger.spec.ts` logs through the real production options into memory. It covers pino-http request lines over a real socket and application events, with synthetic secrets only.
+  - **Red baseline.** Against the previous configuration, 4 of 7 tests failed:
+    - the Gmail callback's `code` and `state` were in the request URL;
+    - there was no `correlationId` field;
+    - tokens, OAuth values, raw bodies, parser payloads, descriptions, and notification text were logged verbatim;
+    - connection-string passwords and bearer tokens in free text were not scrubbed.
+
+    The 3 passing tests were already correct: JSON in production, and ids and error class kept.
+  - **Now.** 19 tests pass, including the review regressions.
+  - **Captured-log e2e.** `apps/api/test/log-redaction.e2e-spec.ts` (3 tests) starts the real `src/main.ts` in production mode with its stdout captured. It runs sign-up, sign-in, renewal, a failed sign-in, a Gmail callback carrying an OAuth code and state, and a 400 whose body holds a password and a token. It then finds no password, token, cookie value, OAuth value, configured secret, or email address in the log. The same log carries `auth.login`, `auth.login_failed`, and `app.started` with the request's correlation id, and `req.remoteAddress`. A separate test checks the invalid-configuration start.
+- [X] T095 [OPS-008, ERR-006] Configure structured Pino redaction in `apps/api/src/common/logging/*` and add contextual auth/sync/parser/classification/alert/delivery/startup events; depends on T029, T045, T079–T083, T093, and T094. The events are emitted from the same service files as T029, T045, and T080–T083, so it runs after them. Verify T094 passes without logging sensitive values.
+  **As built:**
+  - **`common/logging/logging.config.ts`** (`buildPinoHttpOptions`), used by `logger.module.ts`:
+    - `correlationId` on every request line and on every application log inside a request (nestjs-pino's async context).
+    - Request serializer: id, method, URL with sensitive query values redacted (`code`, `state`, tokens, `search`/`q`/`query`, ...), `remoteAddress`/`remotePort` (the T100 TRUST_PROXY check), and safe headers only. Cookies, authorization, and set-cookie are never serialized. The response serializer keeps only the status.
+    - Key redaction: fast-redact paths at the top two levels, plus a recursive scrub that redacts sensitive keys (`SENSITIVE_KEYS`) at any depth, in arrays, and in any case, snake_case, or header spelling.
+    - Text scrubbing of messages, error messages, and stacks: connection-string passwords (with or without a user), bearer tokens, JWTs, Google tokens and authorization codes, and JSON-style, URL-encoded, and `key=value` secret pairs. The regexes are bounded (a 60 KB string scrubs in linear time).
+    - A log call never throws because of its arguments.
+    - The error serializer keeps the error class.
+  - **Events** (ids, enums, and counts only):
+    - `auth.<audited action>`, emitted with the audit row, plus `auth.login_failed` (no account) and `auth.refresh_rejected`;
+    - `gmail.connected`, `gmail.reconnect_required`, `gmail.disconnected`;
+    - `email.sync.started`, `email.sync.finished` (status, failure class, counts), `email.sync.rejected`, `email.sync.unexpected_error`;
+    - `parser.parsed`, `parser.failed` (code and field names);
+    - `classification.decision_recorded` (event, rule, and source ids, marked `inTransaction`);
+    - `alert.evaluated` (created and resolved alert ids, delivery ids), `alert.evaluation_failed`;
+    - `alert.delivery.sent`, `alert.delivery.failed`, `alert.delivery.attempt_failed`, `alert.delivery.logged` (recipient domain only), `alert.delivery.unexpected_error`;
+    - `request.failed` and `request.rejected`;
+    - `app.started` and `app.start_failed`.
+
+    `main.ts` creates the app with `abortOnError: false`, so an invalid configuration ends in one JSON `app.start_failed` line with variable names and reasons, never values. Nest still prints the same names and reasons to stderr.
+  - **Gmail callback.** The deferred problem of `code`/`state` in logs (US3 follow-ups) is fixed.
+  - **GitNexus risk.** `AuthService.writeAuditLog` (CRITICAL: every auth flow) and `ClassificationService.record` (HIGH) gained a log call after their existing write, with no control-flow change. `record` became `async`; every caller already awaited it.
+  - **Verification.** T094 passes. The unit suite passes 597/597 and e2e 833/833 before the review fixes.
+  - **Independent review.** It found no HIGH defect. Fixed, each with a regression test:
+    - MEDIUM: transaction `search` text was logged in request URLs;
+    - MEDIUM: a configuration or create-time failure bypassed `app.start_failed`;
+    - key redaction reached only one level and was case-sensitive;
+    - JSON-style, URL-encoded, user-less-URL, and Google-code secrets were not scrubbed;
+    - quadratic backtracking in the connection-string regex;
+    - a throwing getter could make logging throw;
+    - requests refused before the request logger left no line;
+    - the error class was lost under pino-http.
+
+    Documented, not changed: `classification.decision_recorded` is written inside the caller's transaction and says so.
+- [X] T096 [P] [TEST-006, ERR-005] Add the only component test runner: Vitest with `@testing-library/react` and jsdom, plus the `test` script. Files: `apps/web/package.json`, `apps/web/vite.config.ts`, `apps/web/src/test/setup.ts`. Depends on the stable P1 frontend tasks T045b, T047, T056, T062, and T084. Verify one existing page renders in headless mode.
+  **As built:** Vitest 3.2 (jsdom 26, `@testing-library/react`, `user-event`, `jest-dom` matchers) is the only component runner.
+  - **Configuration:** the `test` block in `apps/web/vite.config.ts`, plus `apps/web/src/test/setup.ts`.
+  - **Scripts:** `test` (`vitest run`) and `test:watch` in `apps/web/package.json`.
+  - **Harness:**
+    - `src/test/api.ts` is a stateful fake of the real API client, with a request log and deferred responses.
+    - `src/test/render.tsx` renders pages inside the real providers.
+    - Any request that neither the fake nor the global guard answers fails the test.
+  - `src/test/runner.test.tsx` renders an existing page headlessly and checks the harness itself.
+  - **Official lint:** `yarn workspace web lint` had no ESLint dependencies before. It now has eslint 9, typescript-eslint, react-hooks, react-refresh and globals, and passes with 0 problems. The 38 `no-explicit-any` errors were fixed with types only (`src/types/{user,account,email}.ts`, typed mappers, data provider, and pages); no rule was disabled.
+- [X] T096a [TEST-005, TEST-006, OPS-007] Add the only browser E2E runner: Playwright (`@playwright/test`) with headless Chromium only, as research.md "Browser E2E runner" describes; depends on T028, T046, and T096.
   - **Files:** `apps/web/package.json` (scripts `test:e2e` and `test:e2e:install`, the latter running `playwright install --with-deps chromium`), `apps/web/playwright.config.ts`, `apps/web/e2e/global-setup.ts`.
   - **Target:** the **development compose stack** (`docker compose up`, `NODE_ENV=development`). `baseURL` comes from `E2E_BASE_URL`, default `http://localhost:5173` (the Vite dev server), with the API at `http://localhost:3000/api`. Production HTTPS behavior is out of scope here; T012 and T100 cover it.
   - **Global setup:** provisions the first admin through `docker compose exec api yarn workspace api admin:bootstrap --email <run-scoped @example.test user>` and loads the T046 parser templates through the admin API.
   - **Diagnostics:** keep traces on failure.
 
   Verify a trivial spec that opens the sign-in page passes headlessly, and that no second browser framework is added.
-- [ ] T097 [TEST-006, ERR-005] Add critical frontend tests under `apps/web/src/features/**/*.test.tsx` for auth renewal/sign-out, loading/empty/error/retry, transaction mutation/correction, sync continuation, alert lifecycle versus read state, goal insufficiency, and duplicate-submit prevention; depends on T096. Verify no runtime mock-data fallback.
-- [ ] T098 [TEST-001, TEST-003, TEST-004, TEST-008, SC-011] Consolidate synthetic fixture builders in `apps/api/test/fixtures/builders/*` and write requirement-to-test traceability in `specs/001-operational-mvp/checklists/test-traceability.md`; depends on T030, T036, T048, T049, T057, T063, and T085–T091. Verify every AUTH, SEC, CFG, TX, DASH, EMAIL, CLASS, BUDGET, ALERT, and GOAL requirement names automated evidence.
-- [ ] T099 [TEST-005, TEST-007, OPS-007] Add a headless clean-user smoke flow in `apps/web/e2e/operational-mvp.spec.ts`, run with the T096a Playwright configuration against the development compose stack; depends on T096a, T097, and T098. Steps:
+  **As built:**
+  - `@playwright/test` 1.63 runs headless Chromium only; no second browser framework was added.
+  - **Scripts:** `test:e2e` (`playwright test`) and `test:e2e:install` (`playwright install --with-deps chromium`).
+  - **`playwright.config.ts`:**
+    - `testDir` is `./e2e` with one worker;
+    - `baseURL` comes from `E2E_BASE_URL`, default `http://localhost:5173`;
+    - traces and screenshots are retained on failure only.
+  - **`e2e/global-setup.ts`**, run against the development compose stack (`E2E_API_URL`, default `http://localhost:3000/api`):
+    - it registers a run-scoped `e2e-admin-<run>@example.test` and promotes it with `docker compose exec -T api yarn workspace api admin:bootstrap --email <admin>`;
+    - it loads the declared T046 parser templates through the admin API, skipping names that already exist;
+    - it hands the run id and admin credentials to specs through environment variables, never through a file.
+  - The trivial `e2e/sign-in.spec.ts` passes headlessly.
+  - Playwright output (`test-results/`, `playwright-report/`, `e2e/.state`) is git-ignored.
+- [X] T097 [TEST-006, ERR-005] Add critical frontend tests under `apps/web/src/features/**/*.test.tsx` for auth renewal/sign-out, loading/empty/error/retry, transaction mutation/correction, sync continuation, alert lifecycle versus read state, goal insufficiency, and duplicate-submit prevention; depends on T096. Verify no runtime mock-data fallback.
+  **As built:** Vitest tests under `apps/web/src/features/**`. They assert on the rendered DOM and on the fake API's request log, never on mocks alone.
+  - **Coverage:**
+    - auth renewal (one shared refresh, no mutation replay), sign-out, and mid-session expiry (`auth/session.test.tsx`);
+    - loading, empty, error, and retry states (Goals, Budgets, Alerts, Transactions, Email);
+    - transaction create, note, category correction, reclassify, and delete;
+    - sync continuation and 409 retry (Email);
+    - alert read state kept separate from lifecycle status;
+    - goal `INSUFFICIENT_DATA` and a stale-response race;
+    - duplicate-submit prevention on every create form.
+  - **No mock data:**
+    - `features/no-mock-data.test.ts` fails if production code imports a mock-data module or contains the removed demo identity strings.
+    - The unused `config/mockData.ts` was deleted.
+    - `AuthPage` lost its demo credentials, prefilled values, and the "Google" and "demo" buttons; the sidebar shows the signed-in account.
+  - **Product fixes found by the tests:**
+    - the listen-rule form could submit twice;
+    - `authProvider.logout` did not clear the auth store.
+  - **Independent review.** It found no HIGH defect. Fixed, each with a regression test that failed first:
+    - MEDIUM: sign-out kept React Query's cache, so the next user in the same tab could briefly see the previous user's data. `AppProvider` now clears the query cache whenever the signed-in user changes or signs out, and `@tanstack/react-query` is declared at refine's range.
+    - MEDIUM: the harness never failed on requests the fake API left unanswered. `assertAllMocksHandled` now runs after every test; tests answer the real `GET /auth/me` through `mockApi().signedIn()`.
+    - A failed listen-rule save escaped as an unhandled rejection. The error now shows in the dialog.
+    - Fabricated sparklines were removed from the Accounts and Ops pages, and provider status now comes from the API rather than a hard-coded "active".
+    - Double-submit checks now settle antd's async validation before counting requests.
+
+    Vitest: 10 files, 46 tests.
+- [X] T098 [TEST-001, TEST-003, TEST-004, TEST-008, SC-011] Consolidate synthetic fixture builders in `apps/api/test/fixtures/builders/*` and write requirement-to-test traceability in `specs/001-operational-mvp/checklists/test-traceability.md`; depends on T030, T036, T048, T049, T057, T063, and T085–T091. Verify every AUTH, SEC, CFG, TX, DASH, EMAIL, CLASS, BUDGET, ALERT, and GOAL requirement names automated evidence.
+  **As built:**
+  - **Builders** in `apps/api/test/fixtures/builders/`:
+    - `ledger.ts`: `LedgerRow`, `ledgerData`, and `seedLedger`. They write synthetic transactions straight to the database, so no alert or classification trigger runs.
+    - `worked-examples.ts`: the data-model worked-example clock and histories (`WORKED_EXAMPLE_NOW`, `H1`, `G6`).
+    - `index.ts`: re-exports both.
+
+    The histories that `goals`, `alerts-goal-risk`, `alerts-cashflow-risk`, and `alerts-lifecycle-delivery` each defined now come from one place. Their 77 tests pass unchanged. Suite-specific helpers stay where they were (`test/helpers/{auth,email,alert}-fixtures.ts`, `parser-gate.ts`); working tests were not rewritten for style.
+  - **CFG-003 evidence:** `src/config/env-example.spec.ts` (59 tests). Every configuration key read by `configuration.ts` is documented in `.env.example` with its tags, and every secret example is a placeholder.
+  - **Traceability:** `specs/001-operational-mvp/checklists/test-traceability.md` covers all 73 AUTH, SEC, CFG, TX, DASH, EMAIL, CLASS, BUDGET, ALERT, and GOAL requirements. Each row gives the id, the evidence files, the test type (unit / integration / component / e2e / release), and the status.
+    - A scan lists a file only when the file cites the id, directly or through a range.
+    - CFG-001, CFG-002, CFG-004, and TX-001 have main evidence that does not name the id text. They are mapped by hand and marked *curated*.
+    - Result: 73 of 73 have automated evidence. CFG-006 is release-gated: `scan-secrets.ps1` is its only evidence. CFG-001 was moved to curated evidence, because the scan matched only `scan-secrets.ps1`.
+- [X] T099 [TEST-005, TEST-007, OPS-007] Add a headless clean-user smoke flow in `apps/web/e2e/operational-mvp.spec.ts`, run with the T096a Playwright configuration against the development compose stack; depends on T096a, T097, and T098. Steps:
   1. The T096a global setup provisions the admin via the bootstrap script and loads parser templates from T046 fixtures.
   2. Registration and login.
   3. Transaction to dashboard.
@@ -1096,7 +1240,26 @@ These were found while implementing and reviewing US5 (T064–T091) and delibera
   7. Fixture-backed email import.
 
   Verify that a failure blocks release. This flow is also the MVP substitute for deferred SC-012.
-- [ ] T100 [OPS-001–OPS-009, AUTH-003, SEC-009, CFG-006, TEST-007, SC-013] Add a clean-checkout container verification script in `scripts/verify-release.ps1`, plus the reference proxy configuration `scripts/release/reference-proxy.nginx.conf` (illustrative, with no certificates, and documented by T105); depends on T006–T009, T026, T028, T093, and T099.
+  **As built:** `apps/web/e2e/operational-mvp.spec.ts` is one headless Chromium test for one clean user (`e2e-user-<run>@example.test`), with one `test.step` per numbered step, so a failure names the broken step. There are no API stubs (`page.route`), no Google, and no SMTP. Expected values (current month, totals, feasibility) are read from the real API.
+  - **Steps:**
+    - Global setup provisions the admin with `admin:bootstrap` and loads the T046 templates.
+    - Register and log in through `AuthPage`.
+    - A manual 50,000 VND expense appears on the dashboard for the current month.
+    - The "large transaction" alert setting persists after a reload.
+    - A 100,000 VND budget with an 80% threshold shows 50%. A second expense takes it to 110%, and the alerts page shows the open, unread budget alert (checked first through the API to be absent).
+    - A 12,000,000 VND, 6-month goal shows the UI text that matches the API's feasibility result. A fresh user gets `INSUFFICIENT_DATA` and "Cần thêm N tháng hoàn chỉnh".
+    - **Fixture-backed email import:** Gmail endpoints are fixed to Google, so the development stack cannot sync a mailbox. The spec stands in for the Gmail fetch only:
+      - through `docker compose exec -T postgres psql` (dollar-quoted values on stdin), it inserts the rows a sync writes: one GMAIL `EmailConnection` with placeholder tokens (never synced) and one PENDING `EmailMessage` whose snippet is the body of the declared fixture `bank_vcb/EMAIL/v1/valid/01-debit-qr-payment.json`;
+      - the real `POST /email-messages/{id}/parse` creates the transaction, and a second call is idempotent (`created: false`);
+      - the transaction matches the fixture's expected amount, direction, currency, and description, and appears in the Transactions UI;
+      - PARSED status is checked through `GET /email-messages`, because the email page has no message list.
+  - **Global setup fix:** the T096a setup refused on every run after the first ("an active administrator already exists"). It now lists administrators, revokes only earlier `e2e-admin-<run>@example.test` accounts, then promotes the new one. A non-e2e administrator still stops the run.
+  - **Product fix:** `DonutChart` showed a hard-coded "13,8tr" in its centre. It now shows the segments' real total; regression test `components/charts/DonutChart.test.tsx`.
+  - **Result:** 2 passed (the smoke flow plus sign-in) on the final two consecutive runs, and 4 more consecutive passes during development.
+  - **Setup flake:** once in about 6 runs under heavy parallel load, `admin:bootstrap --revoke` exited 1 with `PrismaClientKnownRequestError`. The CLI now prints the error's non-secret code, for example `(code P2028)`, so the next occurrence can be diagnosed; regression assertion in `admin-bootstrap.e2e-spec.ts`. The cause is unconfirmed, so this is recorded as an open release finding.
+  - **Limits:** a run that crosses a month boundary can fail. The dashboard's recent-transaction row has no accessible name, so it is found by its content.
+  - A failure in this flow blocks release (T101).
+- [X] T100 [OPS-001–OPS-009, AUTH-003, SEC-009, CFG-006, TEST-007, SC-013] Add a clean-checkout container verification script in `scripts/verify-release.ps1`, plus the reference proxy configuration `scripts/release/reference-proxy.nginx.conf` (illustrative, with no certificates, and documented by T105); depends on T006–T009, T026, T028, T093, and T099.
   - **Where it runs:** authoritatively on the **reference release host** (plan.md "Reference release host and release-test profile": the documented Linux Docker Engine deployment or CI host, with that proxy terminating TLS). It uses `docker compose --env-file .env.release-test -f docker-compose.prod.yml`. Results from any other host, including Docker Desktop, are recorded as informative only.
 
   It invokes `verify-migrations.ps1` and `scan-secrets.ps1`, then checks:
@@ -1120,7 +1283,60 @@ These were found while implementing and reviewing US5 (T064–T091) and delibera
   - graceful shutdown.
 
   Verify it runs without undocumented host state or volume deletion.
-- [ ] T101 [DASH-004, TEST-001, TEST-007, SC-003, SC-004, SC-005, SC-010, SC-011] Run the full release check and record command evidence in `specs/001-operational-mvp/checklists/release-evidence.md`; depends on T036 and T092–T100. The run includes:
+  **As built:** `scripts/verify-release.ps1` and the illustrative `scripts/release/reference-proxy.nginx.conf` (no certificates).
+  - **Scripts reused:**
+    - `scan-secrets.ps1`;
+    - `verify-migrations.ps1`, against a disposable `postgres:16-alpine` container with no named volume, removed on exit (or `-MigrationAdminUrl`, passed through the environment).
+  - **Checks**, against `docker compose --env-file .env.release-test -f docker-compose.prod.yml` under a dedicated project (default `cashlens-release-check`):
+    - **Configuration:** loopback-only API and web ports, PostgreSQL unpublished, pinned `cashlens_net`. The API's effective `NODE_ENV`, `CORS_ORIGIN`, and `TRUST_PROXY` come from the resolved compose configuration, not the env file.
+    - **Startup:** build; `run --rm migrate` before the API; an `http://` `CORS_ORIGIN` fails startup with `app.start_failed`.
+    - **Through the proxy:**
+      - the web app is served;
+      - every bundle chunk uses the relative `/api` and none holds an absolute API origin (a partial scan fails);
+      - HSTS is sent, and plain http redirects to https;
+      - `/api/health/ready` returns 200;
+      - login sets `accessToken` and `refreshToken` with `Secure; HttpOnly; SameSite=Lax`, and `/api/auth/me` succeeds with them.
+    - **TRUST_PROXY:** it finds the `req.remoteAddress` the API logged for a nonce request sent through the proxy, and fails unless TRUST_PROXY covers it. The matcher mirrors proxy-addr keywords, IPs, CIDRs, and IPv4-mapped addresses.
+    - **Loopback:** direct login returns 403 `HTTPS_REQUIRED` with no cookies; loopback readiness returns 200.
+    - **Admins:**
+      - the bootstrap and its idempotent rerun;
+      - the upgrade review: an unapproved administrator is recorded by `--list-admins` and revoked;
+      - the check's own synthetic administrator is revoked afterwards, and leftovers of aborted runs are revoked first.
+    - **Restart:** after an API restart and a full `down`/`up` with volumes kept, the account and exactly one copy of the transaction remain.
+    - **Outage:** with PostgreSQL stopped, readiness and a data call return 503 `SERVICE_UNAVAILABLE`, and both recover without an API restart.
+    - **Shutdown:** SIGTERM leads to a graceful log line within the grace period.
+  - **Safety:**
+    - It never deletes a volume.
+    - It refuses the `cashlens-prod` project name and any project that already has containers.
+    - It prints no secret: origins, ports, and TRUST_PROXY only.
+  - **Exit codes:** 0 authoritative pass; 3 all checks passed on a non-reference host, INFORMATIVE only; 1 failure; 2 prerequisite.
+
+    AUTHORITATIVE requires all of: Linux, Docker Engine (not Desktop), `-ReferenceHost`, `-HostDescription`, a clean checkout, images built by the run, and at least 2 vCPU and 4 GB.
+  - **Run on this machine** (Windows 11, Docker Desktop, 12 CPU, 7.4 GB, uncommitted tree), so **INFORMATIVE only**:
+    - The proxy was an `nginx:1.27-alpine` container built from the reference configuration, with a local test CA (`--resolve` to 127.0.0.1, `--cacert`).
+    - Result: 33/33 checks passed, exit 3, on the second run against a kept volume.
+    - Observed proxy peer: `::ffff:172.28.0.1`, covered by `TRUST_PROXY=loopback,172.28.0.1`.
+    - The authoritative run on the reference release host is still pending.
+  - **Found while running it:**
+    - The T094 logger spec held secret-shaped literals that the release scan flagged. They are now joined at runtime.
+    - `scan-secrets.ps1` reported "clean" while gitleaks logged `ERR ... cannot allocate memory` for an unread file. Any gitleaks ERR line (case-sensitive, colour-stripped, `NO_COLOR=1`) now makes the scan exit 2. Checked red (exit 0) to green (exit 2) with a fake `docker`, the way T009 was verified.
+  - **Independent review.** Fixed, each re-checked by a run:
+    - HIGH: each run left its synthetic administrator promoted, so a second run on the kept volume failed the bootstrap. A back-to-back run now passes after revoking the leftover.
+    - MEDIUM: the recorded TRUST_PROXY came from the env file rather than the value the container runs with. With `TRUST_PROXY=loopback` exported, the evidence shows `loopback` and the check fails.
+    - MEDIUM: authoritative mode did not require a clean checkout or fresh images.
+    - MEDIUM: nothing guarded against an existing stack. A running project now exits 2 and is left untouched.
+    - MEDIUM: `http2 on;` fails on nginx 1.24. `nginx -t` now passes on 1.24 and on stable.
+    - LOW: a bundle scan could stop at its cap and still pass.
+    - LOW: the cookie check did not name the cookies it expects.
+    - LOW: the container id could be read from compose's stderr.
+    - LOW: the migration admin URL was passed on the command line.
+    - LOW: a password containing `@` was only partly redacted.
+    - LOW: the cookie jar was not private on Linux.
+    - LOW: an env file outside the repository failed the ignored-file check.
+    - LOW (nginx): a forged Host header was not closed (catch-all 444 now), the redirect trusted the client's Host, and the HSTS/redirect checks were missing.
+
+    Documented, not changed: `-ReferenceHost` is self-asserted by the operator, and the restart check proves persistence rather than ingestion idempotency (that is the exactly-3 replay).
+- [X] T101 [DASH-004, TEST-001, TEST-007, SC-003, SC-004, SC-005, SC-010, SC-011] Run the full release check and record command evidence in `specs/001-operational-mvp/checklists/release-evidence.md`; depends on T036 and T092–T100. The run includes:
   - all API and web tests, including Playwright against the development stack (T096a);
   - regeneration of `apps/api/docs/swagger.json` and comparison with `contracts/openapi.yaml`, covering envelopes, `EmailSyncRun`, `GoalFeasibility`, `Alert`, `BudgetWrite`, and `UserSettingsWrite`;
   - typecheck, lint, and build;
@@ -1134,6 +1350,20 @@ These were found while implementing and reviewing US5 (T064–T091) and delibera
   - the per-parser rate table and the exactly-3 replay result.
 
   Verify no critical test or configuration finding remains.
+  **As built:** evidence is recorded in `specs/001-operational-mvp/checklists/release-evidence.md`.
+  - **API:** unit 669/669 and e2e 834/834. Type check, build, and lint of the files Phase 8 changed are clean.
+  - **Parser gate:** bank_vcb EMAIL v1, 17/17 (100%), 0 malformed posted.
+  - **Exactly-3 replay:** PASS in ingestion and classification.
+  - **Web:** Vitest 47/47 and Playwright 2/2 (twice). Official lint, type check, and build pass.
+  - **T008:** 10/10.
+  - **T009:** clean, recorded with the image digest and commit range.
+  - **Swagger:** regenerated and compared. All 52 contract operations are present, and BudgetWrite and UserSettingsWrite match after `UpdateBudgetDto`/`UpdateGoalDto` moved to the `@nestjs/swagger` `PartialType` (regression guard `mapped-types-source.spec.ts`).
+  - **The release gate is NOT passed.** Four items remain open:
+    - the authoritative T100 run and the gating benchmark are pending on the reference release host; this machine runs Windows with Docker Desktop, so T100 ran informatively (33/33, exit 3) and the benchmark was not run;
+    - the official API lint fails on 33 problems that pre-date Phase 8, in files it did not change;
+    - the generated Swagger does not describe the envelope or the EmailSyncRun, GoalFeasibility, and Alert response schemas;
+    - the Playwright global setup failed once under heavy load, cause unconfirmed.
+  - **This task's check is NOT met.** Its evidence is recorded, but it requires that no critical test or configuration finding remains, and the open items above (above all the failing official API lint) still stand.
 
 ---
 

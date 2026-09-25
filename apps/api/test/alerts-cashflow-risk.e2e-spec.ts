@@ -1,6 +1,5 @@
 import { createTestApp } from './helpers/test-app'; // first: seeds synthetic config
 import { INestApplication } from '@nestjs/common';
-import { Prisma, TransactionDirection } from '@prisma/client';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { InMemoryEmailTransport } from './fakes/in-memory-email-transport';
@@ -10,6 +9,7 @@ import {
   idPath,
   registerUser,
 } from './helpers/auth-fixtures';
+import { G6, LedgerRow, seedLedger } from './fixtures/builders';
 import {
   EmailImportHarness,
   MutableClock,
@@ -30,31 +30,7 @@ void createTestApp; // imported first for its side effect
 const NOW = new Date('2026-09-23T10:00:00+07:00');
 const TODAY = '2026-09-22T10:00:00+07:00';
 
-type Row = {
-  time: string;
-  direction: TransactionDirection;
-  amount: number;
-  currency?: string;
-};
-
-/** G6 nets: Jun −2,000,000; Jul −1,000,000; Aug −1,500,001 → −1,500,001. */
-const G6: Row[] = [
-  {
-    time: '2026-06-10T08:00:00+07:00',
-    direction: 'EXPENSE',
-    amount: 2_000_000,
-  },
-  {
-    time: '2026-07-10T08:00:00+07:00',
-    direction: 'EXPENSE',
-    amount: 1_000_000,
-  },
-  {
-    time: '2026-08-10T08:00:00+07:00',
-    direction: 'EXPENSE',
-    amount: 1_500_001,
-  },
-];
+type Row = LedgerRow;
 
 describe('Cashflow-risk alerts (T088)', () => {
   let app: INestApplication<App>;
@@ -68,16 +44,7 @@ describe('Cashflow-risk alerts (T088)', () => {
     const user = await registerUser(app, label);
     users.push(user);
     if (history.length) {
-      await prisma.transaction.createMany({
-        data: history.map((row) => ({
-          userId: user.id,
-          amount: new Prisma.Decimal(row.amount),
-          currency: row.currency ?? 'VND',
-          direction: row.direction,
-          transactionTime: new Date(row.time),
-          description: 'US5 cashflow history',
-        })),
-      });
+      await seedLedger(prisma, user.id, history, 'US5 cashflow history');
     }
     return user;
   };

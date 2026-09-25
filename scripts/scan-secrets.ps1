@@ -128,23 +128,35 @@ $commitCount = [int](& git -C $repo rev-list --count "$baseSha..HEAD" | Select-O
 
 # --- helpers -------------------------------------------------------------------
 function Invoke-Gitleaks([string[]]$Arguments) {
-  # The JSON report goes to stdout; gitleaks logs (errors only) pass through on stderr.
+  # The JSON report goes to stdout; gitleaks logs (errors only) go to stderr,
+  # which is captured, echoed, and checked.
   $previous = $null
+  $stderrFile = [System.IO.Path]::GetTempFileName()
   try { $previous = [Console]::OutputEncoding; [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
   try {
-    $stdout = & docker @Arguments
+    $stdout = & docker @Arguments 2> $stderrFile
     $code = $LASTEXITCODE
   }
   finally {
     if ($previous) { try { [Console]::OutputEncoding = $previous } catch { } }
   }
+  # Windows PowerShell 5.1 wraps native stderr in error records; their
+  # position decoration ("At ...", "+ ...") is dropped.
+  $logLines = @(Get-Content -LiteralPath $stderrFile -ErrorAction SilentlyContinue |
+      Where-Object { "$_".Trim() -and "$_" -notmatch '^\s*(At .*char:\d+|\+|~)' })
+  Remove-Item -LiteralPath $stderrFile -Force -ErrorAction SilentlyContinue
+  $logLines | ForEach-Object { Write-Host "  $_" }
+  # Any gitleaks ERR line (for example a file it could not read) means the scan
+  # was incomplete, so it can never count as clean.
+  # Case-sensitive, after removing any colour codes (`\x1b[31mERR` would hide the level).
+  $scanErrors = @($logLines | Where-Object { ("$_" -replace '\x1b\[[0-9;]*m', '') -cmatch '\bERR\b' })
   $text = (@($stdout) -join "`n").Trim()
   $findings = $null
   if ($text) {
     try { $findings = @($text | ConvertFrom-Json | ForEach-Object { $_ } | Where-Object { $_ }) } catch { $findings = $null }
   }
   # gitleaks also exits 1 on fatal errors, so a result only counts with a parsable report.
-  $status = if ($null -eq $findings -or $code -notin 0, 1) { 'error' } elseif ($findings.Count -gt 0) { 'findings' } elseif ($code -eq 0) { 'clean' } else { 'error' }
+  $status = if ($null -eq $findings -or $code -notin 0, 1) { 'error' } elseif ($findings.Count -gt 0) { 'findings' } elseif ($scanErrors.Count -gt 0) { 'error' } elseif ($code -eq 0) { 'clean' } else { 'error' }
   return @{ Status = $status; Findings = @($findings | Where-Object { $_ }); Code = $code }
 }
 
@@ -192,20 +204,20 @@ try {
   else {
     Write-Host "Secret scan: gitleaks v8.30.1 (pinned digest), config .gitleaks.toml"
     Write-Host ("Reviewed history exceptions (.gitleaksignore): {0}" -f $exceptions.Count)
-    $tree = Invoke-Gitleaks (@('run', '--rm', '-v', "${filesDir}:/scan:ro", '-v', "${configDir}:/cfg:ro", $GitleaksImage, 'dir', '/scan') + $common)
+    $tree = Invoke-Gitleaks (@('run', '--rm', '-e', 'NO_COLOR=1', '-v', "${filesDir}:/scan:ro", '-v', "${configDir}:/cfg:ro", $GitleaksImage, 'dir', '/scan') + $common)
     Write-Host ("Working tree: {0} files (tracked + untracked, not ignored): {1}" -f $staged, $(if ($tree.Status -eq 'findings') { "$($tree.Findings.Count) finding(s)" } else { $tree.Status }))
     Write-Findings 'worktree' $tree.Findings
 
     # 2. Feature history: every commit in base..HEAD, repository mounted read-only.
     $gitSafe = @('-e', 'GIT_CONFIG_COUNT=1', '-e', 'GIT_CONFIG_KEY_0=safe.directory', '-e', 'GIT_CONFIG_VALUE_0=/repo')
-    $history = Invoke-Gitleaks (@('run', '--rm') + $gitSafe + @('-v', "${repo}:/repo:ro", '-v', "${configDir}:/cfg:ro", $GitleaksImage, 'git', '/repo', "--log-opts=$baseSha..HEAD") + $common)
+    $history = Invoke-Gitleaks (@('run', '--rm', '-e', 'NO_COLOR=1') + $gitSafe + @('-v', "${repo}:/repo:ro", '-v', "${configDir}:/cfg:ro", $GitleaksImage, 'git', '/repo', "--log-opts=$baseSha..HEAD") + $common)
     Write-Host ("History: {0}..{1} ({2} commits): {3}" -f $baseSha.Substring(0, 7), $headSha.Substring(0, 7), $commitCount, $(if ($history.Status -eq 'findings') { "$($history.Findings.Count) finding(s)" } else { $history.Status }))
     Write-Findings 'history' $history.Findings
 
     $exitCode = if ($tree.Status -eq 'findings' -or $history.Status -eq 'findings') { 1 }
                 elseif ($tree.Status -eq 'error' -or $history.Status -eq 'error') { 2 }
                 else { 0 }
-    if ($exitCode -eq 2) { Write-Host 'PREREQUISITE: gitleaks did not produce a report (see the error above)' }
+    if ($exitCode -eq 2) { Write-Host 'PREREQUISITE: gitleaks did not produce a complete report (see the error above)' }
   }
 }
 finally {

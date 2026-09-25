@@ -126,12 +126,18 @@ run(process.argv.slice(2))
   })
   .catch((error: unknown) => {
     // Configuration errors name keys only; any other error prints its class
-    // only, never a message that could contain the connection string.
+    // and its short error code (Prisma `P2028`, SQLSTATE `3D000`), never a
+    // message that could contain the connection string.
+    const code = (error as { code?: unknown } | null)?.code;
+    const safeCode =
+      typeof code === 'string' && /^[A-Z0-9]{4,6}$/.test(code)
+        ? ` (code ${code})`
+        : '';
     const detail =
       error instanceof ConfigValidationError
         ? error.message
         : error instanceof Error
-          ? error.name
+          ? `${error.name}${safeCode}`
           : 'unknown error';
     console.error(`Configuration or database error: ${detail}`);
     process.exitCode = 1;

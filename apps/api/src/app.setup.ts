@@ -1,7 +1,14 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
 import type { Application, NextFunction, Request, Response } from 'express';
+import { ApiExceptionFilter } from './common/filters/api-exception.filter';
+import {
+  CORRELATION_HEADER,
+  assignCorrelationId,
+  correlationIdOf,
+} from './common/http/correlation';
+import { FieldValidationPipe } from './common/pipes/field-validation.pipe';
 
 /**
  * Request handling shared by main.ts and the e2e harness, so the tests run
@@ -19,16 +26,21 @@ export function configureApp(app: INestApplication): void {
     trustProxy.length ? trustProxy : false,
   );
 
+  // First: every request, including ones refused below, gets its
+  // correlation id before anything can answer it (ERR-006).
+  app.use(assignCorrelationId);
   app.use(rejectNulBytes);
   app.use(cookieParser());
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
-    new ValidationPipe({
+    new FieldValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
     }),
   );
+  // Safe errors with a stable code and the correlation id (ERR-001–ERR-006).
+  app.useGlobalFilters(new ApiExceptionFilter());
 }
 
 /**
@@ -36,15 +48,32 @@ export function configureApp(app: INestApplication): void {
  * request that carries one is answered like an absent resource instead of
  * failing inside the database with a 500 (SEC-007).
  */
+const nulLogger = new Logger('RequestGuard');
+
 function rejectNulBytes(
   request: Request,
   response: Response,
   next: NextFunction,
 ): void {
   if (request.originalUrl.includes('%00')) {
-    response
-      .status(404)
-      .json({ statusCode: 404, message: 'Not Found', error: 'Not Found' });
+    const correlationId = correlationIdOf(request);
+    // Refused before the request logger runs: the only log evidence.
+    nulLogger.warn({
+      event: 'request.rejected',
+      correlationId,
+      statusCode: 404,
+      errorCode: 'NOT_FOUND',
+      reason: 'NUL_BYTE',
+      method: request.method,
+    });
+    response.setHeader(CORRELATION_HEADER, correlationId);
+    response.status(404).json({
+      statusCode: 404,
+      message: 'Not Found',
+      error: 'Not Found',
+      code: 'NOT_FOUND',
+      correlationId,
+    });
     return;
   }
   next();

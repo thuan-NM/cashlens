@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -24,6 +25,8 @@ export type AuthRequestMeta = {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   private readonly refreshTokenTtlDays: number;
 
   constructor(
@@ -65,20 +68,22 @@ export class AuthService {
     return toUserResponse(user);
   }
 
-  async login(
-    dto: LoginDto,
-    meta: AuthRequestMeta = {},
-  ): Promise<AuthSession> {
+  async login(dto: LoginDto, meta: AuthRequestMeta = {}): Promise<AuthSession> {
     const user = await this.usersRepository.findByEmailForAuth(dto.email);
 
     if (!user?.passwordHash) {
       // Same bcrypt cost as a real check, so timing does not reveal whether
       // the account exists (AUTH-004).
       await bcrypt.compare(dto.password, await this.dummyPasswordHash());
+      // No account id to record: the event carries neither email nor password.
+      this.logger.warn({ event: 'auth.login_failed', reason: 'NO_ACCOUNT' });
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
 
     // A disabled or pending-deletion account gets the same generic failure,
     // checked after the password so its status is never disclosed (AUTH-002).
@@ -117,6 +122,11 @@ export class AuthService {
       storedToken.user.deletedAt ||
       storedToken.user.status !== UserStatus.ACTIVE
     ) {
+      this.logger.warn({
+        event: 'auth.refresh_rejected',
+        reason: storedToken ? 'ACCOUNT_INACTIVE' : 'UNKNOWN_TOKEN',
+        userId: storedToken?.user.id,
+      });
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -124,6 +134,12 @@ export class AuthService {
     // that actually revokes it gets a new session.
     const { count } = await this.usersRepository.revokeRefreshToken(tokenHash);
     if (count !== 1) {
+      // A concurrent or replayed refresh of an already rotated token.
+      this.logger.warn({
+        event: 'auth.refresh_rejected',
+        reason: 'ALREADY_ROTATED',
+        userId: storedToken.user.id,
+      });
       throw new UnauthorizedException('Invalid refresh token');
     }
     await this.writeAuditLog(
@@ -198,10 +214,13 @@ export class AuthService {
     await this.createRefreshToken(userId, refreshToken, meta);
 
     return {
-      accessToken: this.jwtService.sign({ sub: userId, email, role: user.role }),
+      accessToken: this.jwtService.sign({
+        sub: userId,
+        email,
+        role: user.role,
+      }),
       refreshToken,
-      refreshTokenMaxAgeMs:
-        this.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
+      refreshTokenMaxAgeMs: this.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
       user,
     };
   }
@@ -262,6 +281,14 @@ export class AuthService {
       // Sanitized: request metadata only, bounded; never a credential (AUTH-005).
       ipAddress: meta.ipAddress?.slice(0, 64),
       userAgent: meta.userAgent?.slice(0, 255),
+    });
+    // The same fact as the audit row, searchable by the correlation id.
+    const log = action === 'LOGIN_FAILED' ? 'warn' : 'log';
+    this.logger[log]({
+      event: `auth.${action.toLowerCase()}`,
+      userId,
+      resourceType,
+      resourceId,
     });
   }
 }

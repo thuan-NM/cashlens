@@ -1,5 +1,6 @@
 import type { AuthProvider } from "@refinedev/core";
 import { apiRequest } from "@/api/client";
+import { useAuthStore } from "@/stores/authStore";
 
 type LoginParams = { email: string; password: string };
 type RegisterParams = LoginParams & { fullName?: string; name?: string };
@@ -55,6 +56,9 @@ export const authProvider: AuthProvider = {
     } catch {
       // The client state should still be cleared if the server session is already gone.
     }
+    // The app's route guard reads the auth store (there is no refine router provider),
+    // so a sign-out triggered by refine (e.g. an expired session in onError) must clear it.
+    useAuthStore.getState().setUser(null);
 
     return { success: true, redirectTo: "/" };
   },

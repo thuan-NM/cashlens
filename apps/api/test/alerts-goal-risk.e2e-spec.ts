@@ -1,6 +1,6 @@
 import { createTestApp } from './helpers/test-app'; // first: seeds synthetic config
 import { INestApplication } from '@nestjs/common';
-import { Prisma, TransactionDirection } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import {
@@ -10,6 +10,7 @@ import {
   idPath,
   registerUser,
 } from './helpers/auth-fixtures';
+import { H1, LedgerRow, seedLedger } from './fixtures/builders';
 import {
   EmailImportHarness,
   MutableClock,
@@ -30,33 +31,7 @@ void createTestApp; // imported first for its side effect
 
 const NOW = new Date('2026-09-23T10:00:00+07:00');
 
-type Row = { time: string; direction: TransactionDirection; amount: number };
-
-/** History H1: nets Jun 9,000,000; Jul 8,000,000; Aug 10,000,001 → available 9,000,000. */
-const H1: Row[] = [
-  { time: '2025-01-10T08:00:00+07:00', direction: 'EXPENSE', amount: 50_000 },
-  { time: '2026-06-05T08:00:00+07:00', direction: 'INCOME', amount: 9_000_000 },
-  {
-    time: '2026-07-05T08:00:00+07:00',
-    direction: 'INCOME',
-    amount: 10_000_000,
-  },
-  {
-    time: '2026-07-20T08:00:00+07:00',
-    direction: 'EXPENSE',
-    amount: 2_000_000,
-  },
-  {
-    time: '2026-08-05T08:00:00+07:00',
-    direction: 'INCOME',
-    amount: 12_000_001,
-  },
-  {
-    time: '2026-08-20T08:00:00+07:00',
-    direction: 'EXPENSE',
-    amount: 2_000_000,
-  },
-];
+type Row = LedgerRow;
 
 /** G1: remaining 40,000,000 over Sep–Dec: 10,000,000 a month > 9,000,000. */
 const G1 = {
@@ -77,16 +52,7 @@ describe('Goal-risk alerts (T087)', () => {
   const newUser = async (label: string, history: Row[] = H1) => {
     const user = await registerUser(app, label);
     users.push(user);
-    await prisma.transaction.createMany({
-      data: history.map((row) => ({
-        userId: user.id,
-        amount: new Prisma.Decimal(row.amount),
-        currency: 'VND',
-        direction: row.direction,
-        transactionTime: new Date(row.time),
-        description: 'US5 goal history',
-      })),
-    });
+    await seedLedger(prisma, user.id, history, 'US5 goal history');
     return user;
   };
   const createGoal = async (user: TestUser, body: Record<string, unknown>) =>

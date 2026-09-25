@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -19,6 +20,8 @@ import { AlertEvaluationService } from '../alerts/alert-evaluation.service';
 
 @Injectable()
 export class ParserService {
+  private readonly logger = new Logger(ParserService.name);
+
   constructor(
     private readonly repository: ParserRepository,
     private readonly engine: ParserEngineService,
@@ -139,6 +142,15 @@ export class ParserService {
       confidence: result.confidence,
       bankName: bank?.name,
     });
+    this.logger.log({
+      event: 'parser.parsed',
+      emailMessageId: message.id,
+      parserTemplateId: template.id,
+      transactionId: outcome.transaction.id,
+      created: outcome.created,
+      duplicate: Boolean(outcome.duplicate),
+      suspectedDuplicate: Boolean(outcome.suspectedDuplicate),
+    });
     return {
       transactionId: outcome.transaction.id,
       created: outcome.created,
@@ -187,6 +199,15 @@ export class ParserService {
       extractedPayload: {},
       normalizedPayload: {},
       errorMessage: new ParserOutputError(code, fields).message,
+    });
+    // The failure code and field names only, as stored (EMAIL-010).
+    this.logger.warn({
+      event: 'parser.failed',
+      emailMessageId,
+      parserTemplateId,
+      parserRunId: run.id,
+      errorCode: code,
+      fieldNames: fields,
     });
     return { parserRun: toParserRunResponse(run), created: false };
   }

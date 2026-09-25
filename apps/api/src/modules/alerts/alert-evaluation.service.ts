@@ -244,6 +244,16 @@ export class AlertEvaluationService {
       await Promise.all(
         outcome.pending.map((deliveryId) => this.delivery.deliver(deliveryId)),
       );
+      this.logger.log({
+        event: 'alert.evaluated',
+        evaluationId: correlationId,
+        userId,
+        families,
+        createdAlertIds: outcome.applied.created.map((alert) => alert.id),
+        resolvedAlertIds: outcome.applied.resolved.map((item) => item.id),
+        suppressed: outcome.applied.suppressed.length,
+        pendingDeliveryIds: outcome.pending,
+      });
       return {
         correlationId,
         ok: true,
@@ -251,9 +261,13 @@ export class AlertEvaluationService {
         resolved: outcome.applied.resolved.length,
       };
     } catch (error) {
-      this.logger.error(
-        `Alert evaluation ${correlationId} for families ${families.join(',')} failed: ${error instanceof Error ? error.name : 'error'}`,
-      );
+      this.logger.error({
+        event: 'alert.evaluation_failed',
+        evaluationId: correlationId,
+        userId,
+        families,
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
       return { correlationId, ok: false, created: 0, resolved: 0 };
     }
   }

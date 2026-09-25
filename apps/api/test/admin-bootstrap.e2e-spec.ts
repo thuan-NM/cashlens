@@ -822,6 +822,11 @@ describe('Admin bootstrap CLI (T013, SEC-009, SC-015)', () => {
 
         expectExit(result, 1, forbidden);
         expectNoSecrets(result, forbidden);
+        // The error class and its non-secret code (Prisma or SQLSTATE) make a
+        // failure diagnosable, for example a transaction timeout (P2028).
+        expect(result.output).toMatch(
+          /Configuration or database error: \w+ \(code [A-Z0-9]{4,6}\)/,
+        );
         expect(databaseName(absentUrl)).toBe(absentName);
         const [{ n }] = await queryRows<{ n: number }>(
           urlForDatabase(shared, 'postgres'),

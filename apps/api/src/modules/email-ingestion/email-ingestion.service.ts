@@ -98,7 +98,21 @@ export class EmailIngestionService {
       connectionId,
       started,
     );
-    if (!lease) throw syncInProgress();
+    if (!lease) {
+      this.logger.warn({
+        event: 'email.sync.rejected',
+        userId: user.id,
+        emailConnectionId: connectionId,
+        errorCode: 'SYNC_IN_PROGRESS',
+      });
+      throw syncInProgress();
+    }
+    this.logger.log({
+      event: 'email.sync.started',
+      userId: user.id,
+      emailConnectionId: connectionId,
+      syncRunId: lease.run.id,
+    });
 
     const query = this.gmailQuery(rules);
     const queryHash = hashQuery(query);
@@ -266,6 +280,17 @@ export class EmailIngestionService {
     await this.auditSync(user, connectionId, finished.id, finished.status, {
       ...counts,
     });
+    const level = finished.status === 'SUCCESS' ? 'log' : 'warn';
+    this.logger[level]({
+      event: 'email.sync.finished',
+      userId: user.id,
+      emailConnectionId: connectionId,
+      syncRunId: finished.id,
+      status: finished.status,
+      errorCode: failure ?? null,
+      hasMore,
+      ...counts,
+    });
     // After the batch committed (ALERT-009): imported transactions are
     // evaluated exactly like manual ones, once per batch; then the terminal
     // run (and any run the lease expired) and the connection state.
@@ -410,9 +435,11 @@ export class EmailIngestionService {
 
   /** The error class only; messages of unexpected errors may carry data. */
   private logUnexpected(runId: string, error: unknown) {
-    this.logger.warn(
-      `Sync run ${runId} hit an unexpected ${error instanceof Error ? error.name : 'error'}`,
-    );
+    this.logger.warn({
+      event: 'email.sync.unexpected_error',
+      syncRunId: runId,
+      errorName: error instanceof Error ? error.name : typeof error,
+    });
   }
 
   /** Sanitized evidence of a sync (SEC-006): run id, status, and counts only. */
