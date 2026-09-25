@@ -19,12 +19,14 @@ const goal = (id: string, name: string) => ({
 
 const feasibility = (goalId: string, overrides: Partial<GoalFeasibility> = {}): GoalFeasibility => ({
   goalId,
+  scenario: "FULL",
   months: 6,
   horizonSource: "GOAL_MONTHS",
   pastDeadline: false,
   targetAmount: 12_000_000,
   savedAmount: 2_000_000,
   remainingAmount: 10_000_000,
+  totalCost: 10_000_000,
   monthlyRequired: 1_666_667,
   feasibilityScore: 80,
   status: "SAFE",

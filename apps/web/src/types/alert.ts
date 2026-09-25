@@ -1,18 +1,20 @@
+import type {
+  Alert as ContractAlert,
+  AlertDelivery,
+  AlertDeliveryStatus as ContractAlertDeliveryStatus,
+  AlertSetting as ContractAlertSetting,
+  AlertStatus as ContractAlertStatus,
+} from "@repo/api-contract";
+
 export type AlertSeverity = "critical" | "warning" | "info";
 
 /** The lifecycle status (ALERT-010); independent of the read state. */
-export type AlertStatus = "ACTIVE" | "DISMISSED" | "RESOLVED";
+export type AlertStatus = ContractAlertStatus;
 
-export type AlertDeliveryStatus = "PENDING" | "SENT" | "SKIPPED" | "FAILED";
+export type AlertDeliveryStatus = ContractAlertDeliveryStatus;
 
 /** The alert's single email outcome; null for user-authored and legacy alerts. */
-export interface AlertEmailDelivery {
-  status: AlertDeliveryStatus;
-  skipReason: string | null;
-  attemptCount: number;
-  failureCode: string | null;
-  sentAt: string | null;
-}
+export type AlertEmailDelivery = Pick<AlertDelivery, "status" | "skipReason" | "attemptCount" | "failureCode" | "sentAt">;
 
 export interface Alert {
   id: string;
@@ -32,32 +34,11 @@ export interface Alert {
   emailDelivery: AlertEmailDelivery | null;
 }
 
-/** An alert as the API returns it (`GET /alerts`). */
-export interface ApiAlert {
-  id: string;
-  type: string;
-  severity?: string;
-  title: string;
-  message: string;
-  isRead?: boolean;
-  status?: AlertStatus;
-  conditionKey?: string | null;
-  triggeredAt?: string;
-  createdAt?: string;
-  dismissedAt?: string | null;
-  resolvedAt?: string | null;
-  resolutionReason?: string | null;
-  emailDelivery?: (AlertEmailDelivery & { channel?: string }) | null;
-}
+/** An alert as the API returns it (`GET /alerts`): the API contract's `Alert`. */
+export type ApiAlert = ContractAlert;
 
-/** A per-type alert setting as the API returns it. */
-export interface ApiAlertSetting {
-  type: string;
-  inAppEnabled?: boolean;
-  emailEnabled?: boolean;
-  threshold?: number | string | null;
-  emailAvailable?: boolean;
-}
+/** A per-type alert setting as the API returns it: the API contract's `AlertSetting`. */
+export type ApiAlertSetting = ContractAlertSetting;
 
 /** A per-type alert preference (`GET /alerts/settings`). */
 export interface AlertSetting {

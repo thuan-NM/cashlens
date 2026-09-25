@@ -2,16 +2,41 @@
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
   "tasks": {
+    "transit": {
+      "dependsOn": ["^transit"]
+    },
     "build": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "dependsOn": ["^build", "transit"],
+      "outputs": ["dist/**"]
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": ["transit"],
+      "outputs": []
     },
     "check-types": {
-      "dependsOn": ["^check-types"]
+      "dependsOn": ["transit"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["transit"],
+      "outputs": []
+    },
+    "test:e2e": {
+      "cache": false,
+      "passThroughEnv": [
+        "E2E_DATABASE_URL",
+        "DATABASE_URL",
+        "CI",
+        "PLAYWRIGHT_*",
+        "LOCALAPPDATA",
+        "USERPROFILE",
+        "E2E_BASE_URL",
+        "E2E_API_URL",
+        "DOCKER_*",
+        "COMPOSE_*",
+        "POSTGRES_HOST_PORT",
+        "API_HOST_PORT"
+      ]
     },
     "dev": {
       "cache": false,

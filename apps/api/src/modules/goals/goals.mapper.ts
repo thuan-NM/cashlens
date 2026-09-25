@@ -1,5 +1,7 @@
 import { Goal, GoalScenarioType, Prisma } from '@prisma/client';
 import { CreateGoalDto } from './dto/create-goal.dto';
+import { GoalFeasibilityResponseDto } from './dto/goal-feasibility.response';
+import { GoalResponseDto } from './dto/goal.response';
 import { UpdateGoalDto } from './dto/update-goal.dto';
 import type { Feasibility } from './goal-feasibility';
 
@@ -18,7 +20,7 @@ const remainingOf = (goal: Pick<Goal, 'targetAmount' | 'savedAmount'>) =>
 
 const optionalDateToIso = (value: Date | null) => value?.toISOString() ?? null;
 
-export const toGoalResponse = (goal: Goal) => {
+export const toGoalResponse = (goal: Goal): GoalResponseDto => {
   const targetAmount = decimalToNumber(goal.targetAmount);
   const savedAmount = decimalToNumber(goal.savedAmount);
   const progressPercent =
@@ -93,7 +95,7 @@ export const toGoalFeasibilityResponse = (
   goal: Goal,
   result: Feasibility,
   scenario: GoalScenarioType,
-) => ({
+): GoalFeasibilityResponseDto => ({
   goalId: goal.id,
   scenario,
   months: result.months,

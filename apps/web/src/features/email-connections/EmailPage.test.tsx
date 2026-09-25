@@ -9,6 +9,13 @@ const connection: EmailConnection = {
   id: "c1",
   provider: "GMAIL",
   emailAddress: "owner@example.test",
+  providerUserId: "owner@example.test",
+  tokenExpiresAt: "2026-09-24T02:00:00.000Z",
+  scopes: ["https://www.googleapis.com/auth/gmail.readonly"],
+  connectedAt: "2026-06-01T00:00:00.000Z",
+  disconnectedAt: null,
+  createdAt: "2026-06-01T00:00:00.000Z",
+  updatedAt: "2026-09-24T01:00:00.000Z",
   status: "ACTIVE",
   lastSyncedAt: null,
   lastFailedAt: null,
@@ -22,6 +29,9 @@ const connection: EmailConnection = {
 
 const run = (id: string, overrides: Partial<SyncRun> = {}): SyncRun => ({
   id,
+  emailConnectionId: "c1",
+  triggerType: "MANUAL",
+  createdAt: "2026-09-24T01:00:00.000Z",
   status: "SUCCESS",
   startedAt: "2026-09-24T01:00:00.000Z",
   finishedAt: "2026-09-24T01:00:05.000Z",

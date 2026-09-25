@@ -1,4 +1,5 @@
 import { EmailConnection } from '@prisma/client';
+import { EmailConnectionResponseDto } from './dto/email-connection.response';
 
 /**
  * What the user can do to recover a connection (EMAIL-003):
@@ -7,7 +8,13 @@ import { EmailConnection } from '@prisma/client';
  * - RECONNECT: the provider refused the grant; a new consent flow is needed.
  * - CONNECT: the user disconnected it; connecting again starts a new grant.
  */
-export type RecoveryAction = 'NONE' | 'RETRY' | 'RECONNECT' | 'CONNECT';
+export const RECOVERY_ACTIONS = [
+  'NONE',
+  'RETRY',
+  'RECONNECT',
+  'CONNECT',
+] as const;
+export type RecoveryAction = (typeof RECOVERY_ACTIONS)[number];
 
 export const recoveryActionOf = (
   connection: Pick<EmailConnection, 'status' | 'disconnectedAt'>,
@@ -24,7 +31,9 @@ export const recoveryActionOf = (
  * Connection identity, status, and sync progress. Credentials, the opaque
  * provider cursor, and the lease token are never returned.
  */
-export const toEmailConnectionResponse = (connection: EmailConnection) => {
+export const toEmailConnectionResponse = (
+  connection: EmailConnection,
+): EmailConnectionResponseDto => {
   const recoveryAction = recoveryActionOf(connection);
   return {
     id: connection.id,

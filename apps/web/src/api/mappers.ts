@@ -219,7 +219,7 @@ export const mapBudget = (item: ApiBudget): Budget => ({
 export const mapGoal = (item: ApiGoal, timeZone?: string): Goal => ({
   id: item.id,
   name: item.name,
-  type: goalTypeLabels[item.type] ?? item.type ?? "Mục tiêu",
+  type: (item.type ? goalTypeLabels[item.type] : undefined) ?? item.type ?? "Mục tiêu",
   target: Number(item.targetAmount ?? 0),
   saved: Number(item.savedAmount ?? 0),
   date: formatDate(item.targetDate, timeZone) || "-",

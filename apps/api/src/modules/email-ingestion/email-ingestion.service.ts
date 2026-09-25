@@ -34,6 +34,11 @@ import {
   serializeCursor,
   windowQuery,
 } from './sync-policy';
+import {
+  gmailRuleQuery,
+  matchesListenRule,
+  parseSender,
+} from './listen-rule-matching';
 
 type ListenRule = Awaited<
   ReturnType<EmailIngestionRepository['enabledRules']>
@@ -114,7 +119,7 @@ export class EmailIngestionService {
       syncRunId: lease.run.id,
     });
 
-    const query = this.gmailQuery(rules);
+    const query = gmailRuleQuery(rules);
     const queryHash = hashQuery(query);
     const before = parseCursor(lease.connection.syncCursor);
     const backfillFrom =
@@ -391,13 +396,18 @@ export class EmailIngestionService {
 
     const message = await this.gmail.getMessage(accessToken, providerMessageId);
     const body = this.gmail.body(message);
-    const sender = this.parseSender(this.gmail.header(message, 'From') ?? '');
+    const sender = parseSender(this.gmail.header(message, 'From') ?? '');
     const subject = this.gmail.header(message, 'Subject') ?? '';
     const receivedAt = message.internalDate
       ? new Date(Number(message.internalDate))
       : this.now();
     const rule = rules.find((candidate) =>
-      this.matches(candidate, sender.email, subject, body, receivedAt),
+      matchesListenRule(candidate, {
+        sender: sender.email,
+        subject,
+        body,
+        receivedAt,
+      }),
     );
     if (!rule) return;
 
@@ -458,47 +468,5 @@ export class EmailIngestionService {
       resourceId: connectionId,
       metadata: { syncRunId, status, ...counts },
     });
-  }
-
-  /** Sender and subject clauses; the time window is added per run. */
-  private gmailQuery(rules: ListenRule[]) {
-    const clauses = rules.flatMap((rule) => {
-      const values: string[] = [];
-      if (rule.senderEmail) values.push(`from:${rule.senderEmail}`);
-      if (rule.senderDomain) values.push(`from:@${rule.senderDomain}`);
-      if (rule.subjectContains)
-        values.push(`subject:"${rule.subjectContains}"`);
-      return values;
-    });
-    return clauses.length ? `{${clauses.join(' ')}}` : '';
-  }
-
-  private matches(
-    rule: ListenRule,
-    sender: string,
-    subject: string,
-    body: string,
-    receivedAt: Date,
-  ) {
-    const normalizedSender = sender.toLowerCase();
-    return (
-      (!rule.syncFromDate || receivedAt >= rule.syncFromDate) &&
-      (!rule.senderEmail ||
-        normalizedSender === rule.senderEmail.toLowerCase()) &&
-      (!rule.senderDomain ||
-        normalizedSender.endsWith(`@${rule.senderDomain.toLowerCase()}`)) &&
-      (!rule.subjectContains ||
-        subject.toLowerCase().includes(rule.subjectContains.toLowerCase())) &&
-      (!rule.bodyContains ||
-        body.toLowerCase().includes(rule.bodyContains.toLowerCase()))
-    );
-  }
-
-  private parseSender(value: string) {
-    const match = value.match(/^(.*?)<([^>]+)>$/);
-    return {
-      name: match?.[1]?.trim().replace(/^"|"$/g, '') || undefined,
-      email: (match?.[2] ?? value).trim().toLowerCase(),
-    };
   }
 }

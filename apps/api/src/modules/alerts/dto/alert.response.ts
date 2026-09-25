@@ -1,10 +1,11 @@
-import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
+import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 import {
   AlertDeliveryChannel,
   AlertDeliveryStatus,
   AlertSeverity,
   AlertStatus,
   AlertType,
+  Prisma,
 } from '@prisma/client';
 
 /**
@@ -84,12 +85,8 @@ export class AlertResponseDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   readAt!: string | null;
 
-  @ApiPropertyOptional({
-    type: 'object',
-    additionalProperties: true,
-    nullable: true,
-  })
-  metadata?: Record<string, unknown> | null;
+  @ApiProperty({ type: 'object', additionalProperties: true, nullable: true })
+  metadata!: Prisma.JsonValue;
 
   @ApiProperty({ enum: AlertStatus, enumName: 'AlertStatus' })
   status!: AlertStatus;
@@ -134,4 +131,43 @@ export class AlertResponseDto {
     description: 'null for legacy and user-authored alerts (no delivery row)',
   })
   emailDelivery!: AlertDeliveryResponseDto | null;
+}
+
+/**
+ * OpenAPI description of `toAlertSettingResponse` (contracts/openapi.yaml
+ * `AlertSetting`). Documentation only.
+ */
+@ApiSchema({ name: 'AlertSetting' })
+export class AlertSettingResponseDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty()
+  userId!: string;
+
+  @ApiProperty({ enum: AlertType, enumName: 'AlertType' })
+  type!: AlertType;
+
+  @ApiProperty()
+  inAppEnabled!: boolean;
+
+  @ApiProperty()
+  emailEnabled!: boolean;
+
+  @ApiProperty({ type: Number, nullable: true })
+  threshold!: number | null;
+
+  @ApiProperty({ type: 'object', additionalProperties: true, nullable: true })
+  metadata!: Prisma.JsonValue;
+
+  @ApiProperty({ format: 'date-time' })
+  createdAt!: string;
+
+  @ApiProperty({ format: 'date-time' })
+  updatedAt!: string;
+
+  @ApiProperty({
+    description: 'false when the deployment runs with email delivery disabled',
+  })
+  emailAvailable!: boolean;
 }

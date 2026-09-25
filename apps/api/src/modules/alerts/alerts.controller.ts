@@ -13,7 +13,10 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ApiEnvelopedResponse } from '../../common/swagger/api-envelope';
 import type { RequestUser } from '../../common/types/request-user.type';
 import { AlertsService } from './alerts.service';
-import { AlertResponseDto } from './dto/alert.response';
+import {
+  AlertResponseDto,
+  AlertSettingResponseDto,
+} from './dto/alert.response';
 import { CreateAlertDto } from './dto/create-alert.dto';
 import { ListAlertsDto } from './dto/list-alerts.dto';
 import { UpdateAlertSettingDto } from './dto/update-alert-setting.dto';
@@ -51,11 +54,17 @@ export class AlertsController {
   }
 
   @Get('settings')
+  @ApiEnvelopedResponse(200, 'Per-type alert settings', {
+    arrayOf: AlertSettingResponseDto,
+  })
   settings(@CurrentUser() user: RequestUser) {
     return this.alertsService.settings(user);
   }
 
   @Patch('settings')
+  @ApiEnvelopedResponse(200, 'Updated alert setting', {
+    model: AlertSettingResponseDto,
+  })
   updateSetting(
     @CurrentUser() user: RequestUser,
     @Body() dto: UpdateAlertSettingDto,

@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
+import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 import { GoalScenarioType } from '@prisma/client';
 import type { FeasibilityStatus, HorizonSource } from '../goal-feasibility';
 
@@ -25,8 +25,8 @@ export class GoalFeasibilityResponseDto {
   @ApiProperty()
   goalId!: string;
 
-  @ApiPropertyOptional({ enum: GoalScenarioType, enumName: 'GoalScenarioType' })
-  scenario?: GoalScenarioType;
+  @ApiProperty({ enum: GoalScenarioType, enumName: 'GoalScenarioType' })
+  scenario!: GoalScenarioType;
 
   @ApiProperty({
     minimum: 0,
@@ -49,8 +49,8 @@ export class GoalFeasibilityResponseDto {
   @ApiProperty({ minimum: 0 })
   remainingAmount!: number;
 
-  @ApiPropertyOptional()
-  totalCost?: number;
+  @ApiProperty({ description: 'Equals remainingAmount' })
+  totalCost!: number;
 
   @ApiProperty({ minimum: 0 })
   monthlyRequired!: number;
@@ -67,15 +67,19 @@ export class GoalFeasibilityResponseDto {
   @ApiProperty({ enum: FEASIBILITY_STATUSES })
   status!: FeasibilityStatus;
 
-  @ApiPropertyOptional({ type: Number, nullable: true })
-  availableMonthlyCashflow?: number | null;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: 'null when INSUFFICIENT_DATA',
+  })
+  availableMonthlyCashflow!: number | null;
 
   @ApiProperty({ type: [String], example: ['2026-06', '2026-07', '2026-08'] })
   observationMonths!: string[];
 
-  @ApiPropertyOptional({ minimum: 0 })
-  monthsRequired?: number;
+  @ApiProperty({ minimum: 0 })
+  monthsRequired!: number;
 
-  @ApiPropertyOptional({ description: 'Comma-separated reason codes' })
-  reason?: string;
+  @ApiProperty({ description: 'Comma-separated reason codes' })
+  reason!: string;
 }

@@ -1,11 +1,11 @@
 {
+  "extends": "@repo/typescript-config/base.json",
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "types": ["node"],
-    "skipLibCheck": true,
     "noEmit": true,
     "strict": true,
     "noUnusedLocals": true,
