@@ -39,14 +39,17 @@ On the **Email** page (`/app/email`):
 1. Click **Kết nối Gmail**. The API returns a Google authorization URL, and the browser opens Google's consent screen.
 2. Approve read-only access. Google redirects the browser to the API callback, `/api/email-connections/gmail/callback`.
 3. The callback checks the signed `state` and a nonce cookie, both valid for 10 minutes, and stores the connection.
-4. The callback answers with the connection as JSON and **does not redirect back to the app**. Return to `/app/email`, where the connection is listed as **Đang hoạt động**.
+4. The browser returns to the **Email** page, which shows **Đã kết nối Gmail**; the connection is listed as **Đang hoạt động**.
+   - The callback redirects to the web origin from configuration (the first `CORS_ORIGIN`), never to an address taken from the request.
+   - The address carries only a fixed outcome: `?gmail=connected`, or `?gmail=failed&reason=STATE_INVALID|GOOGLE_REFUSED|GOOGLE_UNAVAILABLE|FAILED`. It never carries a token, the code, the state, or an error message. The page shows a fixed message for the outcome and removes it from the address.
+   - An API client that does not ask for HTML (no `Accept: text/html`) still gets the enveloped connection as JSON, or the error body.
 
 For the callback to succeed:
 - Finish the flow in the **same browser** within 10 minutes. The nonce cookie is scoped to the callback path.
 - In production the callback must arrive over HTTPS, or it returns 403 `HTTPS_REQUIRED`.
 - Reconnecting the same Gmail address reuses its connection record.
 
-**Disconnect** is `DELETE /api/email-connections/{id}`; the web app has no button for it in this release.
+**Disconnect** with **Ngắt kết nối** on the Email page, then confirm with **Ngắt kết nối Gmail** (API: `DELETE /api/email-connections/{id}`).
 - It revokes the refresh token at Google on a best-effort basis, then always erases the stored tokens and marks the connection disconnected. A running sync is marked expired.
 - Imported transactions and sanitized sync and parse history are **kept**.
 
@@ -65,7 +68,7 @@ A sync imports only messages that match at least one **enabled** listen rule. Wi
 | `isEnabled`, `priority` | Rules are tried in ascending `priority` (default 100); the first rule whose criteria all hold wins |
 
 - **The Email page** creates rules with a name, a sender address, and a sender domain. Every other field is available through the API: `GET/POST /api/email-listen-rules` and `PATCH/DELETE /api/email-listen-rules/{id}`.
-- The rule switch on the page does not save a change in this release. Use `PATCH` with `isEnabled` instead.
+- The rule switch on the page saves `isEnabled` immediately (`PATCH /api/email-listen-rules/{id}`). If saving fails, the page shows **Không thể lưu rule** and the switch returns to the stored value.
 - A message that matches no rule is not stored at all.
 
 ## 5. Manual sync, continuation, and reconnect
@@ -132,7 +135,7 @@ Each run records its found, matched, parsed, created, and failed counts, and a s
 |---|---|---|
 | "Không thể bắt đầu kết nối Gmail" | 503 `SERVICE_UNAVAILABLE` | The OAuth client is not configured; the operator sets the `GMAIL_*` variables |
 | Google shows `redirect_uri_mismatch` | none (from Google) | The authorized redirect URI differs from `GMAIL_REDIRECT_URI`; make them identical, including the port and https |
-| Callback: "Invalid OAuth state" / "OAuth state expired" | 401 `UNAUTHORIZED` | The flow took more than 10 minutes or changed browsers; start connecting again |
+| Callback: "Invalid OAuth state" / "OAuth state expired" (browser: **Không thể kết nối Gmail**, `reason=STATE_INVALID`) | 401 `UNAUTHORIZED` | The flow took more than 10 minutes or changed browsers; start connecting again |
 | Callback: "Gmail did not grant offline access…" | 502 | Connect again and approve access |
 | Callback: "Gmail OAuth token exchange failed" | 502 | Google refused the code; check the client secret, then connect again |
 | "Gmail tạm thời không khả dụng" | 503 `SERVICE_UNAVAILABLE` | Google was unreachable or rate-limited; sync again later |

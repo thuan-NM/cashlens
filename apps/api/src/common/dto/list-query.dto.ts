@@ -8,7 +8,10 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import type { FilterOperator, SortDirection } from '../types/list-query-config.type';
+import type {
+  FilterOperator,
+  SortDirection,
+} from '../types/list-query-config.type';
 
 export class ListSorterDto {
   @IsString()

@@ -15,8 +15,11 @@ interface PrismaListDelegate<TItem> {
   count(args: { where?: Record<string, unknown> }): Promise<number>;
 }
 
-interface PrismaCrudDelegate<TItem, TCreateInput, TUpdateInput>
-  extends PrismaListDelegate<TItem> {
+interface PrismaCrudDelegate<
+  TItem,
+  TCreateInput,
+  TUpdateInput,
+> extends PrismaListDelegate<TItem> {
   findUnique(args: { where: Record<string, unknown> }): Promise<TItem | null>;
   findFirst(args: { where?: Record<string, unknown> }): Promise<TItem | null>;
   create(args: { data: TCreateInput }): Promise<TItem>;

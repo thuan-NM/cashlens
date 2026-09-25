@@ -11,9 +11,11 @@ import {
 } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { ApiEnvelopedResponse } from '../../common/swagger/api-envelope';
 import type { RequestUser } from '../../common/types/request-user.type';
 import { CreateGoalDto } from './dto/create-goal.dto';
 import { GoalContributionDto } from './dto/goal-contribution.dto';
+import { GoalFeasibilityResponseDto } from './dto/goal-feasibility.response';
 import { GoalSimulationQueryDto } from './dto/goal-simulation-query.dto';
 import { ListGoalsDto } from './dto/list-goals.dto';
 import { UpdateGoalDto } from './dto/update-goal.dto';
@@ -36,6 +38,9 @@ export class GoalsController {
 
   /** Enveloped `GoalFeasibility`; side-effect free (never touches alerts). */
   @Get(':id/simulation')
+  @ApiEnvelopedResponse(200, 'Feasibility or insufficient-data result', {
+    model: GoalFeasibilityResponseDto,
+  })
   simulate(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,

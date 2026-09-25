@@ -14,16 +14,45 @@
 |---|---|
 | Backend and frontend tests, type checks, builds, migration matrix, secret scan, parser gate, exactly-3 replay | **PASS** on this machine (details below) |
 | Official web lint | **PASS** |
-| Official API lint (`yarn workspace api lint`) | **FAIL**: 31 errors and 2 warnings, all in files Phase 8 did not change (see Open findings) |
+| Official API lint (`yarn workspace api lint`) | **PASS** since the release-closure run (the script is check-only now; see "Release-closure run") |
 | T100 release verification | **INFORMATIVE PASS** only (33/33 checks, exit 3). The authoritative run is **PENDING** on the reference release host. |
 | SC-001 documentation walkthrough (T107) | **INFORMATIVE PASS**: 3.59 minutes from `git clone` to the Smoke flow stop point, on a machine that is not a clean environment. The authoritative clean-environment walkthrough is **PENDING** (see the T107 section). |
 | Dashboard benchmark (DASH-004, SC-010) | **PENDING**. It gates only on the reference release host with `.env.release-test`. It was **not run** here, and no numbers are recorded. |
 
-Release readiness can be claimed only after these four steps:
+Release readiness can be claimed only after these three steps (the official API lint, formerly step 3, now passes):
 1. `scripts/verify-release.ps1 -ReferenceHost -HostDescription "<host>"` exits 0 on the reference host from a clean checkout.
 2. The gating benchmark passes on that host.
-3. The official API lint passes.
-4. The SC-001 walkthrough is repeated in a clean environment (T107) and finishes in 30 minutes or less.
+3. The SC-001 walkthrough is repeated in a clean environment (T107) and finishes in 30 minutes or less.
+
+## Release-closure run (2026-09-25, on top of `23854d8`)
+
+This run closed the release blockers that do not need the reference host. Its results supersede the older figures in the sections below. The host is the same Windows 11 / Docker Desktop machine, so the authoritative gates remain **pending**.
+
+| Check | Command | Result |
+|---|---|---|
+| Official API lint | `yarn workspace api lint` (now check-only; `lint:fix` is the explicit auto-fix) | **PASS**, 0 problems. The 33 findings were fixed without disabling rules. Two were real bugs: an object filter value was searched as `"[object Object]"` (now 400, `prisma-list-query-builder.spec.ts`), and a `j:`-prefixed (JSON-shaped) refresh cookie gave 500 (now 401, `auth-session.e2e-spec.ts`). |
+| Type checks | `yarn check-types` | **PASS**. It now runs `check-types` in both workspaces: API sources and tests, and the web app, Vite config, and Playwright specs. A deliberate type error in each workspace made it fail. |
+| API unit | `yarn workspace api test` | **681/681** (30 suites) |
+| API e2e | `yarn workspace api test:e2e` | **841/841** (29 suites). This includes the parser rate gate (T048), both exactly-3 replays, and the new Gmail callback suite. |
+| API build + `start:prod` | `yarn workspace api build`, then `yarn workspace api start:prod` | **PASS**. `start:prod` now runs `node dist/src/main.js`; with a valid configuration it logged `app.started` and `/api/health/ready` returned 200. |
+| Swagger | `yarn workspace api swagger:generate`, compared with `contracts/openapi.yaml` | **PASS**: all 52 contract operations present. Envelope, Error, EmailSyncRun, GoalFeasibility, Alert, AlertDelivery, BudgetWrite (`UpdateBudgetDto`), and UserSettingsWrite (`UpdateUserSettingsDto`) match the contract's properties and required fields. All 89 operations document a response (at least the `Error` default). Guarded by `src/swagger.spec.ts`. |
+| Web | `yarn workspace web test`, `lint`, `check-types`, `build` | **51/51**, 0 lint problems, types pass, build passes |
+| Playwright | `yarn workspace web test:e2e` against the development stack | **15/15 clean runs** (2 tests each): 10 in a row, then 5 while the full API e2e suite loaded the same machine |
+| T008 migrations | `verify-migrations.ps1` | **10/10 PASS** |
+| T009 secret scan | `scan-secrets.ps1` | **clean**: 533 files, history `80f3e0d..23854d8` (14 commits) |
+| Production compose | `docker compose --env-file .env.release-test -f docker-compose.prod.yml config --quiet` | **valid** |
+| T100 informative rerun | `verify-release.ps1 -ProxyAddress 127.0.0.1 -CaCert <test CA>`, with release images rebuilt from this tree | **33/33 checks passed, exit 3 (INFORMATIVE ONLY)**. The observed proxy peer `::ffff:172.28.0.1` is covered by `TRUST_PROXY=loopback,172.28.0.1`. |
+
+**Playwright setup flake.** The single earlier `admin:bootstrap --revoke` failure (`PrismaClientKnownRequestError`) did not reproduce in the 15 runs above, including 5 under heavy parallel load. No fix was invented. The CLI prints the Prisma error code, so a recurrence can be diagnosed. This remains an open observation, not a known defect.
+
+**User-facing polish (no new architecture).**
+- **Gmail callback.** It now returns a browser (`Accept: text/html`) to `/app/email` on the configured web origin, with only `?gmail=connected` or `?gmail=failed&reason=STATE_INVALID|GOOGLE_REFUSED|GOOGLE_UNAVAILABLE|FAILED`. The state and nonce checks are unchanged, and there is no token, code, or message in the URL. API clients keep the enveloped JSON.
+  - API tests: `test/gmail-callback-redirect.e2e-spec.ts`, 6 tests, covering success, three failures, an ignored request-supplied target, and JSON compatibility.
+- **Email page.**
+  - It shows the consent outcome with fixed texts only.
+  - **Ngắt kết nối** disconnects after confirmation, disabled while the request runs.
+  - The listen-rule switch saves `isEnabled`, and reverts with an error when saving fails.
+  - Tests: 4 new Vitest tests in `EmailPage.test.tsx`.
 
 ## Backend (apps/api)
 
@@ -176,7 +205,7 @@ No real email content, bank data, or usable credential appears in the repository
 
 ## Open findings
 
-1. **Official API lint fails:** 31 errors and 2 warnings, all in files Phase 8 did not change:
+1. **Resolved in the release-closure run.** Official API lint failed with 31 errors and 2 warnings, all in files Phase 8 did not change:
    - `common/decorators/current-user.decorator.ts`: unsafe `any`;
    - `common/utils/prisma-list-query-builder.ts`: `no-base-to-string`;
    - `modules/auth/auth.controller.ts`: unsafe-argument warnings;
@@ -184,19 +213,19 @@ No real email content, bank data, or usable credential appears in the repository
    - Prettier formatting in several other files.
 
    It blocks a release that requires the official lint.
-2. **The generated Swagger describes few responses.** The envelope, `EmailSyncRun`, `GoalFeasibility`, and `Alert` are only in `contracts/openapi.yaml`, not in `swagger.json`. This is documentation only; runtime shapes are asserted by e2e tests.
-3. **Occasional Playwright setup failure.** Once in about 6 development runs under heavy parallel load, `admin:bootstrap --revoke` in the global setup exited 1 with `PrismaClientKnownRequestError`. The cause is unconfirmed; the CLI now prints the error's non-secret code for diagnosis. The final runs passed twice in a row.
+2. **Resolved in the release-closure run.** The generated Swagger described few responses. The envelope, `EmailSyncRun`, `GoalFeasibility`, and `Alert` are only in `contracts/openapi.yaml`, not in `swagger.json`. This is documentation only; runtime shapes are asserted by e2e tests.
+3. **Not reproduced in 15 later runs (see the release-closure run).** Occasional Playwright setup failure. Once in about 6 development runs under heavy parallel load, `admin:bootstrap --revoke` in the global setup exited 1 with `PrismaClientKnownRequestError`. The cause is unconfirmed; the CLI now prints the error's non-secret code for diagnosis. The final runs passed twice in a row.
 4. **The authoritative T100 run and the benchmark are pending** on the reference release host.
-5. **The informative T100 run used slightly older images.** The release images were built before two later changes: the `bootstrap-admin` error-code change, which affects error output only, and the `DonutChart` fix. Both changes are covered by the API e2e run (834/834) and the web runs above.
+5. **Resolved by the release-closure T100 rerun on freshly built images.** The earlier informative T100 run used slightly older images. The release images were built before two later changes: the `bootstrap-admin` error-code change, which affects error output only, and the `DonutChart` fix. Both changes are covered by the API e2e run (834/834) and the web runs above.
 6. **`verify-release.ps1` has run only under Windows PowerShell 5.1.** It was written for pwsh 7 on Linux as well, but its first run there will be the authoritative run on the reference host.
-7. **T101's own check is not met.** T101 requires that no critical test or configuration finding remains; items 1 and 4 remain.
+7. **T101's own check is not met.** T101 requires that no critical test or configuration finding remains; item 4 (the authoritative T100 run and the benchmark) remains.
 8. **Accepted limitations disclosed by the Phase 9 documentation.** These are not fixed in this release:
-   - after Gmail consent, the OAuth callback answers with JSON and does not redirect back to the app;
-   - the web app has no Gmail disconnect button (use the API), and its listen-rule switch does not save;
+   - ~~after Gmail consent, the OAuth callback answers with JSON~~: resolved, browsers now return to the Email page;
+   - ~~no Gmail disconnect button, and a listen-rule switch that does not save~~: resolved;
    - rotating `EMAIL_TOKEN_ENCRYPTION_KEY` makes existing connections fail with 500 until an operator marks them reconnect-required, using the SQL in `deployment.md`;
    - the development API does not shut down gracefully (only the release image does);
    - there is no login throttling;
    - `dataRetentionDays` is stored but not enforced.
-9. **Broken or empty helper scripts, not used by any document:**
+9. **Resolved in the release-closure run.** Broken or empty helper scripts, not used by any document:
    - `yarn workspace api start:prod` runs `node dist/main`, but the build writes `dist/src/main.js`;
    - the root `yarn check-types` does nothing, because no workspace defines `check-types`.

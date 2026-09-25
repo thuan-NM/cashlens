@@ -18,6 +18,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -49,6 +59,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -67,6 +87,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -96,6 +126,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -130,6 +170,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -157,6 +207,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AdminUserResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -198,6 +258,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -219,6 +289,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -247,6 +327,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -281,6 +371,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -299,6 +399,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AuthResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -323,6 +433,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -337,6 +457,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -351,6 +481,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -398,6 +538,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -420,6 +570,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -443,6 +603,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -474,6 +644,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -495,6 +675,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -536,6 +726,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -558,6 +758,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -581,6 +791,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -612,6 +832,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -633,6 +863,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -765,6 +1005,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -787,6 +1037,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -810,6 +1070,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -841,6 +1111,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -862,6 +1142,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -895,6 +1185,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -928,6 +1228,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "summary": "Applies the rules now, replacing a manual category if there is one\n(CLASS-006). The client warns before calling it; the body must be empty.",
@@ -952,6 +1262,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -985,6 +1305,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1008,6 +1338,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1022,6 +1362,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1044,6 +1394,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1077,6 +1437,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1098,6 +1468,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1176,7 +1556,61 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Owner alerts, paginated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "data",
+                            "total",
+                            "page",
+                            "limit"
+                          ],
+                          "properties": {
+                            "data": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "#/components/schemas/Alert"
+                              }
+                            },
+                            "total": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "page": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "limit": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1198,7 +1632,35 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "User-authored alert",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Alert"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1213,6 +1675,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "summary": "ALERT-004: unread alerts, whatever their lifecycle status.",
@@ -1228,6 +1700,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1242,6 +1724,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1264,6 +1756,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1286,7 +1788,35 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Owned alert marked read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Alert"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1309,7 +1839,35 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Owned alert dismissed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Alert"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "summary": "ACTIVE -> DISMISSED, marking it read; 409 when resolved (ALERT-010).",
@@ -1335,6 +1893,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1359,6 +1927,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1390,6 +1968,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1404,6 +1992,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1418,6 +2016,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1441,6 +2049,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1455,6 +2073,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1478,6 +2106,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1492,6 +2130,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1514,6 +2162,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1547,6 +2205,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1568,6 +2236,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1590,7 +2268,35 @@
         ],
         "responses": {
           "201": {
-            "description": ""
+            "description": "Terminal or continuable run result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/EmailSyncRun"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1613,7 +2319,38 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Owner-visible sync runs, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/EmailSyncRun"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1670,6 +2407,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1684,6 +2431,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1706,6 +2463,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1739,6 +2506,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1769,6 +2546,16 @@
                 }
               }
             }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1792,6 +2579,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1837,6 +2634,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1859,6 +2666,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1882,6 +2699,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1905,6 +2732,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1928,6 +2765,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1959,6 +2806,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -1980,6 +2837,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2003,6 +2870,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "summary": "Re-evaluates the budget alert conditions now (BUDGET-003).",
@@ -2033,6 +2910,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2055,6 +2942,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2100,7 +2997,35 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Feasibility or insufficient-data result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/GoalFeasibility"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "summary": "Enveloped `GoalFeasibility`; side-effect free (never touches alerts).",
@@ -2125,6 +3050,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2156,6 +3091,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2177,6 +3122,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2210,6 +3165,16 @@
         "responses": {
           "201": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2234,6 +3199,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2268,6 +3243,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2292,6 +3277,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2316,6 +3311,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2340,6 +3345,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2364,6 +3379,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2378,6 +3403,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -2392,6 +3427,16 @@
         "responses": {
           "200": {
             "description": ""
+          },
+          "default": {
+            "description": "Error (code, message, correlationId, and fields on validation errors)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -3290,6 +4335,277 @@
           }
         }
       },
+      "Envelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "description": "The response payload"
+          },
+          "message": {
+            "type": "string",
+            "example": "Success"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string",
+            "description": "Per-request id, also sent as the x-correlation-id header"
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message",
+          "timestamp"
+        ]
+      },
+      "AlertType": {
+        "type": "string",
+        "enum": [
+          "BUDGET_THRESHOLD",
+          "LARGE_TRANSACTION",
+          "CATEGORY_SHIFT",
+          "GOAL_RISK",
+          "CASHFLOW_RISK",
+          "PARSER_ISSUE",
+          "SYSTEM"
+        ]
+      },
+      "AlertSeverity": {
+        "type": "string",
+        "enum": [
+          "INFO",
+          "WARNING",
+          "CRITICAL"
+        ]
+      },
+      "AlertStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "DISMISSED",
+          "RESOLVED"
+        ]
+      },
+      "AlertDeliveryChannel": {
+        "type": "string",
+        "enum": [
+          "EMAIL",
+          "IN_APP"
+        ]
+      },
+      "AlertDeliveryStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "SENT",
+          "SKIPPED",
+          "FAILED"
+        ]
+      },
+      "AlertDelivery": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AlertDeliveryChannel"
+              }
+            ]
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AlertDeliveryStatus"
+              }
+            ]
+          },
+          "skipReason": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "NOT_CRITICAL",
+              "EMAIL_DISABLED",
+              "NOTIFICATIONS_DISABLED",
+              "TRANSPORT_DISABLED"
+            ]
+          },
+          "attemptCount": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "lastAttemptAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "failureCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "For example TIMEOUT, AUTH, REJECTED, INTERRUPTED"
+          }
+        },
+        "required": [
+          "channel",
+          "status",
+          "skipReason",
+          "attemptCount",
+          "lastAttemptAt",
+          "sentAt",
+          "failureCode"
+        ]
+      },
+      "Alert": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AlertType"
+              }
+            ]
+          },
+          "severity": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AlertSeverity"
+              }
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "resourceType": {
+            "type": "string",
+            "nullable": true
+          },
+          "resourceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "isRead": {
+            "type": "boolean"
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AlertStatus"
+              }
+            ]
+          },
+          "conditionKey": {
+            "type": "string",
+            "nullable": true,
+            "description": "null for legacy and user-authored alerts"
+          },
+          "thresholdValue": {
+            "type": "number",
+            "nullable": true
+          },
+          "observedValue": {
+            "type": "number",
+            "nullable": true
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "triggeredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "resolutionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "dismissedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "emailDelivery": {
+            "nullable": true,
+            "description": "null for legacy and user-authored alerts (no delivery row)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AlertDelivery"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "type",
+          "severity",
+          "title",
+          "message",
+          "resourceType",
+          "resourceId",
+          "isRead",
+          "readAt",
+          "status",
+          "conditionKey",
+          "thresholdValue",
+          "observedValue",
+          "periodStart",
+          "periodEnd",
+          "triggeredAt",
+          "resolvedAt",
+          "resolutionReason",
+          "dismissedAt",
+          "createdAt",
+          "emailDelivery"
+        ]
+      },
       "CreateAlertDto": {
         "type": "object",
         "properties": {
@@ -3448,6 +4764,108 @@
             "minimum": 0
           }
         }
+      },
+      "EmailSyncTriggerType": {
+        "type": "string",
+        "enum": [
+          "MANUAL",
+          "SCHEDULED",
+          "WEBHOOK",
+          "BACKFILL"
+        ]
+      },
+      "EmailSyncStatus": {
+        "type": "string",
+        "enum": [
+          "RUNNING",
+          "SUCCESS",
+          "PARTIAL_FAILED",
+          "FAILED",
+          "EXPIRED"
+        ]
+      },
+      "EmailSyncRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "emailConnectionId": {
+            "type": "string"
+          },
+          "triggerType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmailSyncTriggerType"
+              }
+            ]
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmailSyncStatus"
+              }
+            ]
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "emailsFound": {
+            "type": "number",
+            "minimum": 0
+          },
+          "emailsMatched": {
+            "type": "number",
+            "minimum": 0
+          },
+          "emailsParsed": {
+            "type": "number",
+            "minimum": 0
+          },
+          "transactionsCreated": {
+            "type": "number",
+            "minimum": 0
+          },
+          "emailsFailed": {
+            "type": "number",
+            "minimum": 0
+          },
+          "hasMore": {
+            "type": "boolean",
+            "description": "True when a non-FAILED run left work in the current window; the next manual sync continues it"
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true,
+            "description": "Sanitized failure summary"
+          }
+        },
+        "required": [
+          "id",
+          "emailConnectionId",
+          "triggerType",
+          "status",
+          "startedAt",
+          "finishedAt",
+          "createdAt",
+          "emailsFound",
+          "emailsMatched",
+          "emailsParsed",
+          "transactionsCreated",
+          "emailsFailed",
+          "hasMore",
+          "errorMessage"
+        ]
       },
       "ParserFieldDto": {
         "type": "object",
@@ -3788,6 +5206,115 @@
           "targetAmount"
         ]
       },
+      "GoalScenarioType": {
+        "type": "string",
+        "enum": [
+          "FULL",
+          "INSTALLMENT"
+        ]
+      },
+      "GoalFeasibility": {
+        "type": "object",
+        "properties": {
+          "goalId": {
+            "type": "string"
+          },
+          "scenario": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GoalScenarioType"
+              }
+            ]
+          },
+          "months": {
+            "type": "number",
+            "minimum": 0,
+            "description": "User months from the current one through the deadline month"
+          },
+          "horizonSource": {
+            "type": "string",
+            "enum": [
+              "QUERY",
+              "TARGET_DATE",
+              "GOAL_MONTHS",
+              "DEFAULT"
+            ]
+          },
+          "pastDeadline": {
+            "type": "boolean"
+          },
+          "targetAmount": {
+            "type": "number"
+          },
+          "savedAmount": {
+            "type": "number"
+          },
+          "remainingAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "totalCost": {
+            "type": "number"
+          },
+          "monthlyRequired": {
+            "type": "number",
+            "minimum": 0
+          },
+          "feasibilityScore": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "nullable": true,
+            "description": "null when INSUFFICIENT_DATA"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "SAFE",
+              "ACCEPTABLE",
+              "RISKY",
+              "NOT_RECOMMENDED",
+              "INSUFFICIENT_DATA"
+            ]
+          },
+          "availableMonthlyCashflow": {
+            "type": "number",
+            "nullable": true
+          },
+          "observationMonths": {
+            "example": [
+              "2026-06",
+              "2026-07",
+              "2026-08"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "monthsRequired": {
+            "type": "number",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "description": "Comma-separated reason codes"
+          }
+        },
+        "required": [
+          "goalId",
+          "months",
+          "horizonSource",
+          "pastDeadline",
+          "targetAmount",
+          "savedAmount",
+          "remainingAmount",
+          "monthlyRequired",
+          "feasibilityScore",
+          "status",
+          "observationMonths"
+        ]
+      },
       "UpdateGoalDto": {
         "type": "object",
         "properties": {
@@ -3854,6 +5381,55 @@
         },
         "required": [
           "amount"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "example": 404
+          },
+          "message": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "error": {
+            "type": "string",
+            "description": "HTTP reason phrase"
+          },
+          "code": {
+            "type": "string",
+            "example": "NOT_FOUND"
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "object",
+            "description": "Validation messages per request field (VALIDATION_FAILED)",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "statusCode",
+          "message",
+          "code",
+          "correlationId"
         ]
       }
     }

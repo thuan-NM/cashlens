@@ -47,9 +47,7 @@ export class TokenEncryptionService {
   }
 
   private key(): Buffer {
-    const secret = this.configService.get<string>(
-      'EMAIL_TOKEN_ENCRYPTION_KEY',
-    );
+    const secret = this.configService.get<string>('EMAIL_TOKEN_ENCRYPTION_KEY');
     if (!secret || secret.length < 32) {
       throw new Error(
         'EMAIL_TOKEN_ENCRYPTION_KEY must contain at least 32 characters',

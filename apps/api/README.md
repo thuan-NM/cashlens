@@ -13,7 +13,10 @@ Frequently used commands, run from the repository root:
 | `yarn workspace api prisma generate` | Generate the Prisma client, once after `yarn install` and after schema changes |
 | `yarn workspace api test` | Unit tests (`src/**/*.spec.ts`) |
 | `yarn workspace api test:e2e` | Integration tests (`test/*.e2e-spec.ts`); needs `E2E_DATABASE_URL` |
+| `yarn workspace api lint` / `lint:fix` | ESLint check only / with automatic fixes |
+| `yarn workspace api check-types` | Type-check sources and tests |
 | `yarn workspace api build` | Compile to `dist/` (the entry point is `dist/src/main.js`) |
+| `yarn workspace api start:prod` | Run the compiled API (`node dist/src/main.js`) with the configuration in the environment |
 | `yarn workspace api prisma migrate deploy` | Apply migrations to `DATABASE_URL` |
 | `yarn workspace api admin:bootstrap --email <email>` | Promote the first administrator (see Local development) |
 | `yarn workspace api swagger:generate` | Regenerate `docs/swagger.json` |

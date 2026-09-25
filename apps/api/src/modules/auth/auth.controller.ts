@@ -65,7 +65,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthResponseDto> {
     const session = await this.authService.refresh(
-      request.cookies?.refreshToken,
+      this.refreshTokenFrom(request),
       this.getRequestMeta(request),
     );
     this.setAuthCookies(response, session);
@@ -86,7 +86,7 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     const result = await this.authService.logout(
-      request.cookies?.refreshToken,
+      this.refreshTokenFrom(request),
       this.getRequestMeta(request),
     );
     this.clearAuthCookies(response);
@@ -142,6 +142,15 @@ export class AuthController {
       'refreshToken',
       this.cookieOptions(REFRESH_COOKIE_PATH),
     );
+  }
+
+  /**
+   * The refresh-token cookie, only when it is a string. cookie-parser turns
+   * `j:`-prefixed values into objects, which are treated as no token.
+   */
+  private refreshTokenFrom(request: Request): string | undefined {
+    const token: unknown = request.cookies?.refreshToken;
+    return typeof token === 'string' ? token : undefined;
   }
 
   private getRequestMeta(request: Request) {

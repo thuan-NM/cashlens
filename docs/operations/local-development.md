@@ -182,11 +182,11 @@ yarn workspace api prisma generate
 | API unit tests | `yarn workspace api test` | nothing else |
 | API integration tests | `yarn workspace api test:e2e` | `E2E_DATABASE_URL` (below) and the database container |
 | Web component tests (Vitest) | `yarn workspace web test` | nothing else |
-| Web lint | `yarn workspace web lint` | nothing else |
+| Lint (check only) | `yarn workspace api lint` and `yarn workspace web lint`; `yarn workspace api lint:fix` applies automatic fixes | nothing else |
 | Browser tests (Playwright, Chromium) | `yarn workspace web test:e2e:install` once, then `yarn workspace web test:e2e` | the running development stack |
 | API build | `yarn workspace api build` | output `apps/api/dist/src/main.js` |
 | Web build | `yarn workspace web build` | output `apps/web/dist` |
-| Type checks | `yarn workspace web build` includes `tsc`; for the API, run `npx tsc -p tsconfig.json --noEmit` in `apps/api` | |
+| Type checks | `yarn check-types` (both workspaces: API sources and tests; web app, Vite config, and Playwright specs) | `prisma generate` done |
 
 **Integration test database.**
 - The integration tests use their own database, never the development one. Its name **must contain `test`**, or the tests refuse to run.

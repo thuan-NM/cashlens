@@ -145,4 +145,72 @@ describe("EmailPage", () => {
     await settle();
     expect(api.calls("POST", "/email-listen-rules")).toHaveLength(1);
   });
+
+  it("shows the outcome of the Gmail consent and clears it from the address", async () => {
+    emailApi();
+    renderWithProviders(<EmailPage />, { route: "/app/email?gmail=connected" });
+    expect(await screen.findByText("Đã kết nối Gmail")).toBeInTheDocument();
+  });
+
+  it("explains a failed Gmail consent with a fixed message, never text from the address", async () => {
+    emailApi();
+    renderWithProviders(<EmailPage />, { route: "/app/email?gmail=failed&reason=STATE_INVALID" });
+    expect(await screen.findByText("Không thể kết nối Gmail")).toBeInTheDocument();
+    expect(screen.getByText("Phiên kết nối đã hết hạn hoặc không hợp lệ. Hãy kết nối lại.")).toBeInTheDocument();
+
+    renderWithProviders(<EmailPage />, { route: "/app/email?gmail=failed&reason=%3Cb%3Einjected%3C%2Fb%3E" });
+    expect(await screen.findAllByText("Không thể kết nối Gmail")).not.toHaveLength(0);
+    expect(screen.queryByText(/injected/)).not.toBeInTheDocument();
+  });
+
+  it("disconnects Gmail after confirmation, with the action disabled while the request runs", async () => {
+    const pending = deferred();
+    let connected = true;
+    const api = mockApi().signedIn()
+      .on("GET", "/email-connections", () => ok(connected ? [connection] : []))
+      .on("GET", "/email-listen-rules", ok([]))
+      .on("GET", "/email-connections/c1/sync-runs", ok([]))
+      .on("DELETE", "/email-connections/c1", () => pending.promise);
+
+    const { user } = renderWithProviders(<EmailPage />);
+    await user.click(await screen.findByRole("button", { name: "Ngắt kết nối" }));
+    await user.click(await screen.findByRole("button", { name: "Ngắt kết nối Gmail" }));
+    await settle();
+    expect(api.calls("DELETE", "/email-connections/c1")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Đang ngắt kết nối..." })).toBeDisabled();
+
+    connected = false;
+    await act(async () => pending.resolve(ok({ id: "c1" })));
+    expect(await screen.findByText("Đã ngắt kết nối Gmail")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Kết nối Gmail" })).toBeInTheDocument();
+    expect(api.calls("DELETE", "/email-connections/c1")).toHaveLength(1);
+  });
+
+  it("saves the listen-rule switch, and restores it when saving fails", async () => {
+    const rule = { id: "r1", name: "VCB", senderEmail: "notify@vcb.example.test", isEnabled: true };
+    let stored = { ...rule };
+    const api = mockApi().signedIn()
+      .on("GET", "/email-connections", ok([connection]))
+      .on("GET", "/email-listen-rules", () => ok([stored]))
+      .on("GET", "/email-connections/c1/sync-runs", ok([]))
+      .on("PATCH", "/email-listen-rules/r1", (request) => {
+        const body = request.body as { isEnabled: boolean };
+        if (api.calls("PATCH", "/email-listen-rules/r1").length > 1) return fail(500, "Internal server error");
+        stored = { ...stored, isEnabled: body.isEnabled };
+        return ok(stored);
+      });
+
+    const { user } = renderWithProviders(<EmailPage />);
+    const toggle = await screen.findByRole("switch", { name: "Bật rule VCB" });
+    expect(toggle).toBeChecked();
+
+    await user.click(toggle);
+    await waitFor(() => expect(api.calls("PATCH", "/email-listen-rules/r1")).toHaveLength(1));
+    expect(api.calls("PATCH", "/email-listen-rules/r1")[0].body).toEqual({ isEnabled: false });
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Bật rule VCB" })).not.toBeChecked());
+
+    await user.click(screen.getByRole("switch", { name: "Bật rule VCB" }));
+    expect(await screen.findByText("Không thể lưu rule")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("switch", { name: "Bật rule VCB" })).not.toBeChecked());
+  });
 });
