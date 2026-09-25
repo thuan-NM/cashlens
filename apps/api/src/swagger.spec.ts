@@ -64,6 +64,32 @@ const REQUIRED: Record<string, string[]> = {
     'createdAt',
   ],
   AlertDelivery: ['channel', 'status', 'attemptCount'],
+  // Consumed by apps/web through @repo/api-contract (refactor wave 1).
+  AlertSetting: [
+    'id',
+    'type',
+    'inAppEnabled',
+    'emailEnabled',
+    'emailAvailable',
+  ],
+  EmailConnection: [
+    'id',
+    'provider',
+    'emailAddress',
+    'status',
+    'recoveryAction',
+    'reconnectRequired',
+    'syncInProgress',
+  ],
+  Goal: [
+    'id',
+    'name',
+    'targetAmount',
+    'savedAmount',
+    'remainingAmount',
+    'currency',
+    'status',
+  ],
 };
 
 const enveloped = (

@@ -12,7 +12,8 @@ export function SettingsPage() {
   const { result: userResult } = useCustom<ApiUser>({ url: "/auth/me", method: "get" });
   const { mutateAsync } = useCustomMutation();
   const user = userResult?.data;
-  const settings: ApiUserSettings = user?.settings ?? {};
+  // Until the account loads, every setting falls back to its default below.
+  const settings: Partial<ApiUserSettings> = user?.settings ?? {};
   const initials = String(user?.fullName ?? user?.email ?? "CL").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 
   const updateSetting = async (values: Record<string, unknown>) => {

@@ -1,36 +1,12 @@
+import type { EmailConnection as ContractEmailConnection, EmailSyncRun as ContractEmailSyncRun } from "@repo/api-contract";
 import { ApiError } from "@/api/client";
 import { describeApiError } from "@/api/mappers";
 
-/** The API's EmailSyncRun (contracts/openapi.yaml). */
-export interface SyncRun {
-  id: string;
-  status: "RUNNING" | "SUCCESS" | "PARTIAL_FAILED" | "FAILED" | "EXPIRED";
-  startedAt: string;
-  finishedAt: string | null;
-  emailsFound: number;
-  emailsMatched: number;
-  emailsParsed: number;
-  emailsFailed: number;
-  transactionsCreated: number;
-  hasMore: boolean;
-  errorMessage: string | null;
-}
+/** The API's EmailSyncRun: the API contract's type. */
+export type SyncRun = ContractEmailSyncRun;
 
-/** The API's email connection view, including recovery state (EMAIL-003). */
-export interface EmailConnection {
-  id: string;
-  provider: string;
-  emailAddress: string;
-  status: "ACTIVE" | "EXPIRED" | "REVOKED" | "ERROR";
-  lastSyncedAt: string | null;
-  lastFailedAt: string | null;
-  errorMessage: string | null;
-  reconnectRequired: boolean;
-  recoveryAction: "NONE" | "RETRY" | "RECONNECT" | "CONNECT";
-  backfillFrom: string | null;
-  backfillCompletedAt: string | null;
-  syncInProgress: boolean;
-}
+/** The API's email connection view, including recovery state (EMAIL-003): the API contract's type. */
+export type EmailConnection = ContractEmailConnection;
 
 export type Tone = "success" | "info" | "warning" | "error";
 

@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { Alert, Skeleton } from "antd";
-import { useCustom } from "@refinedev/core";
 import { AreaChart } from "@/components/charts/AreaChart";
 import { DonutChart } from "@/components/charts/DonutChart";
 import { GaugeChart } from "@/components/charts/GaugeChart";
@@ -11,41 +10,13 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { describeApiError, mapTransactionRecord, type TransactionPayload } from "@/api/mappers";
+import { describeApiError, mapTransactionRecord } from "@/api/mappers";
 import { formatMoney, formatMoneyShort, formatMonthKey, formatPeriod, formatSign } from "@/utils/format";
+import { CASHFLOW_MONTHS, useDashboardData } from "../useDashboardData";
 
 const colors = ["#b06fd6", "#d2604c", "#D97757", "#5b8def", "#8a8378", "#4a9d6e"];
 const UNCATEGORIZED_COLOR = "#9c968d";
 const DONUT_SLICES = 5;
-const CASHFLOW_MONTHS = 6;
-
-type CurrencyTotals = { currency: string; income: number; expense: number; netCashflow: number; transactionCount: number };
-type Overview = CurrencyTotals & {
-  month: string;
-  savingRate: number;
-  unreadAlerts: number;
-  currencies: CurrencyTotals[];
-  periodStart: string;
-  periodEnd: string;
-  /** The account IANA time zone the month periods are computed in. */
-  timeZone?: string | null;
-};
-type CashflowMonth = { month: string; currency: string; income: number; expense: number; netCashflow: number };
-type CategoryRef = { name?: string | null; color?: string | null } | null;
-type BreakdownRow = { categoryId: string | null; category: CategoryRef; currency: string; amount: number; count: number };
-type HotBudget = {
-  id: string;
-  categoryId: string | null;
-  name: string;
-  currency: string;
-  amount: number;
-  spent: number;
-  remaining: number;
-  percentUsed: number;
-  thresholdPercent: number;
-  category: CategoryRef;
-};
-type Insight = { type: string; severity: string; title: string; message: string };
 /**
  * The React Query state of one request. Its `data` is undefined until the first
  * success (refine's `result.data` is a frozen `{}` while pending or failed).
@@ -113,19 +84,7 @@ function renderSection<T>(call: Call<T>, label: string, render: (data: T) => Rea
 }
 
 export function DashboardPage() {
-  // One dashboard load (DASH-004): six requests for the current user month, sent
-  // together with no month parameter. No request waits for the overview; the
-  // sections render once the overview gives the base currency and time zone.
-  const overviewCall = useCustom<Overview>({ url: "/dashboard/overview", method: "get" });
-  const cashflowCall = useCustom<CashflowMonth[]>({
-    url: "/dashboard/cashflow",
-    method: "get",
-    config: { query: { months: CASHFLOW_MONTHS } },
-  });
-  const breakdownCall = useCustom<BreakdownRow[]>({ url: "/dashboard/category-breakdown", method: "get" });
-  const recentCall = useCustom<TransactionPayload[]>({ url: "/dashboard/recent-transactions", method: "get" });
-  const hotBudgetsCall = useCustom<HotBudget[]>({ url: "/dashboard/hot-budgets", method: "get" });
-  const insightsCall = useCustom<Insight[]>({ url: "/dashboard/insights", method: "get" });
+  const { overviewCall, cashflowCall, breakdownCall, recentCall, hotBudgetsCall, insightsCall } = useDashboardData();
 
   const overview = overviewCall.query.data?.data;
   if (!overview) {

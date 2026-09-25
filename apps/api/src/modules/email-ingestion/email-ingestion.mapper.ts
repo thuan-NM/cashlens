@@ -1,4 +1,5 @@
 import { EmailMessage, EmailSyncRun } from '@prisma/client';
+import { EmailSyncRunResponseDto } from './dto/email-sync-run.response';
 
 export const toEmailMessageResponse = (message: EmailMessage) => ({
   ...message,
@@ -11,7 +12,9 @@ export const toEmailMessageResponse = (message: EmailMessage) => ({
  * The contract's EmailSyncRun (T044). The lease token and the opaque provider
  * cursors stay internal.
  */
-export const toEmailSyncRunResponse = (run: EmailSyncRun) => ({
+export const toEmailSyncRunResponse = (
+  run: EmailSyncRun,
+): EmailSyncRunResponseDto => ({
   id: run.id,
   emailConnectionId: run.emailConnectionId,
   triggerType: run.triggerType,

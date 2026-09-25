@@ -5,6 +5,11 @@ import {
   AlertType,
   Prisma,
 } from '@prisma/client';
+import {
+  AlertDeliveryResponseDto,
+  AlertResponseDto,
+  AlertSettingResponseDto,
+} from './dto/alert.response';
 import { CreateAlertDto } from './dto/create-alert.dto';
 import { UpdateAlertSettingDto } from './dto/update-alert-setting.dto';
 
@@ -14,7 +19,9 @@ const decimalToNumber = (value: Prisma.Decimal | null) =>
 const iso = (value: Date | null) => value?.toISOString() ?? null;
 
 /** The email outcome (ALERT-005, ALERT-006); sanitized fields only. */
-export const toAlertDeliveryResponse = (delivery: AlertDelivery) => ({
+export const toAlertDeliveryResponse = (
+  delivery: AlertDelivery,
+): AlertDeliveryResponseDto => ({
   channel: delivery.channel,
   status: delivery.status,
   skipReason: delivery.skipReason,
@@ -30,7 +37,7 @@ export const toAlertDeliveryResponse = (delivery: AlertDelivery) => ({
  */
 export const toAlertResponse = (
   alert: Alert & { deliveries?: AlertDelivery[] },
-) => ({
+): AlertResponseDto => ({
   id: alert.id,
   userId: alert.userId,
   type: alert.type,
@@ -64,7 +71,7 @@ export const toAlertResponse = (
 export const toAlertSettingResponse = (
   setting: AlertSetting,
   emailAvailable: boolean,
-) => ({
+): AlertSettingResponseDto => ({
   id: setting.id,
   userId: setting.userId,
   type: setting.type,

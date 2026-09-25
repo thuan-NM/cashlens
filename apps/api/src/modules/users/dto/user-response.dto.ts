@@ -1,3 +1,5 @@
+import { ApiProperty } from '@nestjs/swagger';
+
 export class UserSettingsResponseDto {
   storeRawEmailBody!: boolean;
   /** Always false: raw email bodies are never retained (DATA-001). */
@@ -7,6 +9,7 @@ export class UserSettingsResponseDto {
   defaultMonthStartDay!: number;
   dataRetentionDays!: number | null;
   notificationEnabled!: boolean;
+  @ApiProperty({ type: 'object', additionalProperties: true, nullable: true })
   metadata!: Record<string, unknown> | null;
 }
 

@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
@@ -24,10 +24,26 @@ async function generateOpenApi(): Promise<void> {
   const outputDirectory = resolve(process.cwd(), 'docs');
   const outputPath = resolve(outputDirectory, 'swagger.json');
 
-  await mkdir(outputDirectory, { recursive: true });
-  await writeFile(outputPath, JSON.stringify(document, null, 2), 'utf8');
+  const generated = JSON.stringify(document, null, 2);
   await app.close();
 
+  // --check: fail when the committed document differs from the code (line
+  // endings ignored), so a DTO or decorator change cannot ship without it.
+  if (process.argv.includes('--check')) {
+    const committed = await readFile(outputPath, 'utf8').catch(() => '');
+    if (committed.replace(/\r\n/g, '\n') !== generated) {
+      console.error(
+        `${outputPath} is stale. Run: yarn workspace api swagger:generate`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+    console.log('OpenAPI document is current.');
+    return;
+  }
+
+  await mkdir(outputDirectory, { recursive: true });
+  await writeFile(outputPath, generated, 'utf8');
   console.log(`OpenAPI document generated at ${outputPath}`);
 }
 

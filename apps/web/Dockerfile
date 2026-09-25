@@ -17,7 +17,12 @@ COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/eslint-config/package.json packages/eslint-config/package.json
 COPY packages/typescript-config/package.json packages/typescript-config/package.json
+COPY packages/api-contract/package.json packages/api-contract/package.json
 RUN yarn workspaces focus web
+# Shared compiler settings, and the generated API contract types the web
+# type-check imports (types only: nothing from them reaches the bundle).
+COPY packages/typescript-config packages/typescript-config
+COPY packages/api-contract packages/api-contract
 COPY apps/web apps/web
 ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}

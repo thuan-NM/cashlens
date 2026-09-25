@@ -16,6 +16,7 @@ import type { RequestUser } from '../../common/types/request-user.type';
 import { CreateGoalDto } from './dto/create-goal.dto';
 import { GoalContributionDto } from './dto/goal-contribution.dto';
 import { GoalFeasibilityResponseDto } from './dto/goal-feasibility.response';
+import { GoalResponseDto } from './dto/goal.response';
 import { GoalSimulationQueryDto } from './dto/goal-simulation-query.dto';
 import { ListGoalsDto } from './dto/list-goals.dto';
 import { UpdateGoalDto } from './dto/update-goal.dto';
@@ -27,11 +28,13 @@ export class GoalsController {
   constructor(private readonly goalsService: GoalsService) {}
 
   @Get()
+  @ApiEnvelopedResponse(200, 'Owner goals', { arrayOf: GoalResponseDto })
   list(@CurrentUser() user: RequestUser, @Query() query: ListGoalsDto) {
     return this.goalsService.list(user, query);
   }
 
   @Post()
+  @ApiEnvelopedResponse(201, 'Created goal', { model: GoalResponseDto })
   create(@CurrentUser() user: RequestUser, @Body() dto: CreateGoalDto) {
     return this.goalsService.create(user, dto);
   }
@@ -50,11 +53,13 @@ export class GoalsController {
   }
 
   @Get(':id')
+  @ApiEnvelopedResponse(200, 'Owned goal', { model: GoalResponseDto })
   findById(@CurrentUser() user: RequestUser, @Param('id') id: string) {
     return this.goalsService.findById(user, id);
   }
 
   @Patch(':id')
+  @ApiEnvelopedResponse(200, 'Updated goal', { model: GoalResponseDto })
   update(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,
@@ -69,6 +74,9 @@ export class GoalsController {
   }
 
   @Post(':id/contribution')
+  @ApiEnvelopedResponse(201, 'Goal after the contribution', {
+    model: GoalResponseDto,
+  })
   contribute(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,

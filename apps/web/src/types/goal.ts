@@ -1,3 +1,5 @@
+import type { Goal as ContractGoal, GoalFeasibility as ContractGoalFeasibility } from "@repo/api-contract";
+
 export interface Goal {
   id: string;
   name: string;
@@ -13,43 +15,10 @@ export interface Goal {
   remaining?: number;
 }
 
-/** A goal as the API returns it (`GET /goals`). */
-export interface ApiGoal {
-  id: string;
-  name: string;
-  type: string;
-  targetAmount?: number | string;
-  savedAmount?: number | string;
-  remainingAmount?: number | string;
-  progressPercent?: number;
-  currency?: string;
-  targetDate?: string | null;
-  months?: number | null;
-  priority?: string;
-  status?: string;
-}
-
-export type GoalHorizonSource = "QUERY" | "TARGET_DATE" | "GOAL_MONTHS" | "DEFAULT";
-export type GoalFeasibilityStatus = "SAFE" | "ACCEPTABLE" | "RISKY" | "NOT_RECOMMENDED" | "INSUFFICIENT_DATA";
+/** A goal as the API returns it (`GET /goals`): the API contract's `Goal`. */
+export type ApiGoal = ContractGoal;
 
 /** `GET /goals/:id/simulation` (contract `GoalFeasibility`): every number comes from the API. */
-export interface GoalFeasibility {
-  goalId: string;
-  scenario?: string;
-  /** Remaining periods: user months from the current one through the deadline month. */
-  months: number;
-  horizonSource: GoalHorizonSource;
-  pastDeadline: boolean;
-  targetAmount: number;
-  savedAmount: number;
-  remainingAmount: number;
-  totalCost?: number;
-  monthlyRequired: number;
-  /** Null when there is not enough history. */
-  feasibilityScore: number | null;
-  status: GoalFeasibilityStatus;
-  availableMonthlyCashflow: number | null;
-  observationMonths: string[];
-  monthsRequired: number;
-  reason: string;
-}
+export type GoalFeasibility = ContractGoalFeasibility;
+export type GoalHorizonSource = GoalFeasibility["horizonSource"];
+export type GoalFeasibilityStatus = GoalFeasibility["status"];

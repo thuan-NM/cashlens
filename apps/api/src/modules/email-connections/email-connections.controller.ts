@@ -19,6 +19,8 @@ import { HttpsRequiredGuard } from '../../common/guards/https-required.guard';
 import { correlationIdOf } from '../../common/http/correlation';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import type { RequestUser } from '../../common/types/request-user.type';
+import { ApiEnvelopedResponse } from '../../common/swagger/api-envelope';
+import { EmailConnectionResponseDto } from './dto/email-connection.response';
 import { EmailConnectionsService } from './email-connections.service';
 import { GMAIL_OAUTH_FLOW_TTL_MS } from './gmail-oauth.service';
 
@@ -108,6 +110,9 @@ export class EmailConnectionsController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
+  @ApiEnvelopedResponse(200, 'Owner connections (disconnected ones excluded)', {
+    arrayOf: EmailConnectionResponseDto,
+  })
   list(@CurrentUser() user: RequestUser) {
     return this.service.list(user);
   }

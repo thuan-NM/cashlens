@@ -1723,7 +1723,28 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Per-type alert settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/AlertSetting"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -1755,7 +1776,25 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Updated alert setting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/AlertSetting"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -2061,6 +2100,7 @@
             }
           }
         },
+        "summary": "The OAuth redirect target, session-issuing: HTTPS only in production.\nA browser navigation (Accept: text/html) is sent back to the web app's\nEmail page with a fixed outcome; an API client gets the enveloped\nconnection, or the error body, as before.",
         "tags": [
           "EmailConnections"
         ]
@@ -2072,7 +2112,28 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Owner connections (disconnected ones excluded)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/EmailConnection"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -2909,7 +2970,28 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Owner goals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Goal"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -2941,7 +3023,25 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Created goal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Goal"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -3049,7 +3149,25 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Owned goal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Goal"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -3090,7 +3208,25 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Updated goal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Goal"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -3164,7 +3300,25 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Goal after the contribution",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Goal"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -3650,6 +3804,11 @@
       "UserSettingsResponseDto": {
         "type": "object",
         "properties": {
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
           "storeRawEmailBody": {
             "type": "boolean"
           },
@@ -3672,21 +3831,17 @@
           },
           "notificationEnabled": {
             "type": "boolean"
-          },
-          "metadata": {
-            "type": "object",
-            "nullable": true
           }
         },
         "required": [
+          "metadata",
           "storeRawEmailBody",
           "rawEmailBodyAvailable",
           "allowAiInsights",
           "autoClassificationEnabled",
           "defaultMonthStartDay",
           "dataRetentionDays",
-          "notificationEnabled",
-          "metadata"
+          "notificationEnabled"
         ]
       },
       "UserResponseDto": {
@@ -4592,6 +4747,7 @@
           "resourceId",
           "isRead",
           "readAt",
+          "metadata",
           "status",
           "conditionKey",
           "thresholdValue",
@@ -4653,6 +4809,63 @@
           "message"
         ]
       },
+      "AlertSetting": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AlertType"
+              }
+            ]
+          },
+          "inAppEnabled": {
+            "type": "boolean"
+          },
+          "emailEnabled": {
+            "type": "boolean"
+          },
+          "threshold": {
+            "type": "number",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "emailAvailable": {
+            "type": "boolean",
+            "description": "false when the deployment runs with email delivery disabled"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "type",
+          "inAppEnabled",
+          "emailEnabled",
+          "threshold",
+          "metadata",
+          "createdAt",
+          "updatedAt",
+          "emailAvailable"
+        ]
+      },
       "UpdateAlertSettingDto": {
         "type": "object",
         "properties": {
@@ -4686,6 +4899,140 @@
         },
         "required": [
           "type"
+        ]
+      },
+      "EmailProvider": {
+        "type": "string",
+        "enum": [
+          "GMAIL",
+          "OUTLOOK",
+          "IMAP"
+        ]
+      },
+      "EmailConnectionStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "EXPIRED",
+          "REVOKED",
+          "ERROR"
+        ]
+      },
+      "EmailConnection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provider": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmailProvider"
+              }
+            ]
+          },
+          "emailAddress": {
+            "type": "string"
+          },
+          "providerUserId": {
+            "type": "string",
+            "nullable": true
+          },
+          "tokenExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EmailConnectionStatus"
+              }
+            ]
+          },
+          "lastSyncedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "connectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "disconnectedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reconnectRequired": {
+            "type": "boolean"
+          },
+          "recoveryAction": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "RETRY",
+              "RECONNECT",
+              "CONNECT"
+            ]
+          },
+          "lastFailedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "backfillFrom": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "backfillCompletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "syncInProgress": {
+            "type": "boolean",
+            "description": "True while an unexpired sync lease exists"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "emailAddress",
+          "providerUserId",
+          "tokenExpiresAt",
+          "scopes",
+          "status",
+          "lastSyncedAt",
+          "connectedAt",
+          "disconnectedAt",
+          "errorMessage",
+          "createdAt",
+          "updatedAt",
+          "reconnectRequired",
+          "recoveryAction",
+          "lastFailedAt",
+          "backfillFrom",
+          "backfillCompletedAt",
+          "syncInProgress"
         ]
       },
       "CreateEmailListenRuleDto": {
@@ -5148,6 +5495,115 @@
           }
         }
       },
+      "GoalPriority": {
+        "type": "string",
+        "enum": [
+          "LOW",
+          "MEDIUM",
+          "HIGH",
+          "CRITICAL"
+        ]
+      },
+      "GoalStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "PAUSED",
+          "COMPLETED",
+          "ARCHIVED"
+        ]
+      },
+      "Goal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "targetAmount": {
+            "type": "number"
+          },
+          "savedAmount": {
+            "type": "number"
+          },
+          "remainingAmount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "max(0, target − saved), exact"
+          },
+          "progressPercent": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "currency": {
+            "type": "string"
+          },
+          "targetDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "months": {
+            "type": "number",
+            "nullable": true
+          },
+          "priority": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GoalPriority"
+              }
+            ]
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/GoalStatus"
+              }
+            ]
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "name",
+          "type",
+          "targetAmount",
+          "savedAmount",
+          "remainingAmount",
+          "progressPercent",
+          "currency",
+          "targetDate",
+          "months",
+          "priority",
+          "status",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "CreateGoalDto": {
         "type": "object",
         "properties": {
@@ -5254,7 +5710,8 @@
             "minimum": 0
           },
           "totalCost": {
-            "type": "number"
+            "type": "number",
+            "description": "Equals remainingAmount"
           },
           "monthlyRequired": {
             "type": "number",
@@ -5279,7 +5736,8 @@
           },
           "availableMonthlyCashflow": {
             "type": "number",
-            "nullable": true
+            "nullable": true,
+            "description": "null when INSUFFICIENT_DATA"
           },
           "observationMonths": {
             "example": [
@@ -5303,16 +5761,21 @@
         },
         "required": [
           "goalId",
+          "scenario",
           "months",
           "horizonSource",
           "pastDeadline",
           "targetAmount",
           "savedAmount",
           "remainingAmount",
+          "totalCost",
           "monthlyRequired",
           "feasibilityScore",
           "status",
-          "observationMonths"
+          "availableMonthlyCashflow",
+          "observationMonths",
+          "monthsRequired",
+          "reason"
         ]
       },
       "UpdateGoalDto": {

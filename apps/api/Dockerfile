@@ -19,7 +19,10 @@ COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/eslint-config/package.json packages/eslint-config/package.json
 COPY packages/typescript-config/package.json packages/typescript-config/package.json
+COPY packages/api-contract/package.json packages/api-contract/package.json
 RUN yarn workspaces focus api
+# Shared compiler settings that apps/api/tsconfig.json extends.
+COPY packages/typescript-config packages/typescript-config
 COPY apps/api apps/api
 # `prisma generate` never connects; this credential-free URL only satisfies prisma.config.ts.
 RUN DATABASE_URL="postgresql://localhost:5432/build" yarn workspace api prisma generate \
@@ -42,6 +45,7 @@ COPY apps/api/package.json apps/api/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY packages/eslint-config/package.json packages/eslint-config/package.json
 COPY packages/typescript-config/package.json packages/typescript-config/package.json
+COPY packages/api-contract/package.json packages/api-contract/package.json
 RUN yarn workspaces focus api --production \
   && mkdir -p apps/api/node_modules
 

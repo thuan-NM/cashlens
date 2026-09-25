@@ -71,13 +71,19 @@ api ──► SMTP relay (optional, for critical alert emails)
 3. **Read models:** the dashboard, budgets, and goal feasibility are computed from stored transactions, following the period, time-zone, and currency policy in `specs/001-operational-mvp/spec.md`.
 4. **Alerts:** each qualifying action evaluates the alert conditions. An alert stays active until its condition clears or the user dismisses it. Eligible critical alerts get one email delivery record, sent through SMTP or skipped when email is disabled.
 
+### Extension seams for post-MVP AI (not implemented)
+
+AI Financial Insight and ML classification are **not** part of this release, and no code exists for them. When they are separately specified, they belong in one new API module (`apps/api/src/modules/ai/`, with `insights/` and `classification/`), not in a separate service. They read through the same owner-scoped repositories and financial period policy as the dashboard. Until then, classification stays exactly: manual lock → user rules → system rules → deterministic fallback.
+
 ## Monorepo map
 
 | Path | Contents |
 |---|---|
 | `apps/api` | NestJS API, Prisma schema and migrations, API tests (`src/**/*.spec.ts` unit, `test/*.e2e-spec.ts` integration), admin bootstrap CLI (`src/scripts/bootstrap-admin.ts`) |
 | `apps/web` | React web app, Vitest component tests (`src/**/*.test.tsx`), Playwright browser tests (`e2e/`) |
-| `packages/eslint-config`, `packages/typescript-config` | Shared lint and TypeScript configuration |
+| `packages/api-contract` | Types-only API contract generated from the API's OpenAPI document; the web app imports response types from it |
+| `packages/typescript-config` | Shared compiler settings: `base.json`, `node-nest.json` (API), `react-vite.json` (web) |
+| `packages/eslint-config` | Shared ESLint building blocks: `base`, `node` (API), `react` (web) |
 | `docker-compose.yml` | Development stack: PostgreSQL, API (watch mode), and web (Vite) |
 | `docker-compose.prod.yml` | Release stack: PostgreSQL, one-off `migrate`, API, and web images on a private network, loopback ports only |
 | `docker-compose.bench.yml` | Benchmark-only override for the dashboard benchmark |
@@ -86,6 +92,33 @@ api ──► SMTP relay (optional, for critical alert emails)
 | `scripts/verify-release.ps1`, `scripts/release/reference-proxy.nginx.conf` | Release verification and the illustrative TLS proxy configuration |
 | `docs/operations` | Operator and developer documentation |
 | `specs/001-operational-mvp` | Specification, plan, data model, contract, tasks, and release checklists |
+
+## Workspace and quality commands
+
+Yarn 4 workspaces (`apps/*`, `packages/*`) are orchestrated by Turborepo. Business code stays in one NestJS modular monolith (`apps/api/src/modules/*`); the shared packages hold only configuration and the generated API contract.
+
+| Root command | Runs in every workspace that defines it |
+|---|---|
+| `yarn build` | `build`: API `nest build` → `apps/api/dist`, web `tsc && vite build` → `apps/web/dist` |
+| `yarn lint` | `lint`: check only; `yarn workspace api lint:fix` is the explicit auto-fix |
+| `yarn check-types` | `check-types`: API sources and tests, web app/Vite config/Playwright specs, and the API contract (including its staleness check) |
+| `yarn test` | `test`: API unit tests (Jest) and web component tests (Vitest) |
+
+**API contract flow.** After changing a response DTO or controller in the API:
+
+```powershell
+yarn workspace api swagger:generate          # apps/api/docs/swagger.json, from code
+yarn workspace @repo/api-contract generate   # packages/api-contract/src/generated/openapi.ts
+```
+
+Both outputs are committed. `yarn contract:check` verifies the whole chain: `swagger:check` rebuilds the document from code and fails when the committed `swagger.json` differs, then the contract check fails when the generated types differ from it. Run it in CI; it is not cached, because it needs a full `nest build`. `yarn check-types` also runs the second check, and `apps/api/src/swagger.spec.ts` fails if a contract response schema disappears. Each documented response DTO is its mapper's declared return type, so it cannot drift from the runtime shape. See [`packages/api-contract/README.md`](packages/api-contract/README.md).
+
+**Turbo cache.**
+- `build`, `lint`, `check-types`, and `test` are cached locally (`.turbo/`). Their inputs are the workspace files plus, through the `transit` task, the files of the workspaces they depend on. A web-only change therefore reuses the API results, and a change to `@repo/api-contract` or `@repo/typescript-config` re-runs its dependents.
+- Declared extra inputs: the web `build` hashes `VITE_API_BASE_URL`; the API `test` hashes `apps/web/src/features/goals/components/GoalsPage.tsx`, which one API test reads; the contract `check-types` hashes `apps/api/docs/swagger.json`.
+- Env files are never hashed or cached.
+- Deliberately **not** cached, and usually run directly with `yarn workspace …`: integration and browser tests (`test:e2e`, which need PostgreSQL or the running stack; Turbo defines them with `cache: false`), `dev`, `swagger:generate`, migrations, the migration matrix, the secret scan, and release verification.
+- No remote cache is configured. It can be added later for CI (`turbo login`/`turbo link`) without changing the task graph.
 
 ## Documentation
 
