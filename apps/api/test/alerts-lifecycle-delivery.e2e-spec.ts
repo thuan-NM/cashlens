@@ -1,6 +1,5 @@
 import { createTestApp } from './helpers/test-app'; // first: seeds synthetic config
 import { INestApplication } from '@nestjs/common';
-import { Prisma, TransactionDirection } from '@prisma/client';
 import { App } from 'supertest/types';
 import { AlertsRepository } from '../src/modules/alerts/alerts.repository';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -13,6 +12,7 @@ import {
   idPath,
   registerUser,
 } from './helpers/auth-fixtures';
+import { G6, seedLedger } from './fixtures/builders';
 import {
   AlertView,
   HOUR,
@@ -37,13 +37,6 @@ void createTestApp; // imported first for its side effect
 const NOW = new Date('2026-09-23T10:00:00+07:00');
 const TODAY = '2026-09-22T10:00:00+07:00';
 
-/** G6 nets: a CRITICAL cashflow-risk condition at the next trigger. */
-const G6: [string, number][] = [
-  ['2026-06-10T08:00:00+07:00', 2_000_000],
-  ['2026-07-10T08:00:00+07:00', 1_000_000],
-  ['2026-08-10T08:00:00+07:00', 1_500_001],
-];
-
 describe('Alert lifecycle and delivery (T091)', () => {
   let app: INestApplication<App>;
   let prisma: PrismaService;
@@ -55,15 +48,7 @@ describe('Alert lifecycle and delivery (T091)', () => {
     const user = await registerUser(app, label);
     users.push(user);
     if (negativeHistory) {
-      await prisma.transaction.createMany({
-        data: G6.map(([time, amount]) => ({
-          userId: user.id,
-          amount: new Prisma.Decimal(amount),
-          direction: TransactionDirection.EXPENSE,
-          transactionTime: new Date(time),
-          description: 'US5 lifecycle history',
-        })),
-      });
+      await seedLedger(prisma, user.id, G6, 'US5 lifecycle history');
     }
     return user;
   };

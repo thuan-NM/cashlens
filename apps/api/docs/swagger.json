@@ -45,7 +45,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserResponseDto"
+                  "$ref": "#/components/schemas/AdminUserResponseDto"
                 }
               }
             }
@@ -60,6 +60,35 @@
       "get": {
         "operationId": "UsersController_findMe",
         "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Users"
+        ]
+      },
+      "patch": {
+        "operationId": "UsersController_updateMe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMyProfileDto"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "",
@@ -127,7 +156,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserResponseDto"
+                  "$ref": "#/components/schemas/AdminUserResponseDto"
                 }
               }
             }
@@ -165,7 +194,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserResponseDto"
+                  "$ref": "#/components/schemas/AdminUserResponseDto"
                 }
               }
             }
@@ -616,9 +645,19 @@
         "operationId": "TransactionsController_list",
         "parameters": [
           {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "description": "User month (DASH-002); cannot be combined with from/to.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "from",
             "required": false,
             "in": "query",
+            "description": "Inclusive lower bound; must not be after `to`.",
             "schema": {
               "type": "string"
             }
@@ -627,6 +666,7 @@
             "name": "to",
             "required": false,
             "in": "query",
+            "description": "Inclusive upper bound.",
             "schema": {
               "type": "string"
             }
@@ -684,8 +724,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "MANUAL",
                 "EMAIL",
+                "MANUAL",
                 "CSV",
                 "SMS",
                 "API"
@@ -697,6 +737,7 @@
             "required": false,
             "in": "query",
             "schema": {
+              "maxLength": 200,
               "type": "string"
             }
           },
@@ -706,6 +747,7 @@
             "in": "query",
             "schema": {
               "minimum": 1,
+              "maximum": 1000000,
               "type": "number"
             }
           },
@@ -860,6 +902,63 @@
         ]
       }
     },
+    "/api/transactions/{id}/reclassify": {
+      "post": {
+        "operationId": "TransactionsController_reclassify",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReclassifyTransactionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Applies the rules now, replacing a manual category if there is one\n(CLASS-006). The client warns before calling it; the body must be empty.",
+        "tags": [
+          "Transactions"
+        ]
+      }
+    },
+    "/api/transactions/{id}/category-history": {
+      "get": {
+        "operationId": "TransactionsController_categoryHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Transactions"
+        ]
+      }
+    },
     "/api/transactions/{id}/duplicate": {
       "patch": {
         "operationId": "TransactionsController_markDuplicate",
@@ -916,6 +1015,309 @@
         ]
       }
     },
+    "/api/classification-rules": {
+      "get": {
+        "operationId": "ClassificationRulesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ClassificationRules"
+        ]
+      },
+      "post": {
+        "operationId": "ClassificationRulesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateClassificationRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ClassificationRules"
+        ]
+      }
+    },
+    "/api/classification-rules/{id}": {
+      "patch": {
+        "operationId": "ClassificationRulesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateClassificationRuleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ClassificationRules"
+        ]
+      },
+      "delete": {
+        "operationId": "ClassificationRulesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "ClassificationRules"
+        ]
+      }
+    },
+    "/api/alerts": {
+      "get": {
+        "operationId": "AlertsController_list",
+        "parameters": [
+          {
+            "name": "severity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INFO",
+                "WARNING",
+                "CRITICAL"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Lifecycle status filter (ALERT-004).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "DISMISSED",
+                "RESOLVED"
+              ]
+            }
+          },
+          {
+            "name": "isRead",
+            "required": false,
+            "in": "query",
+            "description": "Read-state filter; the contract name.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "read",
+            "required": false,
+            "in": "query",
+            "description": "Read-state filter; the existing name, kept for current clients.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Alerts"
+        ]
+      },
+      "post": {
+        "operationId": "AlertsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAlertDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/alerts/unread-count": {
+      "get": {
+        "operationId": "AlertsController_unreadCount",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ALERT-004: unread alerts, whatever their lifecycle status.",
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/alerts/read-all": {
+      "patch": {
+        "operationId": "AlertsController_markAllRead",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/alerts/settings": {
+      "get": {
+        "operationId": "AlertsController_settings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Alerts"
+        ]
+      },
+      "patch": {
+        "operationId": "AlertsController_updateSetting",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAlertSettingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/alerts/{id}/read": {
+      "patch": {
+        "operationId": "AlertsController_markRead",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
+    "/api/alerts/{id}/dismiss": {
+      "patch": {
+        "operationId": "AlertsController_dismiss",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "ACTIVE -> DISMISSED, marking it read; 409 when resolved (ALERT-010).",
+        "tags": [
+          "Alerts"
+        ]
+      }
+    },
     "/api/analytics/monthly-summary": {
       "get": {
         "operationId": "AnalyticsController_monthlySummary",
@@ -924,8 +1326,8 @@
             "name": "month",
             "required": false,
             "in": "query",
+            "description": "User month (DASH-002); defaults to the month containing now.",
             "schema": {
-              "pattern": "^\\d{4}-\\d{2}$",
               "type": "string"
             }
           }
@@ -948,8 +1350,8 @@
             "name": "month",
             "required": false,
             "in": "query",
+            "description": "User month (DASH-002); defaults to the month containing now.",
             "schema": {
-              "pattern": "^\\d{4}-\\d{2}$",
               "type": "string"
             }
           }
@@ -1029,14 +1431,6 @@
         "parameters": [
           {
             "name": "code",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "state",
             "required": true,
             "in": "query",
             "schema": {
@@ -1247,8 +1641,8 @@
               "type": "string",
               "enum": [
                 "PENDING",
-                "IGNORED",
                 "FAILED",
+                "IGNORED",
                 "PARSED"
               ]
             }
@@ -1593,6 +1987,30 @@
         ]
       }
     },
+    "/api/budgets/{id}/recalculate": {
+      "post": {
+        "operationId": "BudgetsController_recalculate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Re-evaluates the budget alert conditions now (BUDGET-003).",
+        "tags": [
+          "Budgets"
+        ]
+      }
+    },
     "/api/goals": {
       "get": {
         "operationId": "GoalsController_list",
@@ -1660,6 +2078,7 @@
             "name": "months",
             "required": false,
             "in": "query",
+            "description": "A what-if horizon of N user months from the current one (`QUERY`).",
             "schema": {
               "minimum": 1,
               "type": "number"
@@ -1669,6 +2088,7 @@
             "name": "scenario",
             "required": false,
             "in": "query",
+            "description": "Retained for compatibility. INSTALLMENT applies no inferred rate or term\n(GOAL-007): the result equals FULL and its reason says so.",
             "schema": {
               "type": "string",
               "enum": [
@@ -1683,6 +2103,7 @@
             "description": ""
           }
         },
+        "summary": "Enveloped `GoalFeasibility`; side-effect free (never touches alerts).",
         "tags": [
           "Goals"
         ]
@@ -1796,156 +2217,6 @@
         ]
       }
     },
-    "/api/alerts": {
-      "get": {
-        "operationId": "AlertsController_list",
-        "parameters": [
-          {
-            "name": "severity",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "CRITICAL",
-                "INFO",
-                "WARNING"
-              ]
-            }
-          },
-          {
-            "name": "read",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "boolean"
-            }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "type": "number"
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 100,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Alerts"
-        ]
-      },
-      "post": {
-        "operationId": "AlertsController_create",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateAlertDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Alerts"
-        ]
-      }
-    },
-    "/api/alerts/read-all": {
-      "patch": {
-        "operationId": "AlertsController_markAllRead",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Alerts"
-        ]
-      }
-    },
-    "/api/alerts/settings": {
-      "get": {
-        "operationId": "AlertsController_settings",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Alerts"
-        ]
-      },
-      "patch": {
-        "operationId": "AlertsController_updateSetting",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateAlertSettingDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Alerts"
-        ]
-      }
-    },
-    "/api/alerts/{id}/read": {
-      "patch": {
-        "operationId": "AlertsController_markRead",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Alerts"
-        ]
-      }
-    },
     "/api/dashboard/overview": {
       "get": {
         "operationId": "DashboardController_overview",
@@ -1954,6 +2225,7 @@
             "name": "month",
             "required": false,
             "in": "query",
+            "description": "User month (DASH-002); defaults to the month containing now.",
             "schema": {
               "type": "string"
             }
@@ -1982,6 +2254,15 @@
               "maximum": 24,
               "type": "number"
             }
+          },
+          {
+            "name": "month",
+            "required": false,
+            "in": "query",
+            "description": "Last month of the trend; defaults to the month containing now.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2002,6 +2283,7 @@
             "name": "month",
             "required": false,
             "in": "query",
+            "description": "User month (DASH-002); defaults to the month containing now.",
             "schema": {
               "type": "string"
             }
@@ -2025,6 +2307,7 @@
             "name": "month",
             "required": false,
             "in": "query",
+            "description": "User month (DASH-002); defaults to the month containing now.",
             "schema": {
               "type": "string"
             }
@@ -2048,6 +2331,7 @@
             "name": "month",
             "required": false,
             "in": "query",
+            "description": "User month (DASH-002); defaults to the month containing now.",
             "schema": {
               "type": "string"
             }
@@ -2071,6 +2355,7 @@
             "name": "month",
             "required": false,
             "in": "query",
+            "description": "User month (DASH-002); defaults to the month containing now.",
             "schema": {
               "type": "string"
             }
@@ -2083,6 +2368,34 @@
         },
         "tags": [
           "Dashboard"
+        ]
+      }
+    },
+    "/api/health/live": {
+      "get": {
+        "operationId": "HealthController_live",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/api/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
         ]
       }
     }
@@ -2233,11 +2546,71 @@
           "email"
         ]
       },
+      "AdminUserResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "baseCurrency": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "lastLoginAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "fullName",
+          "role",
+          "timezone",
+          "locale",
+          "baseCurrency",
+          "status",
+          "lastLoginAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "UserSettingsResponseDto": {
         "type": "object",
         "properties": {
           "storeRawEmailBody": {
             "type": "boolean"
+          },
+          "rawEmailBodyAvailable": {
+            "type": "boolean",
+            "description": "Always false: raw email bodies are never retained (DATA-001)."
           },
           "allowAiInsights": {
             "type": "boolean"
@@ -2262,6 +2635,7 @@
         },
         "required": [
           "storeRawEmailBody",
+          "rawEmailBodyAvailable",
           "allowAiInsights",
           "autoClassificationEnabled",
           "defaultMonthStartDay",
@@ -2336,11 +2710,32 @@
           "updatedAt"
         ]
       },
+      "UpdateMyProfileDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "locale": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "baseCurrency": {
+            "type": "string"
+          }
+        }
+      },
       "UpdateUserSettingsDto": {
         "type": "object",
         "properties": {
           "storeRawEmailBody": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "DATA-001: only `false` is accepted; `true` is refused by the service\nwith 400 RAW_EMAIL_BODY_UNAVAILABLE. Raw bodies are never retained."
           },
           "allowAiInsights": {
             "type": "boolean"
@@ -2639,17 +3034,21 @@
             "type": "string",
             "nullable": true
           }
-        }
+        },
+        "required": [
+          "categoryId"
+        ]
       },
       "CreateTransactionDto": {
         "type": "object",
         "properties": {
           "amount": {
-            "type": "number"
+            "type": "number",
+            "maximum": 9999999999999.99,
+            "minimum": 1
           },
           "currency": {
-            "type": "string",
-            "maxLength": 3
+            "type": "string"
           },
           "direction": {
             "type": "string",
@@ -2684,11 +3083,10 @@
           "description": {
             "type": "string"
           },
-          "balanceAfter": {
-            "type": "number"
-          },
           "feeAmount": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999999999999.99
           },
           "status": {
             "type": "string",
@@ -2696,29 +3094,15 @@
               "PENDING",
               "POSTED",
               "IGNORED",
-              "DELETED",
               "NEEDS_REVIEW"
             ]
           },
           "isDuplicate": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Must agree with duplicateOfTransactionId; see TransactionsService."
           },
           "duplicateOfTransactionId": {
             "type": "string"
-          },
-          "classificationSource": {
-            "type": "string",
-            "enum": [
-              "SYSTEM",
-              "RULE",
-              "ML",
-              "LLM",
-              "MANUAL",
-              "UNKNOWN"
-            ]
-          },
-          "classificationConfidence": {
-            "type": "number"
           },
           "userNote": {
             "type": "string"
@@ -2737,11 +3121,12 @@
         "type": "object",
         "properties": {
           "amount": {
-            "type": "number"
+            "type": "number",
+            "maximum": 9999999999999.99,
+            "minimum": 1
           },
           "currency": {
-            "type": "string",
-            "maxLength": 3
+            "type": "string"
           },
           "direction": {
             "enum": [
@@ -2776,41 +3161,26 @@
           "description": {
             "type": "string"
           },
-          "balanceAfter": {
-            "type": "number"
-          },
           "feeAmount": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 9999999999999.99
           },
           "status": {
             "enum": [
               "PENDING",
               "POSTED",
               "IGNORED",
-              "DELETED",
               "NEEDS_REVIEW"
             ],
             "type": "string"
           },
           "isDuplicate": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Must agree with duplicateOfTransactionId; see TransactionsService."
           },
           "duplicateOfTransactionId": {
             "type": "string"
-          },
-          "classificationSource": {
-            "enum": [
-              "SYSTEM",
-              "RULE",
-              "ML",
-              "LLM",
-              "MANUAL",
-              "UNKNOWN"
-            ],
-            "type": "string"
-          },
-          "classificationConfidence": {
-            "type": "number"
           },
           "userNote": {
             "type": "string"
@@ -2820,6 +3190,10 @@
           }
         }
       },
+      "ReclassifyTransactionDto": {
+        "type": "object",
+        "properties": {}
+      },
       "MarkDuplicateDto": {
         "type": "object",
         "properties": {
@@ -2828,6 +3202,175 @@
             "nullable": true
           }
         }
+      },
+      "CreateClassificationRuleDto": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string"
+          },
+          "merchantPattern": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200
+          },
+          "descriptionPattern": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200
+          },
+          "bankName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200
+          },
+          "direction": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "INCOME",
+              "EXPENSE",
+              "TRANSFER_IN",
+              "TRANSFER_OUT",
+              "ADJUSTMENT"
+            ]
+          },
+          "priority": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "categoryId"
+        ]
+      },
+      "UpdateClassificationRuleDto": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string"
+          },
+          "merchantPattern": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200
+          },
+          "descriptionPattern": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200
+          },
+          "bankName": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200
+          },
+          "direction": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "INCOME",
+              "EXPENSE",
+              "TRANSFER_IN",
+              "TRANSFER_OUT",
+              "ADJUSTMENT"
+            ]
+          },
+          "priority": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CreateAlertDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "SYSTEM",
+              "BUDGET_THRESHOLD",
+              "LARGE_TRANSACTION",
+              "CATEGORY_SHIFT",
+              "GOAL_RISK",
+              "CASHFLOW_RISK",
+              "PARSER_ISSUE"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "INFO",
+              "WARNING",
+              "CRITICAL"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 180
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "resourceType": {
+            "type": "string"
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "message"
+        ]
+      },
+      "UpdateAlertSettingDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "SYSTEM",
+              "BUDGET_THRESHOLD",
+              "LARGE_TRANSACTION",
+              "CATEGORY_SHIFT",
+              "GOAL_RISK",
+              "CASHFLOW_RISK",
+              "PARSER_ISSUE"
+            ]
+          },
+          "inAppEnabled": {
+            "type": "boolean"
+          },
+          "emailEnabled": {
+            "type": "boolean"
+          },
+          "threshold": {
+            "type": "number",
+            "nullable": true,
+            "description": "The LARGE_TRANSACTION amount in the base currency; greater than 0. null\nclears it (the VND default of 5,000,000 applies again).",
+            "minimum": 1
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "type"
+        ]
       },
       "CreateEmailListenRuleDto": {
         "type": "object",
@@ -3117,8 +3660,9 @@
           },
           "thresholdPercent": {
             "type": "number",
+            "description": "The warning threshold, 1–99 (BUDGET-001); critical is fixed at 100 and\nnot writable. Stored legacy values of 100 or more are kept but can no\nlonger be written.",
             "minimum": 1,
-            "maximum": 200
+            "maximum": 99
           },
           "rollover": {
             "type": "boolean"
@@ -3138,7 +3682,53 @@
       },
       "UpdateBudgetDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "categoryId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 3
+          },
+          "period": {
+            "enum": [
+              "WEEKLY",
+              "MONTHLY",
+              "YEARLY",
+              "CUSTOM"
+            ],
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string"
+          },
+          "endsAt": {
+            "type": "string"
+          },
+          "thresholdPercent": {
+            "type": "number",
+            "description": "The warning threshold, 1–99 (BUDGET-001); critical is fixed at 100 and\nnot writable. Stored legacy values of 100 or more are kept but can no\nlonger be written.",
+            "minimum": 1,
+            "maximum": 99
+          },
+          "rollover": {
+            "type": "boolean"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        }
       },
       "CreateGoalDto": {
         "type": "object",
@@ -3164,7 +3754,8 @@
             "maxLength": 3
           },
           "targetDate": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "months": {
             "type": "number",
@@ -3173,10 +3764,10 @@
           "priority": {
             "type": "string",
             "enum": [
+              "CRITICAL",
               "LOW",
               "MEDIUM",
-              "HIGH",
-              "CRITICAL"
+              "HIGH"
             ]
           },
           "status": {
@@ -3199,7 +3790,57 @@
       },
       "UpdateGoalDto": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "type": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "targetAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "savedAmount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 3
+          },
+          "targetDate": {
+            "type": "string",
+            "nullable": true
+          },
+          "months": {
+            "type": "number",
+            "minimum": 1
+          },
+          "priority": {
+            "enum": [
+              "CRITICAL",
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ACTIVE",
+              "ARCHIVED",
+              "PAUSED",
+              "COMPLETED"
+            ],
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        }
       },
       "GoalContributionDto": {
         "type": "object",
@@ -3213,86 +3854,6 @@
         },
         "required": [
           "amount"
-        ]
-      },
-      "CreateAlertDto": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": [
-              "SYSTEM",
-              "BUDGET_THRESHOLD",
-              "LARGE_TRANSACTION",
-              "CATEGORY_SHIFT",
-              "GOAL_RISK",
-              "CASHFLOW_RISK",
-              "PARSER_ISSUE"
-            ]
-          },
-          "severity": {
-            "type": "string",
-            "enum": [
-              "CRITICAL",
-              "INFO",
-              "WARNING"
-            ]
-          },
-          "title": {
-            "type": "string",
-            "maxLength": 180
-          },
-          "message": {
-            "type": "string",
-            "maxLength": 1000
-          },
-          "resourceType": {
-            "type": "string"
-          },
-          "resourceId": {
-            "type": "string"
-          },
-          "metadata": {
-            "type": "object"
-          }
-        },
-        "required": [
-          "type",
-          "title",
-          "message"
-        ]
-      },
-      "UpdateAlertSettingDto": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": [
-              "SYSTEM",
-              "BUDGET_THRESHOLD",
-              "LARGE_TRANSACTION",
-              "CATEGORY_SHIFT",
-              "GOAL_RISK",
-              "CASHFLOW_RISK",
-              "PARSER_ISSUE"
-            ]
-          },
-          "inAppEnabled": {
-            "type": "boolean"
-          },
-          "emailEnabled": {
-            "type": "boolean"
-          },
-          "threshold": {
-            "type": "number",
-            "minimum": 0
-          },
-          "metadata": {
-            "type": "object"
-          }
-        },
-        "required": [
-          "type"
         ]
       }
     }

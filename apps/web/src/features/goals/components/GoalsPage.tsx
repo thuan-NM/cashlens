@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui/Icon";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { apiFieldErrors, describeApiError, mapGoal } from "@/api/mappers";
-import type { Goal, GoalFeasibility, GoalFeasibilityStatus, GoalHorizonSource } from "@/types/goal";
+import type { ApiGoal, Goal, GoalFeasibility, GoalFeasibilityStatus, GoalHorizonSource } from "@/types/goal";
 import { formatMoney, formatMoneyShort, formatMonthKey } from "@/utils/format";
 
 const CREATE_FIELDS = ["name", "type", "targetAmount", "savedAmount", "targetDate", "months"] as const;
@@ -137,7 +137,7 @@ export function GoalsPage() {
   // The account time zone, so a deadline shows the date the API reads (not the browser's).
   const { query: overviewQuery } = useCustom<{ timeZone?: string | null }>({ url: "/dashboard/overview", method: "get" });
   const timeZone = overviewQuery.data?.data?.timeZone ?? undefined;
-  const { query: listQuery } = useList<Record<string, unknown>>({ resource: "goals", pagination: { mode: "off" } });
+  const { query: listQuery } = useList<ApiGoal>({ resource: "goals", pagination: { mode: "off" } });
   const goals = useMemo(() => listQuery.data?.data?.map((item) => mapGoal(item, timeZone)) ?? [], [listQuery.data, timeZone]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = goals.find((goal) => goal.id === selectedId) ?? goals[0];

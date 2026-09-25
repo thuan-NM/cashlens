@@ -40,9 +40,10 @@ export function AuthPage() {
   const navigate = useNavigate();
   const { message } = AntdApp.useApp();
 
-  const submit = async (values?: { name?: string; email?: string; password?: string }) => {
-    const email = values?.email ?? "thuan.nguyen@gmail.com";
-    const password = values?.password ?? "demo1234";
+  // Only what the user typed is ever sent: no demo or fallback credentials.
+  const submit = async (values: { name?: string; email: string; password: string }) => {
+    const email = values.email.trim();
+    const password = values.password;
 
     try {
       if (mode === "register") {
@@ -80,16 +81,13 @@ export function AuthPage() {
           <h2 className="text-[20px] font-bold tracking-tight">{mode === "login" ? "Chào mừng trở lại" : "Bắt đầu với CashLens"}</h2>
           <p className="mt-1 text-[12px] text-[var(--faint)]">{mode === "login" ? "Đăng nhập để xem bức tranh tài chính của bạn" : "Tạo tài khoản miễn phí trong 30 giây"}</p>
           <Segmented block className="mt-5" value={mode} onChange={(value) => setMode(value as typeof mode)} options={[{ label: "Đăng nhập", value: "login" }, { label: "Tạo tài khoản", value: "register" }]} />
-          <Button block className="mt-4" onClick={() => submit()}><span className="h-[18px] w-[18px] rounded-full bg-[conic-gradient(#ea4335,#fbbc05,#34a853,#4285f4,#ea4335)]" />Tiếp tục với Google</Button>
-          <div className="my-4 flex items-center gap-3 text-[11px] text-[var(--faint)]"><span className="h-px flex-1 bg-[var(--border)]" />hoặc dùng email<span className="h-px flex-1 bg-[var(--border)]" /></div>
-          <Form layout="vertical" requiredMark={false} onFinish={submit}>
-            {mode === "register" && <Form.Item label="Họ và tên" name="name"><Input placeholder="Nguyễn Minh Thuận" /></Form.Item>}
-            <Form.Item label="Email" name="email" initialValue="thuan.nguyen@gmail.com"><Input /></Form.Item>
-            <Form.Item label="Mật khẩu" name="password" initialValue="demo1234"><Input.Password /></Form.Item>
+          <Form layout="vertical" requiredMark={false} onFinish={submit} className="mt-4">
+            {mode === "register" && <Form.Item label="Họ và tên" name="name"><Input placeholder="Nguyễn Văn A" autoComplete="name" /></Form.Item>}
+            <Form.Item label="Email" name="email" rules={[{ required: true, message: "Nhập email" }, { type: "email", message: "Email không hợp lệ" }]}><Input autoComplete="email" /></Form.Item>
+            <Form.Item label="Mật khẩu" name="password" rules={[{ required: true, message: "Nhập mật khẩu" }]}><Input.Password autoComplete={mode === "login" ? "current-password" : "new-password"} /></Form.Item>
             <div className="mb-4 flex items-center justify-between text-[11.5px]"><Checkbox defaultChecked>Ghi nhớ đăng nhập</Checkbox><button type="button" className="font-semibold text-[var(--accent)]">Quên mật khẩu?</button></div>
             <Button htmlType="submit" type="primary" block>{mode === "login" ? "Đăng nhập" : "Tạo tài khoản"}</Button>
           </Form>
-          <button onClick={() => submit()} className="mt-2 w-full py-1 text-[12px] font-semibold text-[var(--accent)]">Dùng thử bản demo →</button>
           <p className="mt-4 border-t border-[var(--border)] pt-4 text-center text-[10.5px] leading-relaxed text-[var(--faint)]">OAuth chỉ đọc · CashLens không bao giờ thấy mật khẩu ngân hàng</p>
         </motion.div>
       </section>

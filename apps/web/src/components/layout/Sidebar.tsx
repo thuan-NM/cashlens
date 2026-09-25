@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { NavLink } from "react-router";
 import { Icon } from "@/components/ui/Icon";
 import { Logo } from "@/components/ui/Logo";
+import { useAuthStore } from "@/stores/authStore";
 import { useUiStore } from "@/stores/uiStore";
 import { cn } from "@/utils/cn";
 
@@ -44,7 +45,21 @@ function AnimatedLabel({ visible, children }: { visible: boolean; children: Reac
   );
 }
 
+/** The signed-in account, never a hardcoded identity. */
+function useAccountLabel() {
+  const user = useAuthStore((state) => state.user);
+  const name = user?.fullName?.trim() || user?.email || "";
+  const initials = name
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+  return { name, email: user?.email ?? "", initials: initials || "?" };
+}
+
 function SidebarContent({ mobile = false }: { mobile?: boolean }) {
+  const account = useAccountLabel();
   const storeCollapsed = useUiStore((state) => state.sidebarCollapsed);
   const toggleSidebar = useUiStore((state) => state.toggleSidebar);
   const setMobileNavOpen = useUiStore((state) => state.setMobileNavOpen);
@@ -145,7 +160,7 @@ function SidebarContent({ mobile = false }: { mobile?: boolean }) {
             transition={sidebarSpring}
             className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#e07a3f] to-[#d2604c] text-[11px] font-bold text-white shadow-[0_7px_18px_-8px_rgba(210,96,76,.9)]"
           >
-            MT
+            {account.initials}
           </motion.span>
           <AnimatePresence initial={false}>
             {expanded && (
@@ -156,8 +171,8 @@ function SidebarContent({ mobile = false }: { mobile?: boolean }) {
                 transition={{ duration: 0.16 }}
                 className="min-w-0 whitespace-nowrap"
               >
-                <div className="truncate text-[12px] font-semibold">Minh Thuận</div>
-                <div className="text-[10.5px] text-[var(--faint)]">Gói cá nhân</div>
+                <div className="truncate text-[12px] font-semibold">{account.name}</div>
+                <div className="truncate text-[10.5px] text-[var(--faint)]">{account.email}</div>
               </motion.div>
             )}
           </AnimatePresence>

@@ -1,10 +1,33 @@
 import { App as AntdApp, ConfigProvider, theme } from "antd";
 import viVN from "antd/locale/vi_VN";
 import { Refine } from "@refinedev/core";
-import type { ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, type ReactNode } from "react";
+import { useAuthStore } from "@/stores/authStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { authProvider } from "./authProvider";
 import { dataProvider } from "./dataProvider";
+
+/**
+ * Drops every cached query when the signed-in user goes away or changes (sign-out,
+ * an expired session, another account), so the next user in the same tab never sees
+ * the previous user's data while their own loads.
+ */
+function ClearCacheOnUserChange() {
+  const queryClient = useQueryClient();
+
+  useEffect(
+    () =>
+      useAuthStore.subscribe((state, previous) => {
+        const before = previous.user;
+        const after = state.user;
+        if (before && (!after || after.id !== before.id || after.email !== before.email)) queryClient.clear();
+      }),
+    [queryClient],
+  );
+
+  return null;
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const mode = useThemeStore((state) => state.theme);
@@ -27,6 +50,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ]}
       options={{ syncWithLocation: false, warnWhenUnsavedChanges: false }}
     >
+      <ClearCacheOnUserChange />
       <ConfigProvider
         locale={viVN}
         theme={{

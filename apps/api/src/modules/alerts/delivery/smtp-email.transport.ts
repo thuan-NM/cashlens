@@ -47,7 +47,10 @@ export class SmtpEmailTransport implements EmailTransport {
       return { messageId: info.messageId ?? '' };
     } catch (error) {
       const code = classifySmtpError(error);
-      this.logger.warn(`SMTP delivery attempt failed (${code})`);
+      this.logger.warn({
+        event: 'alert.delivery.attempt_failed',
+        errorCode: code,
+      });
       throw new EmailSendError(code);
     }
   }

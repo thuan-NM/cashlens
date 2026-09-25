@@ -1,6 +1,7 @@
 import {
   BadGatewayException,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -38,6 +39,8 @@ export const ACCESS_TOKEN_REFRESH_MARGIN_MS = SYNC_POLICY.leaseTtlMs;
 
 @Injectable()
 export class EmailConnectionsService {
+  private readonly logger = new Logger(EmailConnectionsService.name);
+
   constructor(
     private readonly repository: EmailConnectionsRepository,
     private readonly gmail: GmailOAuthService,
@@ -95,6 +98,11 @@ export class EmailConnectionsService {
       resourceId: connection.id,
       metadata: { provider: 'GMAIL' },
     });
+    this.logger.log({
+      event: 'gmail.connected',
+      userId,
+      emailConnectionId: connection.id,
+    });
     // A (re)connect resolves reconnect-required (ALERT-009).
     await this.alerts.onConnectionStatusChanged(userId);
 
@@ -142,6 +150,12 @@ export class EmailConnectionsService {
     } catch (error) {
       if (error instanceof GmailReconnectRequiredError) {
         await this.repository.markReconnectRequired(connection.id);
+        this.logger.warn({
+          event: 'gmail.reconnect_required',
+          userId,
+          emailConnectionId: connection.id,
+          errorCode: 'RECONNECT_REQUIRED',
+        });
         // A provider-auth failure: reconnect-required (ALERT-009).
         await this.alerts.onConnectionStatusChanged(userId);
         throw reconnectRequired();
@@ -196,6 +210,11 @@ export class EmailConnectionsService {
       action: 'EMAIL_DISCONNECTED',
       resourceType: 'email_connection',
       resourceId: id,
+    });
+    this.logger.log({
+      event: 'gmail.disconnected',
+      userId: user.id,
+      emailConnectionId: id,
     });
     // A user disconnect never alerts; it resolves the connection's alerts.
     await this.alerts.onConnectionStatusChanged(user.id);

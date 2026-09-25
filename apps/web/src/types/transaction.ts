@@ -5,6 +5,14 @@ export interface Category {
   color: string;
 }
 
+/** A transaction category as the API returns it (`GET /transaction-categories`). */
+export interface ApiCategory {
+  id: string;
+  name: string;
+  type?: string | null;
+  color?: string | null;
+}
+
 export interface Transaction {
   id: string;
   time: string;

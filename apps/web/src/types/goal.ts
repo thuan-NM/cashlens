@@ -13,6 +13,22 @@ export interface Goal {
   remaining?: number;
 }
 
+/** A goal as the API returns it (`GET /goals`). */
+export interface ApiGoal {
+  id: string;
+  name: string;
+  type: string;
+  targetAmount?: number | string;
+  savedAmount?: number | string;
+  remainingAmount?: number | string;
+  progressPercent?: number;
+  currency?: string;
+  targetDate?: string | null;
+  months?: number | null;
+  priority?: string;
+  status?: string;
+}
+
 export type GoalHorizonSource = "QUERY" | "TARGET_DATE" | "GOAL_MONTHS" | "DEFAULT";
 export type GoalFeasibilityStatus = "SAFE" | "ACCEPTABLE" | "RISKY" | "NOT_RECOMMENDED" | "INSUFFICIENT_DATA";
 

@@ -104,9 +104,11 @@ export class AlertDeliveryService {
       await this.attemptAll(deliveryId);
     } catch (error) {
       // The alert stands whatever happens to its email (ALERT-006).
-      this.logger.warn(
-        `Delivery ${deliveryId} stopped on an unexpected ${error instanceof Error ? error.name : 'error'}`,
-      );
+      this.logger.warn({
+        event: 'alert.delivery.unexpected_error',
+        deliveryId,
+        errorName: error instanceof Error ? error.name : typeof error,
+      });
     }
   }
 
@@ -168,6 +170,12 @@ export class AlertDeliveryService {
       try {
         await withTimeout(transport.send(message), budget);
         await this.repository.markSent(delivery.id, this.repository.now());
+        this.logger.log({
+          event: 'alert.delivery.sent',
+          deliveryId: delivery.id,
+          alertId: delivery.alert.id,
+          attemptCount: attempt,
+        });
         return;
       } catch (error) {
         lastError =
@@ -183,6 +191,12 @@ export class AlertDeliveryService {
       failure.code,
       failure.message,
     );
+    this.logger.warn({
+      event: 'alert.delivery.failed',
+      deliveryId: delivery.id,
+      alertId: delivery.alert.id,
+      errorCode: failure.code,
+    });
   }
 
   private message(to: string, type: AlertType): OutgoingEmail {

@@ -8,6 +8,7 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { apiFieldErrors, describeApiError, mapBudget, mapCategory } from "@/api/mappers";
 import type { ApiBudget, ApiBudgetSummary, Budget } from "@/types/budget";
+import type { ApiCategory } from "@/types/transaction";
 import { formatMoney, formatMoneyShort } from "@/utils/format";
 
 const CREATE_FIELDS = ["name", "categoryId", "amount", "period", "startsAt", "thresholdPercent"] as const;
@@ -89,7 +90,7 @@ export function BudgetsPage() {
   const [createErrors, setCreateErrors] = useState<string[]>([]);
   const { result, query } = useList<ApiBudget>({ resource: "budgets", pagination: { mode: "off" } });
   const { result: summary } = useCustom<ApiBudgetSummary>({ url: "/budgets/summary", method: "get" });
-  const { result: categoriesResult } = useList<Record<string, unknown>>({ resource: "transaction-categories", pagination: { mode: "off" } });
+  const { result: categoriesResult } = useList<ApiCategory>({ resource: "transaction-categories", pagination: { mode: "off" } });
   const { mutateAsync: createBudget } = useCreate();
   const categories = categoriesResult?.data?.map(mapCategory) ?? [];
   const budgets = query.data ? (result?.data ?? []).map(mapBudget) : null;

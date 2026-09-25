@@ -37,6 +37,8 @@ export type ProductionServer = {
   /** http://127.0.0.1:<port>; Supertest connects from loopback. */
   baseUrl: string;
   stop: () => Promise<void>;
+  /** Everything the server wrote to stdout (its JSON log), when captured. */
+  stdout: () => string;
 };
 
 /**
@@ -51,6 +53,7 @@ export type ProductionServer = {
  */
 export async function startProductionServer(
   overrides: Record<string, string> = {},
+  options: { captureStdout?: boolean } = {},
 ): Promise<ProductionServer> {
   const shared = new URL(resolveE2eDatabaseUrl());
   const password = decodeURIComponent(shared.password);
@@ -85,8 +88,16 @@ export async function startProductionServer(
   const child = spawn(
     process.execPath,
     ['-r', 'ts-node/register', join('src', 'main.ts')],
-    { cwd: API_ROOT, env, stdio: ['ignore', 'ignore', 'pipe'] },
+    {
+      cwd: API_ROOT,
+      env,
+      stdio: ['ignore', options.captureStdout ? 'pipe' : 'ignore', 'pipe'],
+    },
   );
+  let stdout = '';
+  child.stdout?.on('data', (chunk: Buffer) => {
+    stdout += chunk.toString();
+  });
   let stderr = '';
   child.stderr?.on('data', (chunk: Buffer) => {
     stderr = (stderr + chunk.toString()).slice(-4000);
@@ -100,7 +111,7 @@ export async function startProductionServer(
     const reason = error instanceof Error ? error.message : String(error);
     throw new Error(`${reason}\n${hidePasswords(stderr)}`);
   }
-  return { baseUrl, stop: () => stopProcess(child) };
+  return { baseUrl, stop: () => stopProcess(child), stdout: () => stdout };
 }
 
 function freePort(): Promise<number> {

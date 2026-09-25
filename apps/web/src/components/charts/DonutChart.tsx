@@ -1,4 +1,5 @@
 ﻿import { useState } from "react";
+import { formatMoneyShort } from "@/utils/format";
 
 interface Segment {
   label: string;
@@ -45,7 +46,7 @@ export function DonutChart({ segments }: { segments: Segment[] }) {
         {hover === null ? "Tổng chi" : segments[hover].label}
       </text>
       <text x={center} y={center + 17} textAnchor="middle" fill={hover === null ? "var(--text)" : segments[hover].color} fontSize={16} fontWeight={700} fontFamily="Be Vietnam Pro">
-        {hover === null ? "13,8tr" : `${Math.round((segments[hover].value / total) * 100)}%`}
+        {hover === null ? formatMoneyShort(total) : `${Math.round((segments[hover].value / total) * 100)}%`}
       </text>
     </svg>
   );

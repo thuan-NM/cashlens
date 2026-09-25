@@ -8,6 +8,7 @@ import { useThemeStore } from "@/stores/themeStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useAuthStore } from "@/stores/authStore";
 import { ALERTS_CHANGED_EVENT, notifyAlertsChanged } from "@/utils/alertEvents";
+import type { ApiAlert } from "@/types/alert";
 
 const pageMeta: Record<string, [string, string]> = {
   dashboard: ["Tổng quan", "Dữ liệu trực tiếp từ API"],
@@ -32,7 +33,7 @@ export function TopBar() {
   const setOpen = useUiStore((state) => state.setNotificationOpen);
   const setMobileNavOpen = useUiStore((state) => state.setMobileNavOpen);
   const logout = useAuthStore((state) => state.logout);
-  const { result: alertResult, query: { refetch } } = useList<any>({ resource: "alerts", pagination: { currentPage: 1, pageSize: 10 } });
+  const { result: alertResult, query: { refetch } } = useList<ApiAlert>({ resource: "alerts", pagination: { currentPage: 1, pageSize: 10 } });
   const { mutateAsync } = useCustomMutation();
   // The badge is the server's unread count (ALERT-004), whatever the status.
   const { query: unreadQuery } = useCustom<{ count: number }>({ url: "/alerts/unread-count", method: "get" });

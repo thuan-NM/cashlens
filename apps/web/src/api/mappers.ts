@@ -1,8 +1,8 @@
 ﻿import { ApiError } from "@/api/client";
 import type { Alert, AlertSetting, AlertStatus, ApiAlert, ApiAlertSetting } from "@/types/alert";
 import type { ApiBudget, Budget } from "@/types/budget";
-import type { Goal } from "@/types/goal";
-import type { Category, Transaction } from "@/types/transaction";
+import type { ApiGoal, Goal } from "@/types/goal";
+import type { ApiCategory, Category, Transaction } from "@/types/transaction";
 import { formatDate, formatDateTime } from "@/utils/format";
 
 /** Labels of the API alert types (`AlertType`). */
@@ -27,20 +27,20 @@ const goalTypeLabels: Record<string, string> = {
   CUSTOM: "Mục tiêu khác",
 };
 
-export const mapCategory = (item: any): Category => ({
+export const mapCategory = (item: ApiCategory): Category => ({
   id: item.id,
   name: item.name,
   type: String(item.type ?? "EXPENSE").toLowerCase() as Category["type"],
   color: item.color ?? "#9c968d",
 });
 
-const toDirection = (direction?: string): Transaction["dir"] => {
+const toDirection = (direction?: string | null): Transaction["dir"] => {
   if (direction === "INCOME") return "income";
   if (direction === "TRANSFER_IN" || direction === "TRANSFER_OUT") return "transfer";
   return "expense";
 };
 
-export const mapTransaction = (item: any): Transaction => ({
+export const mapTransaction = (item: TransactionPayload): Transaction => ({
   id: item.id,
   time: item.transactionTime ? new Date(item.transactionTime).toLocaleString("vi-VN") : "",
   desc: item.description ?? item.normalizedDescription ?? "Giao dịch",
@@ -216,7 +216,7 @@ export const mapBudget = (item: ApiBudget): Budget => ({
 });
 
 /** A goal as the list shows it; its deadline is the calendar date in the account time zone (the one the API reads). */
-export const mapGoal = (item: any, timeZone?: string): Goal => ({
+export const mapGoal = (item: ApiGoal, timeZone?: string): Goal => ({
   id: item.id,
   name: item.name,
   type: goalTypeLabels[item.type] ?? item.type ?? "Mục tiêu",

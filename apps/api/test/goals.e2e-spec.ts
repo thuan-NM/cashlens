@@ -1,10 +1,6 @@
 import { createTestApp } from './helpers/test-app'; // first: seeds synthetic config
 import { INestApplication } from '@nestjs/common';
-import {
-  Prisma,
-  TransactionDirection,
-  TransactionStatus,
-} from '@prisma/client';
+import { Prisma, TransactionDirection } from '@prisma/client';
 import { App } from 'supertest/types';
 import {
   CompletedMonthCashflow,
@@ -20,6 +16,7 @@ import {
   idPath,
   registerUser,
 } from './helpers/auth-fixtures';
+import { H1, LedgerRow, seedLedger } from './fixtures/builders';
 
 jest.setTimeout(120_000);
 
@@ -27,40 +24,7 @@ jest.setTimeout(120_000);
 const NOW = new Date('2026-09-23T10:00:00+07:00');
 const JUN_AUG = ['2026-06', '2026-07', '2026-08'];
 
-type Row = {
-  time: string;
-  direction: TransactionDirection;
-  amount: number | string;
-  currency?: string;
-  status?: TransactionStatus;
-  isDuplicate?: boolean;
-};
-
-/** History H1 as persisted records: nets Jun 9,000,000; Jul 8,000,000; Aug 10,000,001. */
-const H1: Row[] = [
-  { time: '2025-01-10T08:00:00+07:00', direction: 'EXPENSE', amount: 50_000 },
-  { time: '2026-06-05T08:00:00+07:00', direction: 'INCOME', amount: 9_000_000 },
-  {
-    time: '2026-07-05T08:00:00+07:00',
-    direction: 'INCOME',
-    amount: 10_000_000,
-  },
-  {
-    time: '2026-07-20T08:00:00+07:00',
-    direction: 'EXPENSE',
-    amount: 2_000_000,
-  },
-  {
-    time: '2026-08-05T08:00:00+07:00',
-    direction: 'INCOME',
-    amount: 12_000_001,
-  },
-  {
-    time: '2026-08-20T08:00:00+07:00',
-    direction: 'EXPENSE',
-    amount: 2_000_000,
-  },
-];
+type Row = LedgerRow;
 
 const nets = (observation: CompletedMonthCashflow) =>
   observation.months.map((month) => [month.key, month.net.toFixed()]);
@@ -71,18 +35,7 @@ describe('Goals from actual data (US6)', () => {
   const users: TestUser[] = [];
 
   const seed = (user: TestUser, rows: Row[]) =>
-    prisma.transaction.createMany({
-      data: rows.map((row) => ({
-        userId: user.id,
-        amount: new Prisma.Decimal(row.amount),
-        currency: row.currency ?? 'VND',
-        direction: row.direction,
-        status: row.status ?? 'POSTED',
-        isDuplicate: row.isDuplicate ?? false,
-        transactionTime: new Date(row.time),
-        description: 'US6 synthetic',
-      })),
-    });
+    seedLedger(prisma, user.id, rows, 'US6 synthetic');
 
   const newUser = async (label: string) => {
     const user = await registerUser(app, label);
@@ -596,6 +549,7 @@ describe('Goals from actual data (US6)', () => {
     const errorBody = (response: { body: Record<string, unknown> }) => {
       const body = { ...response.body };
       delete body.timestamp;
+      delete body.correlationId; // per request (T093)
       delete body.path;
       return body;
     };
@@ -621,6 +575,7 @@ describe('Goals from actual data (US6)', () => {
         success: true,
         message: expect.any(String) as string,
         timestamp: expect.any(String) as string,
+        correlationId: expect.any(String) as string, // additive (T093)
         data: {
           goalId: g1,
           scenario: 'FULL',
