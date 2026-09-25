@@ -435,6 +435,22 @@ describe('Auth sessions (T012)', () => {
         expect(cookieNames(res)).toEqual([]);
       });
 
+      it('a JSON-shaped refresh cookie (cookie-parser "j:" value) is treated as absent: 401 on refresh, 200 on logout, never 500', async () => {
+        // cookie-parser turns `j:{...}` values into objects; only a string is a token.
+        const cookie = `refreshToken=${encodeURIComponent('j:{"token":"x"}')}`;
+        const refresh = observe(
+          'POST /auth/refresh (object cookie)',
+          await http().post(`${AUTH}/refresh`).set('Cookie', cookie),
+        );
+        expect(refresh.status).toBe(401);
+        expect(cookieNames(refresh)).toEqual([]);
+
+        const logout = await http()
+          .post(`${AUTH}/logout`)
+          .set('Cookie', cookie);
+        expect(logout.status).toBe(200);
+      });
+
       it('POST /auth/refresh returns 200 with a NEW refresh cookie (HttpOnly, SameSite=Lax, Path=/api/auth), a working access cookie, and no token in the body', async () => {
         const session = await signIn(account);
 

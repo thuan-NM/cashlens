@@ -566,8 +566,8 @@ paths:
         callback that reaches the handler; a callback refused earlier (HTTPS_REQUIRED) leaves it to expire after
         10 minutes.
       responses:
-        '200': { description: 'Current (as built in US1): the enveloped connection record of the calling user (id, provider, mailbox address, scopes, status, timestamps; no tokens)' }
-        '302': { description: 'Target, not yet implemented: redirect back to the web app with a sanitized connection outcome' }
+        '200': { description: 'API clients (no Accept: text/html): the enveloped connection record of the calling user (id, provider, mailbox address, scopes, status, timestamps; no tokens)' }
+        '303': { description: 'Browser navigations (Accept: text/html), on success and on handled failures: redirect to <first CORS_ORIGIN>/app/email?gmail=connected, or ?gmail=failed&reason=STATE_INVALID|GOOGLE_REFUSED|GOOGLE_UNAVAILABLE|FAILED. The target comes from configuration only; the URL never carries a token, code, state, or message.' }
         '401': { description: 'Missing, invalid, expired, or unbound state, or an inactive account; nothing is linked', content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
         '403': { $ref: '#/components/responses/HttpsRequired' }
   /users/me/settings:

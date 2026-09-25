@@ -6,9 +6,7 @@ export type ParserTemplateWithFields = ParserTemplate & {
   fields: ParserField[];
 };
 
-export const toParserTemplateCreateInput = (
-  dto: CreateParserTemplateDto,
-) => ({
+export const toParserTemplateCreateInput = (dto: CreateParserTemplateDto) => ({
   bankProviderId: dto.bankProviderId,
   name: dto.name,
   version: dto.version,
@@ -24,9 +22,7 @@ export const toParserTemplateCreateInput = (
   },
 });
 
-export const toParserTemplateUpdateInput = (
-  dto: UpdateParserTemplateDto,
-) => ({
+export const toParserTemplateUpdateInput = (dto: UpdateParserTemplateDto) => ({
   bankProviderId: dto.bankProviderId,
   name: dto.name,
   version: dto.version,

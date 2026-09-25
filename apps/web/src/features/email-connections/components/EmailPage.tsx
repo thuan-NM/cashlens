@@ -1,6 +1,7 @@
-import { useRef, useState } from "react";
-import { Alert, Button as AntButton, Form, Input, Modal, Skeleton, Switch } from "antd";
-import { useCreate, useCustom, useCustomMutation, useList } from "@refinedev/core";
+import { useEffect, useRef, useState } from "react";
+import { Alert, Button as AntButton, Form, Input, Modal, Popconfirm, Skeleton, Switch } from "antd";
+import { useCreate, useCustom, useCustomMutation, useList, useUpdate } from "@refinedev/core";
+import { useSearchParams } from "react-router";
 import { describeApiError } from "@/api/mappers";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -34,6 +35,26 @@ const toArray = <T,>(value: unknown): T[] => {
 
 type ListenRuleFormValues = { name?: string; senderEmail?: string; senderDomain?: string };
 
+/**
+ * Messages for the outcome the Gmail OAuth callback puts in the address
+ * (`?gmail=connected` or `?gmail=failed&reason=CODE`). Only these fixed texts
+ * are shown; nothing from the address is displayed.
+ */
+const CONSENT_FAILURES: Record<string, string> = {
+  STATE_INVALID: "Phiên kết nối đã hết hạn hoặc không hợp lệ. Hãy kết nối lại.",
+  GOOGLE_REFUSED: "Google từ chối cấp quyền. Hãy kết nối lại và chấp thuận quyền chỉ đọc.",
+  GOOGLE_UNAVAILABLE: "Google tạm thời không khả dụng. Hãy thử lại sau.",
+};
+
+const consentOutcome = (params: URLSearchParams): SyncOutcome | null => {
+  const result = params.get("gmail");
+  if (result === "connected") return { tone: "success", title: "Đã kết nối Gmail", detail: "Thêm rule lắng nghe rồi đồng bộ để nhập giao dịch." };
+  if (result === "failed") {
+    return { tone: "error", title: "Không thể kết nối Gmail", detail: CONSENT_FAILURES[params.get("reason") ?? ""] ?? "Hãy thử kết nối lại.", action: "RECONNECT" };
+  }
+  return null;
+};
+
 const formatTime = (value: string | null | undefined) => (value ? new Date(value).toLocaleString("vi-VN") : "-");
 
 export function EmailPage() {
@@ -47,6 +68,10 @@ export function EmailPage() {
   const [savingRule, setSavingRule] = useState(false);
   const [open, setOpen] = useState(false);
   const [ruleError, setRuleError] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const disconnectInFlight = useRef(false);
+  const [savingRuleIds, setSavingRuleIds] = useState<string[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
   const { result: connectionsResult, query: connectionsQuery } = useList<EmailConnection>({ resource: "email-connections", pagination: { mode: "off" } });
   const { result: rulesResult, query: { refetch: refetchRules } } = useList<ApiEmailListenRule>({ resource: "email-listen-rules", pagination: { mode: "off" } });
   const connections = toArray<EmailConnection>(connectionsResult?.data);
@@ -60,6 +85,15 @@ export function EmailPage() {
   const runs = toArray<SyncRun>(runsResult?.data);
   const { mutateAsync } = useCustomMutation();
   const { mutateAsync: createRule } = useCreate();
+  const { mutateAsync: updateRule } = useUpdate();
+
+  // The OAuth callback returns here with its outcome; show it once, then drop it from the address.
+  useEffect(() => {
+    const consent = consentOutcome(searchParams);
+    if (!consent) return;
+    setOutcome(consent);
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
   const state = firstConnection ? connectionState(firstConnection) : null;
 
   const connect = async () => {
@@ -91,6 +125,36 @@ export function EmailPage() {
       setSyncing(false);
       void connectionsQuery.refetch();
       void runsQuery.refetch();
+    }
+  };
+
+  // Disconnect erases the stored Gmail tokens; imported transactions are kept (DATA-002).
+  const disconnect = async () => {
+    if (!firstConnection || disconnectInFlight.current) return;
+    disconnectInFlight.current = true;
+    setDisconnecting(true);
+    try {
+      await mutateAsync({ url: `/email-connections/${firstConnection.id}`, method: "delete", values: {} });
+      setOutcome({ tone: "success", title: "Đã ngắt kết nối Gmail", detail: "Giao dịch đã nhập vẫn được giữ lại." });
+    } catch (error) {
+      setOutcome({ tone: "error", title: "Không thể ngắt kết nối Gmail", detail: describeApiError(error) });
+    } finally {
+      disconnectInFlight.current = false;
+      setDisconnecting(false);
+      void connectionsQuery.refetch();
+    }
+  };
+
+  const toggleRule = async (rule: ApiEmailListenRule, isEnabled: boolean) => {
+    if (savingRuleIds.includes(rule.id)) return;
+    setSavingRuleIds((ids) => [...ids, rule.id]);
+    try {
+      await updateRule({ resource: "email-listen-rules", id: rule.id, values: { isEnabled }, successNotification: false, errorNotification: false });
+    } catch (error) {
+      setOutcome({ tone: "error", title: "Không thể lưu rule", detail: describeApiError(error) });
+    } finally {
+      setSavingRuleIds((ids) => ids.filter((id) => id !== rule.id));
+      void refetchRules();
     }
   };
 
@@ -163,6 +227,17 @@ export function EmailPage() {
           {firstConnection?.errorMessage && <div className="mt-1 text-[11px] text-[var(--warn)]">{firstConnection.errorMessage}</div>}
         </div>
         {primaryAction()}
+        {firstConnection && (
+          <Popconfirm
+            title="Ngắt kết nối Gmail?"
+            description="CashLens xóa quyền truy cập đã lưu. Giao dịch đã nhập vẫn được giữ lại."
+            okText="Ngắt kết nối Gmail"
+            cancelText="Hủy"
+            onConfirm={() => void disconnect()}
+          >
+            <Button disabled={disconnecting}>{disconnecting ? "Đang ngắt kết nối..." : "Ngắt kết nối"}</Button>
+          </Popconfirm>
+        )}
       </div>
     );
   };
@@ -216,7 +291,7 @@ export function EmailPage() {
 
       <SectionHeading title="Rule lắng nghe" description="Chỉ email khớp rule mới được xử lý" action={<Button icon={<Icon name="plus" width={15} />} onClick={() => setOpen(true)}>Thêm rule</Button>} />
       <Card padding="p-0" className="overflow-hidden">
-        {rules.length ? <div className="divide-y divide-[var(--border)]">{rules.map((rule) => <div key={rule.id} className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-5"><span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[var(--surface-3)] text-[10.5px] font-bold">{rule.bank ?? "API"}</span><div className="min-w-[180px] flex-1"><div className="text-[12px] font-semibold">{rule.name}</div><div className="mt-0.5 truncate text-[10.5px] text-[var(--faint)]">{rule.senderEmail ?? rule.senderDomain ?? "Chưa cấu hình sender"}</div></div><div className="text-[10.5px] text-[var(--muted)]">{rule.lastMatchedAt ? new Date(rule.lastMatchedAt).toLocaleString("vi-VN") : "Chưa khớp"}</div><Switch defaultChecked={rule.isEnabled ?? false} /></div>)}</div> : <div className="p-8 text-center text-[12px] text-[var(--muted)]">Chưa có rule lắng nghe từ API.</div>}
+        {rules.length ? <div className="divide-y divide-[var(--border)]">{rules.map((rule) => <div key={rule.id} className="flex flex-wrap items-center gap-3 px-4 py-3.5 sm:px-5"><span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[var(--surface-3)] text-[10.5px] font-bold">{rule.bank ?? "API"}</span><div className="min-w-[180px] flex-1"><div className="text-[12px] font-semibold">{rule.name}</div><div className="mt-0.5 truncate text-[10.5px] text-[var(--faint)]">{rule.senderEmail ?? rule.senderDomain ?? "Chưa cấu hình sender"}</div></div><div className="text-[10.5px] text-[var(--muted)]">{rule.lastMatchedAt ? new Date(rule.lastMatchedAt).toLocaleString("vi-VN") : "Chưa khớp"}</div><Switch checked={rule.isEnabled ?? false} loading={savingRuleIds.includes(rule.id)} aria-label={`Bật rule ${rule.name}`} onChange={(checked) => void toggleRule(rule, checked)} /></div>)}</div> : <div className="p-8 text-center text-[12px] text-[var(--muted)]">Chưa có rule lắng nghe từ API.</div>}
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">

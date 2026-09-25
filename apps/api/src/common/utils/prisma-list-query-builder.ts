@@ -11,7 +11,17 @@ const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
 const DEFAULT_OPERATORS: Record<ListFieldConfig['type'], FilterOperator[]> = {
-  string: ['eq', 'ne', 'contains', 'startswith', 'endswith', 'in', 'nin', 'null', 'nnull'],
+  string: [
+    'eq',
+    'ne',
+    'contains',
+    'startswith',
+    'endswith',
+    'in',
+    'nin',
+    'null',
+    'nnull',
+  ],
   number: ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'nin', 'null', 'nnull'],
   date: ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'null', 'nnull'],
   boolean: ['eq', 'ne', 'null', 'nnull'],
@@ -52,7 +62,8 @@ function buildWhere(
   if (query.search?.trim()) {
     const search = query.search.trim();
     const searchableFields = Object.entries(config).filter(
-      ([, fieldConfig]) => fieldConfig.searchable && fieldConfig.type === 'string',
+      ([, fieldConfig]) =>
+        fieldConfig.searchable && fieldConfig.type === 'string',
     );
 
     if (searchableFields.length > 0) {
@@ -68,11 +79,19 @@ function buildWhere(
     const fieldConfig = getFieldConfig(config, filter.field);
 
     if (!fieldConfig.filterable) {
-      throw new BadRequestException(`Field "${filter.field}" is not filterable`);
+      throw new BadRequestException(
+        `Field "${filter.field}" is not filterable`,
+      );
     }
 
     validateOperator(filter.operator, fieldConfig, filter.field);
-    and.push({ [filter.field]: buildFilterValue(filter.operator, filter.value, fieldConfig) });
+    and.push({
+      [filter.field]: buildFilterValue(
+        filter.operator,
+        filter.value,
+        fieldConfig,
+      ),
+    });
   }
 
   return and.length > 0 ? { AND: and } : {};
@@ -93,7 +112,10 @@ function buildOrderBy(
   });
 }
 
-function getFieldConfig(config: ListQueryConfig, field: string): ListFieldConfig {
+function getFieldConfig(
+  config: ListQueryConfig,
+  field: string,
+): ListFieldConfig {
   const fieldConfig = config[field];
 
   if (!fieldConfig) {
@@ -108,7 +130,8 @@ function validateOperator(
   fieldConfig: ListFieldConfig,
   field: string,
 ) {
-  const allowedOperators = fieldConfig.operators ?? DEFAULT_OPERATORS[fieldConfig.type];
+  const allowedOperators =
+    fieldConfig.operators ?? DEFAULT_OPERATORS[fieldConfig.type];
 
   if (!allowedOperators.includes(operator)) {
     throw new BadRequestException(
@@ -128,11 +151,11 @@ function buildFilterValue(
     case 'ne':
       return { not: normalizeValue(value, fieldConfig) };
     case 'contains':
-      return { contains: String(value ?? ''), mode: 'insensitive' };
+      return { contains: scalarText(value), mode: 'insensitive' };
     case 'startswith':
-      return { startsWith: String(value ?? ''), mode: 'insensitive' };
+      return { startsWith: scalarText(value), mode: 'insensitive' };
     case 'endswith':
-      return { endsWith: String(value ?? ''), mode: 'insensitive' };
+      return { endsWith: scalarText(value), mode: 'insensitive' };
     case 'in':
       return { in: normalizeArray(value, fieldConfig) };
     case 'nin':
@@ -152,8 +175,32 @@ function buildFilterValue(
   }
 }
 
-function normalizeArray(value: unknown, fieldConfig: ListFieldConfig): unknown[] {
-  const values = Array.isArray(value) ? value : String(value ?? '').split(',');
+/**
+ * Text of a scalar filter value. An object or array is refused, rather than
+ * silently matched as the text "[object Object]".
+ */
+function scalarText(value: unknown): string {
+  if (value === undefined || value === null) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
+    return String(value);
+  }
+  throw new BadRequestException('Expected a text filter value');
+}
+
+function normalizeArray(
+  value: unknown,
+  fieldConfig: ListFieldConfig,
+): unknown[] {
+  const values = Array.isArray(value) ? value : scalarText(value).split(',');
   return values.map((item) => normalizeValue(item, fieldConfig));
 }
 
@@ -189,7 +236,7 @@ function normalizeValue(value: unknown, fieldConfig: ListFieldConfig): unknown {
   }
 
   if (fieldConfig.type === 'date') {
-    const date = new Date(String(value));
+    const date = new Date(scalarText(value));
 
     if (Number.isNaN(date.getTime())) {
       throw new BadRequestException('Expected a valid date filter value');
