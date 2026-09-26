@@ -1,4 +1,5 @@
-﻿import { ApiError } from "@/api/client";
+﻿import type { Transaction as ContractTransaction } from "@repo/api-contract";
+import { ApiError } from "@/api/client";
 import type { Alert, AlertSetting, AlertStatus, ApiAlert, ApiAlertSetting } from "@/types/alert";
 import type { ApiBudget, Budget } from "@/types/budget";
 import type { ApiGoal, Goal } from "@/types/goal";
@@ -53,29 +54,8 @@ export const mapTransaction = (item: TransactionPayload): Transaction => ({
 });
 
 /** The transaction fields of the API response that the web client reads. */
-export type TransactionPayload = {
-  id: string;
-  amount?: number | string | null;
-  currency?: string | null;
-  direction?: string | null;
-  status?: string | null;
-  isDuplicate?: boolean | null;
-  duplicateOfTransactionId?: string | null;
-  categoryId?: string | null;
-  category?: { name?: string | null; color?: string | null } | null;
-  classificationSource?: string | null;
-  classificationRuleId?: string | null;
-  classifiedAt?: string | null;
-  transactionTime?: string | null;
-  userNote?: string | null;
-  description?: string | null;
-  normalizedDescription?: string | null;
-  merchantName?: string | null;
-  counterpartyName?: string | null;
-  bankName?: string | null;
-  sourceType?: string | null;
-  account?: { institutionName?: string | null } | null;
-};
+/** A transaction as the API returns it: the API contract's `Transaction`. */
+export type TransactionPayload = ContractTransaction;
 
 /**
  * A persisted transaction with the state the list, detail drawer, and dashboard

@@ -9,7 +9,9 @@ OPS-001-OPS-009, AUTH-003, SEC-009, CFG-006, and SC-013:
 
   1. Secret scan (scripts/scan-secrets.ps1) and migration matrix
      (apps/api/test/scripts/verify-migrations.ps1, against a disposable
-     PostgreSQL container unless -MigrationAdminUrl is given).
+     PostgreSQL container unless -MigrationAdminUrl is given), and the API
+     contract chain (`yarn contract:check`: code -> swagger.json -> generated
+     @repo/api-contract types; a stale link fails the run).
   2. Compose configuration: API and web published on 127.0.0.1 only,
      PostgreSQL unpublished, pinned cashlens_net (172.28.0.0/24).
   3. Build, then `run --rm migrate` before the API starts.
@@ -277,7 +279,7 @@ function Get-ApiLogLines {
 # ---------------------------------------------------------------------------
 # Prerequisites and host classification
 # ---------------------------------------------------------------------------
-foreach ($tool in @('docker', 'git', 'node', $curl)) {
+foreach ($tool in @('docker', 'git', 'node', 'corepack', $curl)) {
   if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) { Exit-Prerequisite "$tool is not on PATH" }
 }
 & docker compose version *> $null
@@ -390,6 +392,15 @@ try {
   $evidence['migrations'] = & $hideUrlPassword ((($migrationOut | Where-Object { $_ -match '\b(PASS|FAIL)\b' } | ForEach-Object { ($_ -replace '\s{2,}', ' ').Trim() }) -join ' | '))
   Add-Result 'migration matrix (verify-migrations.ps1)' ($migrationExit -eq 0) ("exit $migrationExit")
   if ($migrationExit -ne 0) { $migrationOut | Select-Object -Last 20 | ForEach-Object { Write-Host "  $(& $hideUrlPassword $_)" } }
+
+  # The API contract chain: code -> apps/api/docs/swagger.json -> packages/api-contract types.
+  # Needs the host dependencies (yarn install --immutable), like the migration matrix.
+  Push-Location $repoRoot
+  try { $contractOut = & corepack yarn contract:check 2>&1 | ForEach-Object { "$_" }; $contractExit = $LASTEXITCODE }
+  finally { Pop-Location }
+  $evidence['apiContract'] = (($contractOut | Where-Object { $_ -match 'current|stale' }) -join ' | ')
+  Add-Result 'API contract current (yarn contract:check)' ($contractExit -eq 0) ("exit $contractExit")
+  if ($contractExit -ne 0) { $contractOut | Select-Object -Last 10 | ForEach-Object { Write-Host "  $_" } }
 
   # -------------------------------------------------------------------------
   # 2. Compose configuration (parsed in memory; it contains resolved secrets)

@@ -23,6 +23,7 @@ import {
   decisionColumns,
   manualDecision,
 } from './classification.service';
+import { TransactionListResponseDto } from './dto/transaction.response';
 import { TransactionsRepository } from './transactions.repository';
 
 /**
@@ -63,7 +64,10 @@ export class TransactionsService {
    * income, expense, and net of every row matching the same filters (not just
    * the page), under the same policy as the dashboard (TX-003).
    */
-  async list(user: RequestUser, query: ListTransactionsDto) {
+  async list(
+    user: RequestUser,
+    query: ListTransactionsDto,
+  ): Promise<TransactionListResponseDto> {
     if (query.month && (query.from || query.to)) {
       throw new BadRequestException([
         'month cannot be combined with from or to',

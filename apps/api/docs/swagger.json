@@ -725,7 +725,28 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Categories visible to the user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/TransactionCategory"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -757,7 +778,25 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Created category",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/TransactionCategory"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -790,7 +829,25 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Category",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/TransactionCategory"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -831,7 +888,25 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Updated category",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/TransactionCategory"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -1004,7 +1079,25 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "One page plus the matching eligible totals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/TransactionPage"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -1036,7 +1129,25 @@
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Created transaction",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Transaction"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -1069,7 +1180,25 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Owned transaction",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Transaction"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -1110,7 +1239,25 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Updated transaction",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Transaction"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -1304,7 +1451,25 @@
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Transaction with its duplicate state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Transaction"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -1337,7 +1502,25 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Ignored transaction",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/Transaction"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -3352,7 +3535,25 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Current user month totals",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/DashboardOverview"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -3396,7 +3597,28 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "One row per user month, oldest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CashflowMonth"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -3430,7 +3652,28 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Expense per category and currency",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CategoryBreakdownRow"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -3464,7 +3707,28 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "The five most recent eligible transactions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/Transaction"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -3498,7 +3762,28 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Budgets at or over their threshold",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/HotBudget"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -3532,7 +3817,28 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Deterministic, rule-based insights",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Envelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DashboardInsight"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "default": {
             "description": "Error (code, message, correlationId, and fields on validation errors)",
@@ -4178,6 +4484,136 @@
           }
         }
       },
+      "Envelope": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "description": "The response payload"
+          },
+          "message": {
+            "type": "string",
+            "example": "Success"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "correlationId": {
+            "type": "string",
+            "description": "Per-request id, also sent as the x-correlation-id header"
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "message",
+          "timestamp"
+        ]
+      },
+      "TransactionCategoryType": {
+        "type": "string",
+        "enum": [
+          "INCOME",
+          "EXPENSE",
+          "TRANSFER",
+          "NEUTRAL"
+        ]
+      },
+      "TransactionCategoryStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "ARCHIVED"
+        ]
+      },
+      "TransactionCategory": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string",
+            "nullable": true,
+            "description": "null for system categories"
+          },
+          "parentId": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransactionCategoryType"
+              }
+            ]
+          },
+          "icon": {
+            "type": "string",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true
+          },
+          "isSystem": {
+            "type": "boolean"
+          },
+          "excludeFromBudget": {
+            "type": "boolean"
+          },
+          "excludeFromAnalytics": {
+            "type": "boolean",
+            "description": "Never shown in analytics breakdowns"
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransactionCategoryStatus"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "parentId",
+          "name",
+          "slug",
+          "type",
+          "icon",
+          "color",
+          "isSystem",
+          "excludeFromBudget",
+          "excludeFromAnalytics",
+          "sortOrder",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "CreateTransactionCategoryDto": {
         "type": "object",
         "properties": {
@@ -4237,6 +4673,485 @@
         },
         "required": [
           "categoryId"
+        ]
+      },
+      "TransactionSourceType": {
+        "type": "string",
+        "enum": [
+          "EMAIL",
+          "MANUAL",
+          "CSV",
+          "SMS",
+          "API"
+        ]
+      },
+      "TransactionDirection": {
+        "type": "string",
+        "enum": [
+          "INCOME",
+          "EXPENSE",
+          "TRANSFER_IN",
+          "TRANSFER_OUT",
+          "ADJUSTMENT"
+        ]
+      },
+      "TransactionStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "POSTED",
+          "IGNORED",
+          "DELETED",
+          "NEEDS_REVIEW"
+        ]
+      },
+      "ClassificationSource": {
+        "type": "string",
+        "enum": [
+          "RULE",
+          "ML",
+          "LLM",
+          "MANUAL",
+          "SYSTEM",
+          "UNKNOWN",
+          "USER_RULE",
+          "SYSTEM_RULE",
+          "FALLBACK"
+        ]
+      },
+      "AccountType": {
+        "type": "string",
+        "enum": [
+          "BANK_ACCOUNT",
+          "CHECKING",
+          "SAVINGS",
+          "CREDIT_CARD",
+          "CASH",
+          "E_WALLET",
+          "INVESTMENT",
+          "OTHER"
+        ]
+      },
+      "AccountStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "INACTIVE",
+          "ARCHIVED",
+          "CLOSED"
+        ]
+      },
+      "TransactionAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "bankProviderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "institutionName": {
+            "type": "string",
+            "nullable": true
+          },
+          "accountMask": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AccountType"
+              }
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "openingBalance": {
+            "type": "string",
+            "description": "Decimal string, e.g. \"1250000.00\""
+          },
+          "currentBalance": {
+            "type": "string",
+            "nullable": true,
+            "description": "Decimal string"
+          },
+          "creditLimit": {
+            "type": "string",
+            "nullable": true,
+            "description": "Decimal string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AccountStatus"
+              }
+            ]
+          },
+          "balanceUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastSyncedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "bankProviderId",
+          "name",
+          "institutionName",
+          "accountMask",
+          "type",
+          "currency",
+          "openingBalance",
+          "currentBalance",
+          "creditLimit",
+          "isDefault",
+          "status",
+          "balanceUpdatedAt",
+          "lastSyncedAt",
+          "metadata",
+          "createdAt",
+          "updatedAt",
+          "deletedAt"
+        ]
+      },
+      "Transaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "string"
+          },
+          "rawEmailId": {
+            "type": "string",
+            "nullable": true
+          },
+          "emailMessageId": {
+            "type": "string",
+            "nullable": true
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "financialAccountId": {
+            "type": "string",
+            "nullable": true
+          },
+          "bankProviderId": {
+            "type": "string",
+            "nullable": true
+          },
+          "bankName": {
+            "type": "string",
+            "nullable": true
+          },
+          "merchantName": {
+            "type": "string",
+            "nullable": true
+          },
+          "counterpartyName": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransactionSourceType"
+              }
+            ]
+          },
+          "sourceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "externalTransactionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "transactionCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "direction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransactionDirection"
+              }
+            ]
+          },
+          "transactionTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "postedDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "normalizedDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "balanceAfter": {
+            "type": "number",
+            "nullable": true
+          },
+          "feeAmount": {
+            "type": "number",
+            "nullable": true
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransactionStatus"
+              }
+            ]
+          },
+          "isDuplicate": {
+            "type": "boolean"
+          },
+          "duplicateOfTransactionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "classificationSource": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ClassificationSource"
+              }
+            ]
+          },
+          "classificationConfidence": {
+            "type": "number",
+            "nullable": true
+          },
+          "classificationRuleId": {
+            "type": "string",
+            "nullable": true
+          },
+          "classifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "userNote": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "account": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransactionAccount"
+              }
+            ]
+          },
+          "category": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransactionCategory"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "rawEmailId",
+          "emailMessageId",
+          "categoryId",
+          "financialAccountId",
+          "bankProviderId",
+          "bankName",
+          "merchantName",
+          "counterpartyName",
+          "sourceType",
+          "sourceId",
+          "externalTransactionId",
+          "transactionCode",
+          "amount",
+          "currency",
+          "direction",
+          "transactionTime",
+          "postedDate",
+          "description",
+          "normalizedDescription",
+          "balanceAfter",
+          "feeAmount",
+          "status",
+          "isDuplicate",
+          "duplicateOfTransactionId",
+          "classificationSource",
+          "classificationConfidence",
+          "classificationRuleId",
+          "classifiedAt",
+          "userNote",
+          "metadata",
+          "account",
+          "category",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CurrencyTotals": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "income": {
+            "type": "number"
+          },
+          "expense": {
+            "type": "number"
+          },
+          "netCashflow": {
+            "type": "number"
+          },
+          "transactionCount": {
+            "type": "number",
+            "description": "Eligible records of every direction, transfers included"
+          }
+        },
+        "required": [
+          "currency",
+          "income",
+          "expense",
+          "netCashflow",
+          "transactionCount"
+        ]
+      },
+      "TotalsSummary": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "income": {
+            "type": "number"
+          },
+          "expense": {
+            "type": "number"
+          },
+          "netCashflow": {
+            "type": "number"
+          },
+          "transactionCount": {
+            "type": "number",
+            "description": "Eligible records of every direction, transfers included"
+          },
+          "currencies": {
+            "description": "Every currency group, sorted by code; empty when nothing is eligible",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CurrencyTotals"
+            }
+          }
+        },
+        "required": [
+          "currency",
+          "income",
+          "expense",
+          "netCashflow",
+          "transactionCount",
+          "currencies"
+        ]
+      },
+      "TransactionPage": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            }
+          },
+          "total": {
+            "type": "number",
+            "minimum": 0
+          },
+          "page": {
+            "type": "number",
+            "minimum": 1
+          },
+          "limit": {
+            "type": "number",
+            "minimum": 1
+          },
+          "totals": {
+            "$ref": "#/components/schemas/TotalsSummary"
+          }
+        },
+        "required": [
+          "data",
+          "total",
+          "page",
+          "limit",
+          "totals"
         ]
       },
       "CreateTransactionDto": {
@@ -4489,37 +5404,6 @@
             "type": "boolean"
           }
         }
-      },
-      "Envelope": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "example": true
-          },
-          "data": {
-            "type": "object",
-            "description": "The response payload"
-          },
-          "message": {
-            "type": "string",
-            "example": "Success"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "correlationId": {
-            "type": "string",
-            "description": "Per-request id, also sent as the x-correlation-id header"
-          }
-        },
-        "required": [
-          "success",
-          "data",
-          "message",
-          "timestamp"
-        ]
       },
       "AlertType": {
         "type": "string",
@@ -5844,6 +6728,219 @@
         },
         "required": [
           "amount"
+        ]
+      },
+      "DashboardOverview": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "income": {
+            "type": "number"
+          },
+          "expense": {
+            "type": "number"
+          },
+          "netCashflow": {
+            "type": "number"
+          },
+          "transactionCount": {
+            "type": "number",
+            "description": "Eligible records of every direction, transfers included"
+          },
+          "currencies": {
+            "description": "Every currency group, sorted by code; empty when nothing is eligible",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CurrencyTotals"
+            }
+          },
+          "month": {
+            "type": "string",
+            "description": "The user month, YYYY-MM",
+            "example": "2026-09"
+          },
+          "savingRate": {
+            "type": "number",
+            "description": "Base-currency net / income × 100, rounded half up to a whole percent; 0 without income"
+          },
+          "unreadAlerts": {
+            "type": "number",
+            "description": "Unread CRITICAL alerts"
+          },
+          "periodStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "periodEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timeZone": {
+            "type": "string",
+            "description": "The account IANA time zone"
+          }
+        },
+        "required": [
+          "currency",
+          "income",
+          "expense",
+          "netCashflow",
+          "transactionCount",
+          "currencies",
+          "month",
+          "savingRate",
+          "unreadAlerts",
+          "periodStart",
+          "periodEnd",
+          "timeZone"
+        ]
+      },
+      "CashflowMonth": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "description": "The user month, YYYY-MM"
+          },
+          "currency": {
+            "type": "string",
+            "description": "The base currency"
+          },
+          "income": {
+            "type": "number"
+          },
+          "expense": {
+            "type": "number"
+          },
+          "netCashflow": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "month",
+          "currency",
+          "income",
+          "expense",
+          "netCashflow"
+        ]
+      },
+      "CategoryBreakdownRow": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "nullable": true,
+            "description": "null groups uncategorized records"
+          },
+          "category": {
+            "nullable": true,
+            "description": "Categories flagged excludeFromAnalytics never appear",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransactionCategory"
+              }
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "categoryId",
+          "category",
+          "currency",
+          "amount",
+          "count"
+        ]
+      },
+      "HotBudget": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "spent": {
+            "type": "number"
+          },
+          "remaining": {
+            "type": "number",
+            "minimum": 0
+          },
+          "percentUsed": {
+            "type": "number",
+            "minimum": 0
+          },
+          "thresholdPercent": {
+            "type": "number"
+          },
+          "category": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TransactionCategory"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "categoryId",
+          "name",
+          "currency",
+          "amount",
+          "spent",
+          "remaining",
+          "percentUsed",
+          "thresholdPercent",
+          "category"
+        ]
+      },
+      "DashboardInsight": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "POSITIVE_CASHFLOW, NEGATIVE_CASHFLOW, or HOT_BUDGET"
+          },
+          "severity": {
+            "type": "string",
+            "description": "INFO, WARNING, or CRITICAL"
+          },
+          "title": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "severity",
+          "title",
+          "message"
         ]
       },
       "Error": {

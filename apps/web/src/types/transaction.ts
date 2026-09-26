@@ -1,3 +1,5 @@
+import type { TransactionCategory as ContractTransactionCategory } from "@repo/api-contract";
+
 export interface Category {
   id: string;
   name: string;
@@ -5,13 +7,8 @@ export interface Category {
   color: string;
 }
 
-/** A transaction category as the API returns it (`GET /transaction-categories`). */
-export interface ApiCategory {
-  id: string;
-  name: string;
-  type?: string | null;
-  color?: string | null;
-}
+/** A transaction category as the API returns it (`GET /transaction-categories`): the API contract's type. */
+export type ApiCategory = ContractTransactionCategory;
 
 export interface Transaction {
   id: string;

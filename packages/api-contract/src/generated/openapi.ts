@@ -1047,6 +1047,10 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        AccountStatus: "ACTIVE" | "INACTIVE" | "ARCHIVED" | "CLOSED";
+        /** @enum {string} */
+        AccountType: "BANK_ACCOUNT" | "CHECKING" | "SAVINGS" | "CREDIT_CARD" | "CASH" | "E_WALLET" | "INVESTMENT" | "OTHER";
         AdminUserResponseDto: {
             baseCurrency: string;
             /** Format: date-time */
@@ -1142,6 +1146,26 @@ export interface components {
         AuthResponseDto: {
             user: components["schemas"]["UserResponseDto"];
         };
+        CashflowMonth: {
+            /** @description The base currency */
+            currency: string;
+            expense: number;
+            income: number;
+            /** @description The user month, YYYY-MM */
+            month: string;
+            netCashflow: number;
+        };
+        CategoryBreakdownRow: {
+            amount: number;
+            /** @description Categories flagged excludeFromAnalytics never appear */
+            category: components["schemas"]["TransactionCategory"] | null;
+            /** @description null groups uncategorized records */
+            categoryId: string | null;
+            count: number;
+            currency: string;
+        };
+        /** @enum {string} */
+        ClassificationSource: "RULE" | "ML" | "LLM" | "MANUAL" | "SYSTEM" | "UNKNOWN" | "USER_RULE" | "SYSTEM_RULE" | "FALLBACK";
         CreateAlertDto: {
             message: string;
             metadata?: Record<string, never>;
@@ -1285,6 +1309,47 @@ export interface components {
             /** @enum {string} */
             status?: "ACTIVE" | "DISABLED" | "PENDING_DELETE";
             timezone?: string;
+        };
+        CurrencyTotals: {
+            currency: string;
+            expense: number;
+            income: number;
+            netCashflow: number;
+            /** @description Eligible records of every direction, transfers included */
+            transactionCount: number;
+        };
+        DashboardInsight: {
+            message: string;
+            /** @description INFO, WARNING, or CRITICAL */
+            severity: string;
+            title: string;
+            /** @description POSITIVE_CASHFLOW, NEGATIVE_CASHFLOW, or HOT_BUDGET */
+            type: string;
+        };
+        DashboardOverview: {
+            /** @description Every currency group, sorted by code; empty when nothing is eligible */
+            currencies: components["schemas"]["CurrencyTotals"][];
+            currency: string;
+            expense: number;
+            income: number;
+            /**
+             * @description The user month, YYYY-MM
+             * @example 2026-09
+             */
+            month: string;
+            netCashflow: number;
+            /** Format: date-time */
+            periodEnd: string;
+            /** Format: date-time */
+            periodStart: string;
+            /** @description Base-currency net / income × 100, rounded half up to a whole percent; 0 without income */
+            savingRate: number;
+            /** @description The account IANA time zone */
+            timeZone: string;
+            /** @description Eligible records of every direction, transfers included */
+            transactionCount: number;
+            /** @description Unread CRITICAL alerts */
+            unreadAlerts: number;
         };
         EmailConnection: {
             /** Format: date-time */
@@ -1439,6 +1504,18 @@ export interface components {
         GoalScenarioType: "FULL" | "INSTALLMENT";
         /** @enum {string} */
         GoalStatus: "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED";
+        HotBudget: {
+            amount: number;
+            category: components["schemas"]["TransactionCategory"] | null;
+            categoryId: string | null;
+            currency: string;
+            id: string;
+            name: string;
+            percentUsed: number;
+            remaining: number;
+            spent: number;
+            thresholdPercent: number;
+        };
         ListFilterDto: {
             field: string;
             /** @enum {string} */
@@ -1488,6 +1565,130 @@ export interface components {
             password: string;
             timezone?: string;
         };
+        TotalsSummary: {
+            /** @description Every currency group, sorted by code; empty when nothing is eligible */
+            currencies: components["schemas"]["CurrencyTotals"][];
+            currency: string;
+            expense: number;
+            income: number;
+            netCashflow: number;
+            /** @description Eligible records of every direction, transfers included */
+            transactionCount: number;
+        };
+        Transaction: {
+            account: components["schemas"]["TransactionAccount"] | null;
+            amount: number;
+            balanceAfter: number | null;
+            bankName: string | null;
+            bankProviderId: string | null;
+            category: components["schemas"]["TransactionCategory"] | null;
+            categoryId: string | null;
+            classificationConfidence: number | null;
+            classificationRuleId: string | null;
+            classificationSource: components["schemas"]["ClassificationSource"];
+            /** Format: date-time */
+            classifiedAt: string | null;
+            counterpartyName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            currency: string;
+            description: string | null;
+            direction: components["schemas"]["TransactionDirection"];
+            duplicateOfTransactionId: string | null;
+            emailMessageId: string | null;
+            externalTransactionId: string | null;
+            feeAmount: number | null;
+            financialAccountId: string | null;
+            id: string;
+            isDuplicate: boolean;
+            merchantName: string | null;
+            metadata: {
+                [key: string]: unknown;
+            } | null;
+            normalizedDescription: string | null;
+            /** Format: date-time */
+            postedDate: string | null;
+            rawEmailId: string | null;
+            sourceId: string | null;
+            sourceType: components["schemas"]["TransactionSourceType"];
+            status: components["schemas"]["TransactionStatus"];
+            transactionCode: string | null;
+            /** Format: date-time */
+            transactionTime: string;
+            /** Format: date-time */
+            updatedAt: string;
+            userId: string;
+            userNote: string | null;
+        };
+        TransactionAccount: {
+            accountMask: string | null;
+            /** Format: date-time */
+            balanceUpdatedAt: string | null;
+            bankProviderId: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description Decimal string */
+            creditLimit: string | null;
+            currency: string;
+            /** @description Decimal string */
+            currentBalance: string | null;
+            /** Format: date-time */
+            deletedAt: string | null;
+            id: string;
+            institutionName: string | null;
+            isDefault: boolean;
+            /** Format: date-time */
+            lastSyncedAt: string | null;
+            metadata: {
+                [key: string]: unknown;
+            } | null;
+            name: string;
+            /** @description Decimal string, e.g. "1250000.00" */
+            openingBalance: string;
+            status: components["schemas"]["AccountStatus"];
+            type: components["schemas"]["AccountType"];
+            /** Format: date-time */
+            updatedAt: string;
+            userId: string;
+        };
+        TransactionCategory: {
+            color: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description Never shown in analytics breakdowns */
+            excludeFromAnalytics: boolean;
+            excludeFromBudget: boolean;
+            icon: string | null;
+            id: string;
+            isSystem: boolean;
+            name: string;
+            parentId: string | null;
+            slug: string;
+            sortOrder: number;
+            status: components["schemas"]["TransactionCategoryStatus"];
+            type: components["schemas"]["TransactionCategoryType"];
+            /** Format: date-time */
+            updatedAt: string;
+            /** @description null for system categories */
+            userId: string | null;
+        };
+        /** @enum {string} */
+        TransactionCategoryStatus: "ACTIVE" | "ARCHIVED";
+        /** @enum {string} */
+        TransactionCategoryType: "INCOME" | "EXPENSE" | "TRANSFER" | "NEUTRAL";
+        /** @enum {string} */
+        TransactionDirection: "INCOME" | "EXPENSE" | "TRANSFER_IN" | "TRANSFER_OUT" | "ADJUSTMENT";
+        TransactionPage: {
+            data: components["schemas"]["Transaction"][];
+            limit: number;
+            page: number;
+            total: number;
+            totals: components["schemas"]["TotalsSummary"];
+        };
+        /** @enum {string} */
+        TransactionSourceType: "EMAIL" | "MANUAL" | "CSV" | "SMS" | "API";
+        /** @enum {string} */
+        TransactionStatus: "PENDING" | "POSTED" | "IGNORED" | "DELETED" | "NEEDS_REVIEW";
         UpdateAlertSettingDto: {
             emailEnabled?: boolean;
             inAppEnabled?: boolean;
@@ -2590,11 +2791,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description One row per user month, oldest first */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["CashflowMonth"][];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -2619,11 +2825,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Expense per category and currency */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["CategoryBreakdownRow"][];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -2648,11 +2859,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Budgets at or over their threshold */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["HotBudget"][];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -2677,11 +2893,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Deterministic, rule-based insights */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["DashboardInsight"][];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -2706,11 +2927,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Current user month totals */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["DashboardOverview"];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -2735,11 +2961,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description The five most recent eligible transactions */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Transaction"][];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -3679,11 +3910,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Categories visible to the user */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["TransactionCategory"][];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -3709,11 +3945,16 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Created category */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["TransactionCategory"];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -3737,11 +3978,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Category */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["TransactionCategory"];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -3797,11 +4043,16 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Updated category */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["TransactionCategory"];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -3838,11 +4089,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description One page plus the matching eligible totals */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["TransactionPage"];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -3868,11 +4124,16 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Created transaction */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Transaction"];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -3896,11 +4157,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Owned transaction */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Transaction"];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -3956,11 +4222,16 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Updated transaction */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Transaction"];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -4048,11 +4319,16 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Transaction with its duplicate state */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Transaction"];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {
@@ -4076,11 +4352,16 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
+            /** @description Ignored transaction */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Envelope"] & {
+                        data?: components["schemas"]["Transaction"];
+                    };
+                };
             };
             /** @description Error (code, message, correlationId, and fields on validation errors) */
             default: {

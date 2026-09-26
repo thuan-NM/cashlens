@@ -9,12 +9,17 @@ Nest API (controllers + response DTOs, each mapper returns its DTO)
   → src/index.ts aliases                       → apps/web (import type … from "@repo/api-contract")
 ```
 
+**Two OpenAPI artifacts, two roles.**
+- `apps/api/docs/swagger.json` is generated from the running code (controllers + response DTOs). It is the **only** source of these types.
+- `specs/001-operational-mvp/contracts/openapi.yaml` is the feature's hand-written **specification contract**. Release evidence compares `swagger.json` against it (operations and schema fields). It is never used to generate code, and this package never reads it.
+- The API owns its response DTOs and never imports this package; the web app imports only types from it.
+
 **Generated output is committed.** It is deterministic (LF, alphabetized, no timestamps), so reviewers see contract changes in the diff and nothing is generated at install time.
 
 **Staleness guards**
 - `yarn workspace @repo/api-contract check-types` (also run by the root `yarn check-types`) fails when `src/generated/openapi.ts` differs from what `swagger.json` produces.
 - `apps/api/src/swagger.spec.ts` fails when a contract response schema disappears from the committed `swagger.json`.
-- `yarn workspace api swagger:check` fails when `swagger.json` differs from what the code generates. The root `yarn contract:check` runs both checks.
+- `yarn workspace api swagger:check` fails when `swagger.json` differs from what the code generates. The root `yarn contract:check` runs both checks. It is mandatory: it is part of the root `yarn quality` gate and a failing check of `scripts/verify-release.ps1`.
 - The web and this package reject imports of API sources, Prisma, or NestJS (ESLint `no-restricted-imports`, pinned by `apps/web/src/test/import-boundary.test.ts`).
 
 **Rules**

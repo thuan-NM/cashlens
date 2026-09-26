@@ -36,5 +36,21 @@ export type EmailSyncStatus = Schemas["EmailSyncStatus"];
 export type Goal = Schemas["Goal"];
 export type GoalFeasibility = Schemas["GoalFeasibility"];
 
+export type Transaction = Schemas["Transaction"];
+/** The financial account embedded in a transaction (serialized entity: money as decimal strings). */
+export type TransactionAccount = Schemas["TransactionAccount"];
+export type TransactionCategory = Schemas["TransactionCategory"];
+/** `GET /transactions`: one page plus the eligible totals of the matching rows. */
+export type TransactionPage = Schemas["TransactionPage"];
+export type TotalsSummary = Schemas["TotalsSummary"];
+export type CurrencyTotals = Schemas["CurrencyTotals"];
+
+export type DashboardOverview = Schemas["DashboardOverview"];
+export type CashflowMonth = Schemas["CashflowMonth"];
+export type CategoryBreakdownRow = Schemas["CategoryBreakdownRow"];
+export type HotBudget = Schemas["HotBudget"];
+/** A deterministic, rule-based dashboard insight (not an AI-generated one). */
+export type DashboardInsight = Schemas["DashboardInsight"];
+
 export type User = Schemas["UserResponseDto"];
 export type UserSettings = Schemas["UserSettingsResponseDto"];

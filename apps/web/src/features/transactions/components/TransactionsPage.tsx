@@ -1,3 +1,4 @@
+import type { DashboardOverview, TransactionCategory, TransactionPage } from "@repo/api-contract";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, App as AntdApp, Drawer, Form, Input, Modal, Pagination, Popconfirm, Segmented, Select, Skeleton } from "antd";
 import { type HttpError, useCustom, useCustomMutation, useList } from "@refinedev/core";
@@ -26,11 +27,10 @@ const CREATE_FIELDS = ["amount", "direction", "description", "categoryId"] as co
 /** The API message of a 404 about the transaction itself, not a related category, account, or original. */
 const TRANSACTION_NOT_FOUND = "Transaction not found";
 
-type CurrencyTotals = { currency: string; income: number; expense: number; netCashflow: number; transactionCount: number };
-type TotalsSummary = CurrencyTotals & { currencies: CurrencyTotals[] };
-type TransactionListResponse = { data: TransactionPayload[]; total: number; page: number; limit: number; totals: TotalsSummary };
-type CategoryPayload = { id: string; name: string; type?: string | null; color?: string | null };
-type OverviewResponse = { month: string; currency: string; periodStart: string; periodEnd: string; timeZone?: string | null };
+// API responses, from the API contract.
+type TransactionListResponse = TransactionPage;
+type CategoryPayload = TransactionCategory;
+type OverviewResponse = Pick<DashboardOverview, "month" | "currency" | "periodStart" | "periodEnd" | "timeZone">;
 type MutationValues = Record<string, unknown> | undefined;
 type CreateValues = { direction: string; amount: string; description?: string; categoryId?: string };
 

@@ -81,6 +81,27 @@ const REQUIRED: Record<string, string[]> = {
     'reconnectRequired',
     'syncInProgress',
   ],
+  // Refactor wave 2: transactions, categories, dashboard.
+  Transaction: [
+    'id',
+    'amount',
+    'currency',
+    'direction',
+    'transactionTime',
+    'status',
+    'classificationSource',
+    'account',
+    'category',
+  ],
+  TransactionAccount: ['id', 'name', 'openingBalance', 'deletedAt'],
+  TransactionCategory: ['id', 'name', 'type', 'excludeFromAnalytics'],
+  TransactionPage: ['data', 'total', 'page', 'limit', 'totals'],
+  TotalsSummary: ['currency', 'income', 'expense', 'currencies'],
+  DashboardOverview: ['month', 'savingRate', 'unreadAlerts', 'timeZone'],
+  CashflowMonth: ['month', 'currency', 'income', 'expense', 'netCashflow'],
+  CategoryBreakdownRow: ['categoryId', 'category', 'amount', 'count'],
+  HotBudget: ['id', 'amount', 'spent', 'percentUsed', 'category'],
+  DashboardInsight: ['type', 'severity', 'title', 'message'],
   Goal: [
     'id',
     'name',
@@ -155,6 +176,19 @@ describe('OpenAPI response schemas', () => {
     expect(
       enveloped(document, '/api/alerts/{id}/dismiss', 'patch', '200').$ref,
     ).toBe(ref('Alert'));
+    expect(enveloped(document, '/api/transactions', 'get', '200').$ref).toBe(
+      ref('TransactionPage'),
+    );
+    expect(
+      enveloped(document, '/api/dashboard/overview', 'get', '200').$ref,
+    ).toBe(ref('DashboardOverview'));
+    expect(
+      enveloped(document, '/api/dashboard/insights', 'get', '200').items?.$ref,
+    ).toBe(ref('DashboardInsight'));
+    expect(
+      enveloped(document, '/api/transaction-categories', 'get', '200').items
+        ?.$ref,
+    ).toBe(ref('TransactionCategory'));
   });
 
   it('documents the Error body as the default response of every operation', () => {
